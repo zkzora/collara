@@ -1,0 +1,115 @@
+
+Collara
+Privacy-Preserving Collateral Infrastructure for Real-World Assets
+1. Overview
+Collara adalah infrastruktur digital berbasis Canton Network yang memungkinkan perusahaan mengubah aset fisik bernilai tinggi menjadi verified digital collateral identity yang dapat digunakan oleh institusi keuangan untuk proses pembiayaan.
+Collara bukan marketplace pinjaman dan bukan sekadar platform tokenisasi aset. Collara berfungsi sebagai trust layer yang menghubungkan pemilik aset, verifier, lender, dan auditor dalam workflow yang aman, transparan, dan berbasis kontrol akses.
+2. Problem Statement
+Perusahaan industri memiliki aset bernilai tinggi seperti mesin manufaktur, alat berat, kendaraan komersial, equipment energi, dan medical equipment.
+Namun proses penggunaan aset sebagai collateral masih menghadapi masalah:
+- Data aset tersebar di banyak pihak.
+- Verifikasi membutuhkan waktu lama.
+- Risiko fraud dan dokumen tidak valid.
+- Tidak ada shared trust antar organisasi.
+3. Solution Overview
+Collara membuat Digital Collateral Passport untuk setiap aset.
+Passport berisi:
+- Asset identity
+- Ownership record
+- Maintenance history
+- Verification status
+- Insurance status
+- Collateral eligibility
+Tujuannya adalah membuat aset fisik menjadi aset digital yang dapat dipercaya untuk kebutuhan pembiayaan.
+4. Why Canton Network
+Collara membutuhkan teknologi yang mendukung:
+Privacy-Preserving Data Sharing:
+Setiap pihak hanya melihat data sesuai hak akses.
+Trusted Multi-Party Workflow:
+Pemilik aset, verifier, bank, dan auditor dapat berkolaborasi tanpa membuka seluruh data internal.
+Institutional Compatibility:
+Mendukung permissioned access, auditability, dan compliance workflow.
+5. User Roles
+Asset Owner:
+- Register asset
+- Update asset status
+- Request verification
+Asset Verifier:
+- Validate ownership
+- Verify asset condition
+- Submit verification report
+Financial Institution:
+- Review collateral passport
+- Assess financing eligibility
+- Approve financing
+Auditor:
+- Review history
+- Generate compliance report
+6. End-to-End Workflow
+Step 1: Asset Registration
+Perusahaan membuat digital collateral passport.
+Step 2: Verification
+Verifier memvalidasi kepemilikan dan kondisi aset.
+Step 3: Collateral Assessment
+Bank melakukan evaluasi berdasarkan data terpercaya.
+Step 4: Financing Decision
+Bank memberikan keputusan pembiayaan.
+Step 5: Lifecycle Update
+Setiap perubahan aset dicatat.
+Step 6: Audit Reporting
+Auditor dapat memeriksa seluruh riwayat.
+7. MVP Scope
+Use case:
+Equipment Financing
+Features:
+- Asset Registry
+- Verification Workflow
+- Collateral Dashboard
+- Status Update
+- Audit Report
+8. Technical Architecture
+Frontend:
+Dashboard untuk owner, bank, dan auditor.
+Backend:
+Workflow engine, user management, API.
+Canton Layer:
+Smart contract untuk asset creation, ownership state, verification state, dan collateral status.
+Data Layer:
+Asset metadata, permissions, dan event history.
+9. Smart Contract Objects
+Asset Contract:
+Menyimpan identitas aset.
+Verification Contract:
+Menyimpan proses validasi aset.
+Collateral Contract:
+Menyimpan status kelayakan aset sebagai jaminan.
+10. Business Model
+Target customers:
+- Commercial banks
+- Equipment financing companies
+- Industrial enterprises
+- Insurance companies
+- Auditors
+Revenue:
+Enterprise subscription dan transaction fee.
+11. Competitive Positioning
+Asset Registry:
+Collara menambahkan collateral readiness.
+ERP Asset Management:
+Collara menyediakan trust layer antar organisasi.
+RWA Tokenization:
+Collara fokus pada financing workflow.
+Loan Marketplace:
+Collara fokus pada asset verification.
+12. Hackathon Demo Scenario
+Manufacturing company membutuhkan pembiayaan.
+Workflow:
+Company registers asset.
+Verifier validates asset.
+Bank reviews passport.
+Bank approves financing.
+Auditor generates report.
+13. One Sentence Pitch
+Collara transforms physical business assets into trusted, privacy-preserving digital collateral identities, enabling faster institutional financing through Canton Network.
+14. Vision
+Collara menjadi trust infrastructure yang menghubungkan real-world assets dengan institutional finance.

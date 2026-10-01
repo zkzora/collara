@@ -1,0 +1,22 @@
+
+Collara Website Content Specification
+Homepage
+CollaraPrivacy-Preserving Collateral Infrastructure for Real-World AssetsCollara membantu perusahaan mengubah aset fisik menjadi digital collateral identity yang terpercaya untuk mempercepat akses pembiayaan institusi.
+Problem Section
+Aset bernilai tinggi masih sulit digunakan sebagai collateral karena data tersebar, proses verifikasi manual, dan tidak adanya shared trust antar organisasi.Collara menyelesaikan masalah tersebut dengan menyediakan workflow digital yang aman dan dapat diaudit.
+Solution Section
+Cara kerja Collara:1. Register AssetPerusahaan membuat identitas digital aset.2. Verify AssetPihak independen melakukan validasi.3. Assess CollateralBank mengevaluasi kelayakan.4. Enable FinancingPembiayaan dilakukan berdasarkan data terpercaya.5. Audit LifecycleSeluruh aktivitas dapat ditelusuri.
+Canton Advantage
+Privacy:Data hanya diberikan kepada pihak yang memiliki izin.Trust:Semua pihak menggunakan sumber data yang sama.Auditability:Setiap perubahan tercatat dalam lifecycle aset.
+Use Case Section
+Industrial Equipment FinancingContoh aset:- Mesin manufaktur- Alat berat- Equipment energi- Kendaraan komersialPihak:Asset OwnerVerifierBankAuditor
+Asset Owner Dashboard Content
+Menu:- My Assets- Register Asset- Verification Request- Financing Request- Asset HistoryFitur:Mendaftarkan aset dan melihat status collateral.
+Verifier Dashboard Content
+Menu:- Pending Verification- Inspection- Approved Assets- ReportsFitur:Melakukan validasi dan memberikan approval.
+Bank Dashboard Content
+Menu:- Collateral Review- Eligible Assets- Financing StatusFitur:Melihat informasi collateral dan mengambil keputusan pembiayaan.
+Auditor Dashboard Content
+Menu:- Audit Trail- Compliance Report- HistoryFitur:Melihat seluruh perubahan aset dan menghasilkan laporan.
+Contact Section
+Request PilotCollara terbuka untuk kolaborasi dengan perusahaan, bank, dan institusi yang ingin mengembangkan workflow asset financing berbasis Canton Network.

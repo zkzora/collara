@@ -1,0 +1,18 @@
+
+Collara State Transition Design
+Asset Creation State
+Actor:Asset OwnerAction:Perusahaan membuat aset baru dalam Collara.Input:Informasi aset dan dokumen kepemilikan.Output:AssetPassport contract dibuat dengan status CREATED.
+Verification Requested State
+Actor:Asset OwnerAction:Pemilik meminta validasi aset.Output:Verification Contract dibuat dan diberikan kepada verifier.
+Asset Verified State
+Actor:VerifierAction:Melakukan pemeriksaan aset.Pemeriksaan:- Kepemilikan- Kondisi- Dokumen- MaintenanceOutput:Status aset berubah menjadi VERIFIED.
+Collateral Assessment State
+Actor:Bank atau Financial InstitutionAction:Melakukan evaluasi collateral.Parameter:- Nilai aset- Risiko- Status verifikasi- KepemilikanOutput:Eligible atau Rejected.
+Financing Active State
+Actor:Financial InstitutionAction:Menyetujui pembiayaan.Output:Financing Contract aktif dan aset terhubung sebagai collateral.
+Asset Update State
+Actor:Authorized OwnerAction:Mengubah informasi:- Maintenance- Insurance- Location- ConditionOutput:History aset bertambah.
+Ownership Transfer State
+Actor:Current Owner dan New OwnerAction:Transfer kepemilikan.Output:Owner berubah, seluruh histori tetap tersimpan.
+Archive State
+Actor:Owner atau administrator.Action:Menutup lifecycle aset.Output:Aset menjadi archived dan tidak dapat diubah tanpa workflow baru.

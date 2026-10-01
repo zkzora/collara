@@ -1,0 +1,52 @@
+
+Collara UI/UX Improvement Guide
+1. Apakah Dokumen Saat Ini Sudah Cukup Untuk Build?
+Dokumen yang sudah dibuat sudah cukup untuk memulai development MVP.
+Sudah tersedia:- Product concept- Business workflow- Canton/Daml contract structure- State transition- System architecture- Website content
+Tambahan yang masih diperlukan untuk development:- UI/UX flow- User journey- Screen specification- API specification- Database schema- Daml implementation detail
+2. Prinsip UI/UX Collara
+Collara adalah aplikasi enterprise. Pengguna utama adalah perusahaan, bank, verifier, dan auditor.
+Prinsip:
+Clarity:Pengguna memahami status aset tanpa memahami blockchain.
+Workflow-driven:Tampilan mengikuti proses kerja pengguna.
+Role-based:Setiap pengguna melihat fitur yang relevan.
+Trust Visibility:Status verification, ownership, dan audit history harus mudah ditemukan.
+3. User Journey
+Asset Owner:Login → Dashboard → Register Asset → Submit Verification → Request Financing.
+Verifier:Login → Verification Queue → Review Asset → Submit Result.
+Bank:Login → Collateral Dashboard → Review Passport → Approve Financing.
+Auditor:Login → Audit Center → Review History → Generate Report.
+4. Struktur Halaman MVP
+Dashboard:- Total assets- Pending verification- Eligible collateral- Active financing
+Asset Registry:- Daftar aset- Status- Owner- Verification state
+Asset Detail:- Asset identity- Verification status- Collateral information- Timeline history
+Workflow Center:Aktivitas yang membutuhkan tindakan.
+Audit Center:Laporan dan histori.
+5. Referensi UI/UX
+SAP Asset Management:https://www.sap.com/products/asset-management.html
+Pelajari:- asset lifecycle- enterprise workflow
+Stripe Dashboard:https://dashboard.stripe.com/
+Pelajari:- financial dashboard- status management- transaction workflow
+Fireblocks:https://www.fireblocks.com/
+Pelajari:- institutional blockchain workflow- permission management
+Dune:https://dune.com/
+Pelajari:- analytics dashboard- data presentation
+6. Rekomendasi MVP
+Fokus fitur:
+1. Asset Registration
+2. Verification Workflow
+3. Collateral Review
+4. Audit Timeline
+Jangan membuat terlalu banyak menu.
+Tambahkan:- status indicator- approval workflow- timeline history- permission control- report export
+7. Final UX Flow
+Asset Owner:Create Asset
+↓
+Verifier:Validate Asset
+↓
+Bank:Review Collateral
+↓
+Bank:Approve Financing
+↓
+Auditor:Verify History
+Tujuan:Setiap pengguna mengetahui apa yang harus dilakukan, status proses, dan langkah berikutnya.

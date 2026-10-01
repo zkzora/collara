@@ -1,0 +1,14 @@
+
+Collara Canton/Daml Contract Structure
+Overview
+Dokumen ini menjelaskan struktur contract pada Collara menggunakan Canton Network dan Daml.Collara menggunakan model distributed ledger berbasis contract untuk mengelola identitas aset, verifikasi, collateral assessment, pembiayaan, dan audit.
+AssetPassport Contract
+Tujuan:Merepresentasikan identitas digital aset fisik.Data:- Asset ID- Asset category- Manufacturer- Serial number- Owner- Purchase value- Current valuation- Location- Asset status- Creation dateSignatory:Asset OwnerObservers:Verifier, Bank, AuditorLifecycle:Created → Verified → Active → Transferred → Archived
+Verification Contract
+Tujuan:Menyimpan proses pemeriksaan dan validasi aset.Data:- Asset reference- Verification provider- Inspection result- Condition score- Supporting documents- Approval statusSignatory:VerifierObservers:Asset Owner, Financial Institution, AuditorLifecycle:Requested → Review → Approved/Rejected
+CollateralAssessment Contract
+Tujuan:Menentukan apakah aset memenuhi syarat sebagai collateral.Data:- Asset reference- Lender- Valuation- Risk score- Eligibility statusSignatory:Financial InstitutionLifecycle:Submitted → Evaluated → Eligible/Rejected
+Financing Contract
+Tujuan:Mencatat hubungan pembiayaan antara lender dan pemilik aset.Data:- Loan ID- Borrower- Lender- Asset collateral- Amount- Duration- StatusLifecycle:Requested → Approved → Active → Completed
+AuditRecord Contract
+Tujuan:Mencatat seluruh aktivitas sistem.Data:- Event- Actor- Timestamp- Previous state- New stateAudit record dibuat setiap terjadi perubahan contract.

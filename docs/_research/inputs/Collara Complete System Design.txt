@@ -1,0 +1,18 @@
+
+Collara Complete System Design
+System Overview
+Collara adalah sistem infrastructure untuk menghubungkan real-world asset dengan institutional financing menggunakan Canton Network.
+Frontend Layer
+Berisi aplikasi dashboard untuk:- Asset Owner- Verifier- Bank- AuditorFungsi:- Asset management- Verification request- Collateral review- Audit reporting
+Backend Application Layer
+Komponen:Authentication Service:Mengelola login dan role.Asset Service:Mengelola data aset.Verification Service:Mengelola proses validasi.Collateral Service:Mengelola kelayakan aset.Reporting Service:Membuat laporan audit.
+Canton Blockchain Layer
+Menjalankan contract:- AssetPassport Contract- Verification Contract- CollateralAssessment Contract- Financing Contract- Audit ContractLayer ini menyimpan state transition dan workflow antar pihak.
+Data Layer
+Menyimpan:- User profile- Asset metadata- Document reference- Transaction history- Analytics data
+Integration Layer
+Integrasi dengan:- Banking system- ERP perusahaan- Insurance provider- Valuation serviceTujuan:Memperluas sumber data untuk collateral verification.
+Security Model
+Sistem menggunakan:- Role based access control- Permissioned data sharing- Audit trail- Identity verification
+MVP Architecture Flow
+User Interface↓Backend API↓Canton Workflow Engine↓Daml Contracts↓Audit and Reporting System
