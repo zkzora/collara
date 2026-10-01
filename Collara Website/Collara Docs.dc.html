@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Collara — Docs (pre-build)</title>
+<meta name="description" content="Collara documentation: overview, workflow, roles and permissions, synthetic demo scenario, and planned BitSafe governance. Pre-build specification.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html{scroll-behavior:smooth}
+body{margin:0;background:#08090A;color:#F7F8F8;font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+a{color:#F7F8F8;text-decoration:none}a:hover{color:#FFFFFF}
+button{font-family:inherit}
+table{border-collapse:collapse}
+@media (max-width:920px){.l-desk{display:none!important}.l-mob{display:flex!important}.l-pad{padding-left:20px!important;padding-right:20px!important}.o-grid{grid-template-columns:1fr!important}.o-side{position:static!important;flex-direction:row!important;flex-wrap:wrap!important;gap:4px 14px!important;padding-bottom:20px!important;border-bottom:1px solid rgba(255,255,255,.07)}.o-g2,.o-g3{grid-template-columns:1fr!important}.o-foot{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media (max-width:560px){.o-foot{grid-template-columns:1fr!important}.o-kv{grid-template-columns:1fr!important;row-gap:2px!important}}
+</style>
+</helmet>
+<div id="top" style="min-height:100vh;background:#08090A;color:#F7F8F8;font-family:Geist,system-ui,sans-serif;overflow-x:clip">
+
+<header style="position:sticky;top:0;z-index:50;background:rgba(8,9,10,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.07)">
+  <div class="l-pad" style="max-width:1120px;margin:0 auto;padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+    <a href="Collara Landing.dc.html" style="display:flex;align-items:center;gap:9px"><img src="assets/collara-mark.png" alt="Collara" style="width:30px;height:30px;display:block"><span style="font-weight:600;font-size:17px;letter-spacing:-0.01em">Collara</span></a>
+    <nav class="l-desk" style="display:flex;align-items:center;gap:26px;font-size:14px">
+      <a href="Collara Landing.dc.html#product" style="color:#9C9DA1" style-hover="color:#F7F8F8">Product</a>
+      <a href="Collara Landing.dc.html#workflow" style="color:#9C9DA1" style-hover="color:#F7F8F8">Workflow</a>
+      <a href="Collara Landing.dc.html#for-lenders" style="color:#9C9DA1" style-hover="color:#F7F8F8">For Lenders</a>
+      <a href="Collara Landing.dc.html#why-canton" style="color:#9C9DA1" style-hover="color:#F7F8F8">Why Canton</a>
+      <a href="#top" style="color:#F7F8F8">Docs</a>
+    </nav>
+    <div class="l-desk" style="display:flex;align-items:center;gap:6px">
+      <a href="Collara Dashboard.dc.html" style="font-size:14px;color:#9C9DA1;padding:8px 12px;border-radius:8px" style-hover="color:#F7F8F8;background:rgba(255,255,255,.05)">Sign in</a>
+      <a href="/pilot" style="font-size:14px;font-weight:500;white-space:nowrap;color:#08090A;background:#F7F8F8;padding:8px 14px;border-radius:8px" style-hover="background:#FFFFFF">Request a pilot</a>
+    </div>
+    <button class="l-mob" onClick="{{ toggleMenu }}" aria-label="Toggle menu" style="display:none;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:transparent;color:#F7F8F8;font-size:18px;cursor:pointer">{{ menuGlyph }}</button>
+  </div>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="border-top:1px solid rgba(255,255,255,.07);background:#08090A;padding:10px 20px 20px;display:flex;flex-direction:column;gap:2px;font-size:16px">
+      <a href="Collara Landing.dc.html#product" style="padding:12px 8px;color:#F7F8F8;border-radius:8px" style-hover="background:rgba(255,255,255,.05)">Product</a>
+      <a href="Collara Landing.dc.html#workflow" style="padding:12px 8px;color:#F7F8F8;border-radius:8px" style-hover="background:rgba(255,255,255,.05)">Workflow</a>
+      <a href="Collara Landing.dc.html#for-lenders" style="padding:12px 8px;color:#F7F8F8;border-radius:8px" style-hover="background:rgba(255,255,255,.05)">For Lenders</a>
+      <a href="Collara Landing.dc.html#why-canton" style="padding:12px 8px;color:#F7F8F8;border-radius:8px" style-hover="background:rgba(255,255,255,.05)">Why Canton</a>
+      <a href="#top" onClick="{{ closeMenu }}" style="padding:12px 8px;color:#F7F8F8;border-radius:8px" style-hover="background:rgba(255,255,255,.05)">Docs</a>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <a href="Collara Dashboard.dc.html" style="display:flex;justify-content:center;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:15px">Sign in</a>
+        <a href="/pilot" style="display:flex;justify-content:center;padding:12px;background:#F7F8F8;color:#08090A;border-radius:8px;font-size:15px;font-weight:500">Request a pilot</a>
+      </div>
+    </div>
+  </sc-if>
+</header>
+
+<div style="border-bottom:1px solid oklch(82% 0.12 75 / .25);background:oklch(82% 0.12 75 / .08)">
+  <div class="l-pad" style="max-width:1120px;margin:0 auto;padding:9px 32px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;font-size:12.5px;color:oklch(90% 0.08 80)">
+    <span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Pre-build</span>
+    <span style="color:oklch(84% 0.06 80)">This documentation describes a specification and interactive UI mockups. No running implementation, deployed contracts, API, or test suite exists yet.</span>
+  </div>
+</div>
+
+<div class="l-pad" style="max-width:1120px;margin:0 auto;padding:56px 32px 96px">
+  <div class="o-grid" style="display:grid;grid-template-columns:220px minmax(0,1fr);gap:56px;align-items:start">
+
+    <nav class="o-side" style="position:sticky;top:88px;display:flex;flex-direction:column;gap:2px;font-size:14px">
+      <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D;margin-bottom:8px">Docs · v0.1 draft</div>
+      <a href="#overview" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Overview</a>
+      <a href="#workflow" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Workflow</a>
+      <a href="#roles" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Roles &amp; permissions</a>
+      <a href="#demo" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Synthetic demo scenario</a>
+      <a href="#governance" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Planned BitSafe governance</a>
+      <a href="#setup" style="color:#9C9DA1;padding:6px 0" style-hover="color:#F7F8F8">Setup, API &amp; tests</a>
+      <div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:#9C9DA1">
+        <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">Status labels</div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3">UI mockup</span><span>Clickable design in this project</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250)">Specified</span><span>Defined in the spec, no code</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80)">Planned</span><span>Later phase, may change</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.13 155 / .45);color:oklch(80% 0.12 155)">Implemented</span><span>None at this time</span></div>
+      </div>
+    </nav>
+
+    <div style="display:flex;flex-direction:column;gap:80px;min-width:0">
+
+      <section id="overview" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">01 · Overview</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250)">Specified</span></div>
+        <h1 style="margin:0;font-size:clamp(28px,3.4vw,38px);font-weight:500;letter-spacing:-0.025em;line-height:1.15;text-wrap:pretty">Collara documentation</h1>
+        <p style="margin:0;font-size:16px;line-height:1.65;color:#C9CBD3;max-width:680px;text-wrap:pretty">Collara is a private coordination workspace for used CNC equipment financing. It links an equipment passport with its evidence, verification scope, lender decision, and collateral workflow, and discloses each record only to the counterparties named on it. It is being designed as Daml workflows on Canton.</p>
+        <div style="padding:18px 20px;border-radius:10px;background:#0F1013;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:14px;font-weight:500">Project status: pre-build</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9C9DA1">What exists today is a product specification and three interactive UI mockups: the landing page, the lender workspace, and a governance simulation inside that workspace. The mockups project state locally in the browser. There are no deployed contracts, no ledger, no API, and no test suite. Nothing on this page describes working software.</p>
+        </div>
+        <div class="o-g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:14px;font-weight:500">What Collara coordinates</div>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:#9C9DA1"><li>Equipment passport and document versions</li><li>Verification requests and scoped attestations</li><li>Evidence packages shared with a named lender</li><li>Lender assessment and collateral decision</li><li>Pledge activation, release request, and release decision</li><li>Permission-scoped case history and exports</li></ul>
+          </div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:14px;font-weight:500">What Collara is not</div>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:#9C9DA1"><li>Not a lender; credit decisions and funding stay with the lender</li><li>Not a custodian and not a legal lien registry</li><li>An attestation is not proof of legal ownership</li><li>A Collara record does not verify pledges made outside Collara</li><li>Cash settlement and MainNet wallet payments are outside the initial scope</li></ul>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:14px;font-weight:500">Capability status</div>
+          <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+            <table style="width:100%;min-width:560px">
+              <thead><tr>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Capability</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Status</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Where</th>
+              </tr></thead>
+              <tbody>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">Landing page</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3;white-space:nowrap">UI mockup</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1"><a href="Collara Landing.dc.html" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Collara Landing</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">Lender workspace: overview, case queue, case workspace, asset passport, collateral review, pledge and release, audit center</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3;white-space:nowrap">UI mockup</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1"><a href="Collara Dashboard.dc.html" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Collara Dashboard</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">Daml contract model: passport, evidence package, verification, assessment, proposal, pledge control</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250);white-space:nowrap">Specified</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">Specification · <a href="#workflow" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Workflow</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">Roles, mandates, and scoped disclosure</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250);white-space:nowrap">Specified</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">Specification · <a href="#roles" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Roles &amp; permissions</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">LocalNet demo with access-denial and authorization tests</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80);white-space:nowrap">Planned</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">Scenario defined · <a href="#demo" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Synthetic demo scenario</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">BitSafe governance for the verifier registry</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80)">Planned</span> <span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3">UI mockup</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">Simulation in the workspace · <a href="#governance" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Planned BitSafe governance</a></td></tr>
+                <tr><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px">Decentralization Manager integration</td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80);white-space:nowrap">Planned</span></td><td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">Not connected</td></tr>
+                <tr><td style="padding:11px 14px;font-size:14px">Setup instructions, API reference, test commands</td><td style="padding:11px 14px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.12);color:#9C9DA1;white-space:nowrap">Not available</span></td><td style="padding:11px 14px;font-size:13px;color:#9C9DA1">Added only after a verified implementation · <a href="#setup" style="color:#C9CBD3;border-bottom:1px solid rgba(255,255,255,.2)">Setup, API &amp; tests</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">02 · Workflow</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250)">Specified</span></div>
+        <h2 style="margin:0;font-size:clamp(24px,2.6vw,30px);font-weight:500;letter-spacing:-0.02em;line-height:1.2">From equipment evidence to authorized release</h2>
+        <p style="margin:0;font-size:15px;line-height:1.65;color:#9C9DA1;max-width:680px;text-wrap:pretty">Six steps, each ending in a committed workflow state. Operational events such as uploads, drafts, and views are application actions and do not change workflow state. Failed or unknown commands never appear as successful lifecycle events.</p>
+        <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:640px">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Step</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Who acts</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Records</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Committed states</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">01</span>Register the equipment</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Equipment owner</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Passport, equipment identifier, ownership evidence, document versions</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top">DRAFT → REGISTERED</td></tr>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">02</span>Request verification</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Owner assigns an accepted verifier; verifier reviews and may request changes</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Verification request with defined scope; attestation listing checked items, evidence versions, limitations, and validity</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top;line-height:1.6">REQUESTED → IN_REVIEW<br>→ CHANGES_REQUESTED<br>→ ATTESTED</td></tr>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">03</span>Share with the lender</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Owner, with the dealer's consent for contributed records</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Evidence package addressed to one named lender; unrelated records stay outside the package</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top">NOT_SUBMITTED → SUBMITTED</td></tr>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">04</span>Record review and pledge</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Lender analyst records the assessment; lender approver records the collateral decision and issues the proposal; owner accepts; pledge activates with both authorizations</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Collateral assessment (per lender, per case), financing proposal (versioned), pledge on the asset's canonical control</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top;line-height:1.6">IN_REVIEW → ELIGIBLE | REJECTED<br>DRAFT → ISSUED → ACCEPTED | WITHDRAWN<br>AVAILABLE → ACTIVE</td></tr>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">05</span>Request and authorize release</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Owner requests with a reason; the approver mandate of the lender named on the lock decides</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;color:#9C9DA1;vertical-align:top">Release request and decision on the active pledge</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top;line-height:1.6">ACTIVE → RELEASE_REQUESTED<br>→ RELEASED | RELEASE_REJECTED</td></tr>
+              <tr><td style="padding:12px 14px;font-size:14px;vertical-align:top"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#62666D;margin-right:8px">06</span>Export the case history</td><td style="padding:12px 14px;font-size:13.5px;color:#9C9DA1;vertical-align:top">Any participant, within their access scope</td><td style="padding:12px 14px;font-size:13.5px;color:#9C9DA1;vertical-align:top">Case workflow report with cut-off, ledger coverage watermark, retention caveat, and checksum</td><td style="padding:12px 14px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;vertical-align:top">Export job · no state change</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="o-g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:14px;font-weight:500">Pledge activation prerequisites (all required)</div>
+            <ol style="margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:#9C9DA1"><li>Lender-authorized collateral decision: Eligible for this case</li><li>Proposal issued and accepted at the exact version</li><li>Attestation valid at activation</li><li>Evidence snapshot matches the attested versions</li><li>Asset control available: no active lock on the canonical control</li></ol>
+          </div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:14px;font-weight:500">Workflow rules</div>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:#9C9DA1"><li>One active lock per registered asset within Collara</li><li>Eligibility is recorded per lender and per case; it does not transfer</li><li>Only the designated lender's approver mandate can authorize release</li><li>A rejected release leaves the lock active; the owner may reapply</li><li>Release ends the Collara workflow lock only; legal lien termination is separate</li><li>Historical lock records are retained after release</li></ul>
+          </div>
+        </div>
+        <p style="margin:0;padding:14px 16px;border-radius:8px;background:#0F1013;border:1px solid rgba(255,255,255,.06);font-size:13.5px;line-height:1.6;color:#9C9DA1">Boundary. Credit decisions, disbursement, legal filings, and enforcement remain with the lender and its existing processes. The workflow blocks a second active lock for the same registered asset within Collara; it does not detect pledges made outside the system or guarantee that duplicate registrations of a physical asset cannot occur.</p>
+      </section>
+
+      <section id="roles" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">03 · Roles &amp; permissions</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(74% 0.1 250 / .45);color:oklch(84% 0.08 250)">Specified</span></div>
+        <h2 style="margin:0;font-size:clamp(24px,2.6vw,30px);font-weight:500;letter-spacing:-0.02em;line-height:1.2">Different participants, different permissions</h2>
+        <p style="margin:0;font-size:15px;line-height:1.65;color:#9C9DA1;max-width:680px;text-wrap:pretty">Participation does not grant access to every document, every loan term, or every case. Responsibilities are expressed as mandates in the workflow, not only as interface controls. Access is re-evaluated when a report is generated and again when it is downloaded.</p>
+        <div class="o-g3" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Equipment owner</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Borrower mandate</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Registers the passport, submits evidence, requests verification, approves sharing, accepts the proposal, co-authorizes activation, and requests release.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Dealer</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Contributor</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Contributes equipment records to an invited case and consents when those records are shared onward.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Verifier</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Registry member</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Accepts an assignment, requests changes, and issues an attestation with an explicit scope. Cannot approve financing or establish legal lien priority.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Lender analyst</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Lender · Analyst mandate</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Works the review queue, opens shared evidence, drafts and submits the assessment, and requests exports. Cannot record decisions.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Lender approver</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Lender · Approver mandate</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Records the collateral decision, issues or withdraws proposals, co-authorizes activation, and authorizes or rejects release. Holds the organization's governance seat (planned).</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500">Auditor</div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#62666D">Scoped grant</div><p style="margin:4px 0 0;font-size:13.5px;line-height:1.6;color:#9C9DA1">Inspects and exports the records covered by a grant that names the case, the permission, the expiry, and the consenting parties.</p></div>
+        </div>
+        <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:760px">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Action</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Owner</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Dealer</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Verifier</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Analyst</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Approver</th>
+              <th style="text-align:center;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08)">Auditor</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ matrix }}" as="r" hint-placeholder-count="12">
+                <tr>
+                  <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px">{{ r.action }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c0 }}">{{ r.v0 }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c1 }}">{{ r.v1 }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c2 }}">{{ r.v2 }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c3 }}">{{ r.v3 }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c4 }}">{{ r.v4 }}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;font-size:13px;color:{{ r.c5 }}">{{ r.v5 }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:#62666D">✓ permitted within the participant's case scope · "scope" means only within an explicit grant or the records addressed to that party. Equipment evidence and financing terms are separate records, so their recipients can differ. Privacy depends on the implemented contract model and the deployment; the hosting provider's access and trust model must also be considered.</p>
+      </section>
+
+      <section id="demo" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">04 · Synthetic demo scenario</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3">UI mockup</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80)">LocalNet demo planned</span></div>
+        <h2 style="margin:0;font-size:clamp(24px,2.6vw,30px);font-weight:500;letter-spacing:-0.02em;line-height:1.2">One case, CL-001, modelled end to end</h2>
+        <p style="margin:0;font-size:15px;line-height:1.65;color:#9C9DA1;max-width:680px;text-wrap:pretty">All organizations, people, documents, and amounts are synthetic. No funds are transferred. Today the scenario runs as a local projection inside the workspace mockup; the planned LocalNet demo will replay the same scenario against committed Daml contracts and add access-denial and authorization tests.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08)">
+            <div style="font-size:14px;font-weight:500">Organizations</div>
+            <div class="o-kv" style="margin-top:12px;display:grid;grid-template-columns:minmax(110px,max-content) minmax(0,1fr);row-gap:8px;column-gap:12px;font-size:13.5px;line-height:1.5">
+              <span style="color:#62666D">Demo Manufacturer</span><span style="color:#C9CBD3">Equipment owner · borrower mandate</span>
+              <span style="color:#62666D">Demo CNC Dealer</span><span style="color:#C9CBD3">Dealer · contributor</span>
+              <span style="color:#62666D">Demo Verifier</span><span style="color:#C9CBD3">Verifier · VER-001, active</span>
+              <span style="color:#62666D">Demo Lender A</span><span style="color:#C9CBD3">Lender · the workspace viewpoint (analyst and approver mandates)</span>
+              <span style="color:#62666D">Demo Lender B</span><span style="color:#C9CBD3">Second lender · governance seat only</span>
+              <span style="color:#62666D">Demo Auditor</span><span style="color:#C9CBD3">Auditor · scoped grant after release</span>
+            </div>
+          </div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08)">
+            <div style="font-size:14px;font-weight:500">Fixtures</div>
+            <div class="o-kv" style="margin-top:12px;display:grid;grid-template-columns:minmax(110px,max-content) minmax(0,1fr);row-gap:8px;column-gap:12px;font-size:13.5px;line-height:1.5">
+              <span style="color:#62666D">Asset</span><span style="color:#C9CBD3">ASSET-DEMO-001 · CNC machining center DEMO-CNC-500 · serial SYNTH-CNC-001</span>
+              <span style="color:#62666D">Case</span><span style="color:#C9CBD3">CL-001 · used CNC financing · policy CP-2026-CNC-01</span>
+              <span style="color:#62666D">Evidence package</span><span style="color:#C9CBD3">PKG-001 v2 · 5 documents: inspection report v2, dealer invoice, equipment photos (6), maintenance log, purchase agreement</span>
+              <span style="color:#62666D">Attestation</span><span style="color:#C9CBD3">ATT-001 · issued by Demo Verifier · 7 checked items · valid to 2027-03-10</span>
+              <span style="color:#62666D">Assessment</span><span style="color:#C9CBD3">CA-001 · Demo Lender A · per lender, per case</span>
+              <span style="color:#62666D">Proposal</span><span style="color:#C9CBD3">FP-001 v2 · USD 105,000.00 · valuation illustrative at USD 150,000</span>
+              <span style="color:#62666D">Pledge</span><span style="color:#C9CBD3">PL-001 on control v3 → v4 · release request RR-001, reason: external loan completion</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:14px;font-weight:500">Two demo moments</div>
+          <div class="o-g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="padding:18px 20px;border-radius:10px;background:#0F1013;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#62666D">Moment A · Lender review</div><p style="margin:0;font-size:13.5px;line-height:1.6;color:#9C9DA1">PKG-001 v2 is shared and ATT-001 is valid. CA-001 is in review with a saved analyst draft. The approver mandate records Eligible for this case or Rejected for this case. Eligible unlocks proposal issuance; nothing is disbursed.</p></div>
+            <div style="padding:18px 20px;border-radius:10px;background:#0F1013;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#62666D">Moment B · Release review</div><p style="margin:0;font-size:13.5px;line-height:1.6;color:#9C9DA1">FP-001 v2 was accepted and PL-001 activated on 2026-09-22. Demo Manufacturer requested release on 2026-09-30. The approver mandate authorizes release (control becomes AVAILABLE at v5) or rejects it (lock stays ACTIVE). After release, Demo Auditor holds a scoped grant to CL-001 until 2026-12-31.</p></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:14px;font-weight:500">Committed events in the scenario</div>
+          <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+            <table style="width:100%;min-width:700px">
+              <thead><tr>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Date (UTC)</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Reference</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Event</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Actor</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9C9DA1;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">State change</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="10">
+                  <tr>
+                    <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9C9DA1;white-space:nowrap">{{ e.t }}</td>
+                    <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;white-space:nowrap">{{ e.ref }}</td>
+                    <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px">{{ e.e }}</td>
+                    <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9C9DA1">{{ e.a }}</td>
+                    <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#9C9DA1;white-space:nowrap">{{ e.chg }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#62666D">Events after 2026-09-13 belong to Moment B. In the mockup, the approver's own actions append events timestamped "just now".</p>
+        </div>
+        <div style="padding:16px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:14px;font-weight:500">Known limits of the mockup</div>
+          <ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#9C9DA1"><li>Only CL-001 is modelled. Queue rows CL-002 to CL-005 are filler and open nothing.</li><li>Ledger offsets, commit hashes, checksums, and timestamps are illustrative values, not outputs of a ledger.</li><li>Person names in the workspace (analyst, approver) are placeholders.</li><li>State changes are local to the browser session and reset on reload.</li></ul>
+        </div>
+      </section>
+
+      <section id="governance" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">05 · Planned BitSafe governance</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80)">Planned</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3">UI simulation</span></div>
+        <h2 style="margin:0;font-size:clamp(24px,2.6vw,30px);font-weight:500;letter-spacing:-0.02em;line-height:1.2">Verifier-registry administration by a governance set</h2>
+        <p style="margin:0;font-size:15px;line-height:1.65;color:#9C9DA1;max-width:680px;text-wrap:pretty">The BitSafe governance module is intended to decide which verifiers can be assigned to verification requests, so that no single operator adds or suspends a verifier. It is a planned capability. The workspace contains a UI simulation of it until the Decentralization Manager integration is implemented.</p>
+        <div style="padding:14px 16px;border-radius:8px;background:oklch(74% 0.1 250 / .08);border:1px solid oklch(74% 0.1 250 / .28);font-size:13.5px;line-height:1.6;color:#C9CBD3">Governance controls verifier-registry administration only. It never authorizes collateral release. Collateral decisions, financing proposals, pledge activation, and release remain under lender mandates and are not subject to governance votes.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08)">
+            <div style="font-size:14px;font-weight:500">Design as simulated</div>
+            <div class="o-kv" style="margin-top:12px;display:grid;grid-template-columns:minmax(110px,max-content) minmax(0,1fr);row-gap:8px;column-gap:12px;font-size:13.5px;line-height:1.5">
+              <span style="color:#62666D">Governance set</span><span style="color:#C9CBD3">Three seats: Demo Lender A, Demo Lender B, Demo Auditor</span>
+              <span style="color:#62666D">Seat holder</span><span style="color:#C9CBD3">The organization's approver mandate (audit lead mandate for the auditor seat)</span>
+              <span style="color:#62666D">Proposal types</span><span style="color:#C9CBD3">Add verifier · Suspend verifier</span>
+              <span style="color:#62666D">Threshold</span><span style="color:#C9CBD3">2 of 3 approvals pass a proposal; 2 rejections close it</span>
+              <span style="color:#62666D">Execution</span><span style="color:#C9CBD3">A separate step after threshold, by any seat. Registry changes apply only on execution.</span>
+              <span style="color:#62666D">Expiry</span><span style="color:#C9CBD3">14 days after opening if not executed</span>
+              <span style="color:#62666D">Suspension effect</span><span style="color:#C9CBD3">Blocks new assignments; attestations already issued remain valid and are not reopened</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:14px;font-weight:500">Simulated in the workspace today</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.18);color:#C9CBD3">UI mockup</span></div>
+              <ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#9C9DA1"><li>Verifier registry with active and suspended entries</li><li>Proposal list covering open, rejected, and executed states</li><li>Proposal detail with per-seat approval progress and execution state</li><li>Approve, reject, execute, and propose actions from seat 1, recorded locally</li></ul>
+            </div>
+            <div style="padding:18px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:14px;font-weight:500">Pending implementation</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid oklch(82% 0.12 75 / .45);color:oklch(88% 0.1 80)">Planned</span></div>
+              <ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#9C9DA1"><li>Decentralization Manager integration: proposals, votes, and execution as committed records</li><li>Seat key management and membership changes</li><li>Enforcement of expiry and of the registry check at verifier assignment</li><li>Reinstatement of a suspended verifier (not yet specified)</li></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="setup" style="display:flex;flex-direction:column;gap:22px;scroll-margin-top:96px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D">06 · Setup, API reference &amp; tests</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid rgba(255,255,255,.12);color:#9C9DA1">Not available</span></div>
+        <h2 style="margin:0;font-size:clamp(24px,2.6vw,30px);font-weight:500;letter-spacing:-0.02em;line-height:1.2">Added after a verified implementation</h2>
+        <p style="margin:0;font-size:15px;line-height:1.65;color:#9C9DA1;max-width:680px;text-wrap:pretty">No implementation exists yet, so this page intentionally contains no setup instructions, no API endpoints, and no test commands. These sections will be written only once the implementation exists and has been verified against the LocalNet demo scenario. Until then, treat any command, endpoint, or integration attributed to Collara as unverified.</p>
+        <div class="o-g3" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+          <div style="padding:18px 20px;border-radius:10px;border:1px dashed rgba(255,255,255,.14);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500;color:#9C9DA1">Setup</div><p style="margin:0;font-size:13px;line-height:1.6;color:#62666D">Will cover a LocalNet deployment of the Daml workflows and the workspace. Not yet written.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px dashed rgba(255,255,255,.14);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500;color:#9C9DA1">API reference</div><p style="margin:0;font-size:13px;line-height:1.6;color:#62666D">Will document the commands and queries behind each workflow transition. Not yet written.</p></div>
+          <div style="padding:18px 20px;border-radius:10px;border:1px dashed rgba(255,255,255,.14);display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:500;color:#9C9DA1">Tests</div><p style="margin:0;font-size:13px;line-height:1.6;color:#62666D">Will list the access-denial and authorization tests run against the demo scenario. Not yet written.</p></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<footer style="border-top:1px solid rgba(255,255,255,.07);padding:56px 0 40px">
+  <div class="l-pad" style="max-width:1120px;margin:0 auto;padding:0 32px">
+    <div class="o-foot" style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));gap:32px">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:300px">
+        <a href="Collara Landing.dc.html" style="display:flex;align-items:center;gap:9px"><img src="assets/collara-mark.png" alt="Collara" style="width:26px;height:26px;display:block"><span style="font-weight:600;font-size:16px;letter-spacing:-0.01em">Collara</span></a>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#9C9DA1">Private equipment evidence and collateral workflows. Starting with used CNC financing.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D;margin-bottom:4px">Product</div><a href="Collara Landing.dc.html#product" style="color:#9C9DA1" style-hover="color:#F7F8F8">Product</a><a href="Collara Landing.dc.html#workflow" style="color:#9C9DA1" style-hover="color:#F7F8F8">Workflow</a><a href="Collara Landing.dc.html#for-lenders" style="color:#9C9DA1" style-hover="color:#F7F8F8">For Lenders</a></div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D;margin-bottom:4px">Resources</div><a href="#top" style="color:#9C9DA1" style-hover="color:#F7F8F8">Docs</a><a href="Collara Landing.dc.html#why-canton" style="color:#9C9DA1" style-hover="color:#F7F8F8">Why Canton</a></div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D;margin-bottom:4px">Contact</div><a href="/pilot" style="color:#9C9DA1" style-hover="color:#F7F8F8">Request a pilot</a></div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#62666D;margin-bottom:4px">Legal</div><a href="/privacy" style="color:#9C9DA1" style-hover="color:#F7F8F8">Privacy</a><a href="/terms" style="color:#9C9DA1" style-hover="color:#F7F8F8">Terms</a></div>
+    </div>
+    <p style="margin:48px 0 0;padding-top:24px;border-top:1px solid rgba(255,255,255,.07);font-size:13px;line-height:1.6;color:#62666D">Collara is in development. It is not a lender, custodian, legal lien registry, or provider of guaranteed financing. Documentation v0.1 draft · pre-build.</p>
+  </div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { menuOpen: false };
+  renderVals() {
+    const { menuOpen } = this.state;
+    const Y = '#F7F8F8', N = '#3A3D44', S = '#9C9DA1';
+    // owner, dealer, verifier, analyst, approver, auditor — true | false | 'scope'
+    const rows = [
+      ['Register passport and submit evidence', [true, false, false, false, false, false]],
+      ['Contribute records to an invited case', [false, true, false, false, false, false]],
+      ['Request verification and assign a verifier', [true, false, false, false, false, false]],
+      ['Accept assignment, request changes, issue attestation', [false, false, true, false, false, false]],
+      ['Approve sharing of an evidence package', [true, 'scope', false, false, false, false]],
+      ['Open shared evidence and record the assessment', [false, false, false, true, true, false]],
+      ['Record the collateral decision (eligible / rejected)', [false, false, false, false, true, false]],
+      ['Issue or withdraw a financing proposal', [false, false, false, false, true, false]],
+      ['Accept a proposal (exact version)', [true, false, false, false, false, false]],
+      ['Authorize pledge activation', [true, false, false, false, true, false]],
+      ['Request release', [true, false, false, false, false, false]],
+      ['Authorize or reject release', [false, false, false, false, true, false]],
+      ['View case history', ['scope', 'scope', 'scope', 'scope', 'scope', 'scope']],
+      ['Export a case report', [true, false, false, true, true, 'scope']],
+      ['Vote on verifier-registry proposals (planned)', [false, false, false, false, true, true]],
+    ];
+    const matrix = rows.map(([action, v]) => {
+      const o = { action };
+      v.forEach((x, i) => { o['v' + i] = x === true ? '✓' : x === 'scope' ? 'scope' : '—'; o['c' + i] = x === true ? Y : x === 'scope' ? S : N; });
+      return o;
+    });
+    const ev = (t, ref, e, a, chg) => ({ t, ref, e, a, chg });
+    const timeline = [
+      ev('2026-09-01', 'ASSET-DEMO-001', 'Passport registered', 'Demo Manufacturer · Owner', 'DRAFT → REGISTERED'),
+      ev('2026-09-03', 'VR-001', 'Verification requested', 'Demo Manufacturer · Owner', '— → REQUESTED'),
+      ev('2026-09-04', 'VR-001', 'Assignment accepted', 'Demo Verifier', 'REQUESTED → IN_REVIEW'),
+      ev('2026-09-06', 'VR-001', 'Changes requested: spindle photos and maintenance log', 'Demo Verifier', 'IN_REVIEW → CHANGES_REQUESTED'),
+      ev('2026-09-10', 'ATT-001', 'Attestation issued against evidence v2', 'Demo Verifier', 'IN_REVIEW → ATTESTED'),
+      ev('2026-09-12', 'CL-001', 'Case created', 'Demo Manufacturer · Borrower', '— → DRAFT'),
+      ev('2026-09-12', 'PKG-001', 'Package shared with Demo Lender A (5 documents, dealer consent)', 'Demo Manufacturer + Demo CNC Dealer', 'NOT_SUBMITTED → SUBMITTED'),
+      ev('2026-09-13', 'CA-001', 'Review started', 'Demo Lender A · Analyst', 'SUBMITTED → IN_REVIEW'),
+      ev('2026-09-18', 'CA-001', 'Collateral decision recorded: Eligible for this case', 'Demo Lender A · Approver', 'IN_REVIEW → ELIGIBLE'),
+      ev('2026-09-19', 'FP-001', 'Proposal issued (v1)', 'Demo Lender A · Approver', 'DRAFT → ISSUED'),
+      ev('2026-09-20', 'FP-001', 'Proposal withdrawn and reissued, expiry corrected (v2)', 'Demo Lender A · Approver', 'ISSUED → WITHDRAWN · ISSUED'),
+      ev('2026-09-21', 'FP-001', 'Proposal accepted at exact version v2', 'Demo Manufacturer · Borrower', 'ISSUED → ACCEPTED'),
+      ev('2026-09-22', 'PL-001', 'Pledge activated', 'Demo Manufacturer + Demo Lender A', 'AVAILABLE → ACTIVE'),
+      ev('2026-09-30', 'RR-001', 'Release requested: external loan completion', 'Demo Manufacturer · Borrower', 'ACTIVE → RELEASE_REQUESTED'),
+    ];
+    return {
+      menuOpen, matrix, timeline,
+      menuGlyph: menuOpen ? '×' : '≡',
+      toggleMenu: () => this.setState(s => ({ menuOpen: !s.menuOpen })),
+      closeMenu: () => this.setState({ menuOpen: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>

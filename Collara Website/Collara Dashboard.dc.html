@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Collara — Workspace (Demo Lender A)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#101116;color:#F4F5F7;font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#F4F5F7;text-decoration:none}a:hover{color:#FFFFFF}
+button,input,select,textarea{font-family:inherit}
+input::placeholder,textarea::placeholder{color:#676A75}
+select option{background:#16171D;color:#F4F5F7}
+@keyframes d-toast{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width:900px){.d-side{display:none!important}.d-menu{display:inline-flex!important}.d-hide{display:none!important}.d-g2,.d-g3,.d-g4,.d-hdr{grid-template-columns:1fr!important}.d-pad{padding:16px!important}.d-tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}.d-wrap{flex-wrap:wrap!important}}
+@media (max-width:560px){.d-tiles{grid-template-columns:1fr!important}}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;height:100vh;background:#101116;color:#F4F5F7;font-family:Geist,system-ui,sans-serif;font-size:14px">
+
+<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:6px 16px;background:oklch(82% 0.12 75 / .1);border-bottom:1px solid oklch(82% 0.12 75 / .25);font-size:12px;color:oklch(90% 0.08 80)">
+  <span style="font-family:'Red Hat Mono',ui-monospace,monospace;letter-spacing:.05em;font-weight:500">Demo data — LocalNet</span>
+  <span style="color:oklch(82% 0.06 80)">Synthetic organizations and fixtures. No funds are transferred. Viewing as Demo Lender A · {{ mandate }}.</span>
+</div>
+
+<div style="display:flex;flex:1;min-height:0">
+  <aside class="d-side" style="width:232px;flex:none;display:flex;flex-direction:column;background:#0C0D11;border-right:1px solid rgba(255,255,255,.07)">
+    <div style="display:flex;align-items:center;gap:9px;padding:16px 16px 12px"><img src="assets/collara-mark.png" alt="Collara" style="width:26px;height:26px;display:block"><span style="font-weight:600;font-size:15.5px;letter-spacing:-0.01em">Collara</span></div>
+    <button style="margin:0 10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:#12131A;color:#F4F5F7;text-align:left;cursor:pointer" style-hover="background:#171821">
+      <span style="display:flex;align-items:center;gap:9px;min-width:0"><span style="width:26px;height:26px;border-radius:6px;background:oklch(74% 0.1 250 / .18);color:oklch(84% 0.08 250);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none">LA</span><span style="min-width:0"><span style="display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Demo Lender A</span><span style="display:block;font-size:11.5px;color:#9A9CA6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mandate }}</span></span></span>
+      <span style="color:#676A75;font-size:11px">▾</span>
+    </button>
+    <nav style="display:flex;flex-direction:column;gap:2px;padding:0 10px">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+        <button onClick="{{ n.go }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:34px;padding:0 10px;border-radius:7px;border:none;background:{{ n.bg }};color:{{ n.color }};font-size:13.5px;font-weight:500;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.06);color:#F4F5F7"><span style="display:flex;align-items:center;gap:10px"><img src="assets/collara-mark.png" alt="" style="width:14px;height:14px;display:block;opacity:{{ n.markOpacity }}">{{ n.label }}</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ n.count }}</span></button>
+      </sc-for>
+    </nav>
+    <div style="margin:18px 20px 0;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#4E515B">Saved views</div>
+    <div style="display:flex;flex-direction:column;gap:1px;padding:6px 10px 0">
+      <button onClick="{{ viewReady }}" style="display:flex;align-items:center;justify-content:space-between;height:30px;padding:0 10px 0 26px;border-radius:7px;border:none;background:transparent;color:#9A9CA6;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.05);color:#F4F5F7"><span>Ready for review</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ counts.review }}</span></button>
+      <button onClick="{{ viewEvidence }}" style="display:flex;align-items:center;justify-content:space-between;height:30px;padding:0 10px 0 26px;border-radius:7px;border:none;background:transparent;color:#9A9CA6;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.05);color:#F4F5F7"><span>Needs evidence</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ counts.evidence }}</span></button>
+      <button onClick="{{ viewApproval }}" style="display:flex;align-items:center;justify-content:space-between;height:30px;padding:0 10px 0 26px;border-radius:7px;border:none;background:transparent;color:#9A9CA6;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.05);color:#F4F5F7"><span>Awaiting approval</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ counts.approval }}</span></button>
+      <button onClick="{{ viewRelease }}" style="display:flex;align-items:center;justify-content:space-between;height:30px;padding:0 10px 0 26px;border-radius:7px;border:none;background:transparent;color:#9A9CA6;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.05);color:#F4F5F7"><span>Release requests</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ counts.release }}</span></button>
+    </div>
+    <div style="flex:1"></div>
+    <div style="padding:10px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:2px">
+      <button style="display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:7px;border:none;background:transparent;color:#9A9CA6;font-size:13.5px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.05);color:#F4F5F7"><img src="assets/collara-mark.png" alt="" style="width:14px;height:14px;display:block;opacity:.45">Settings</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px 4px;font-size:12px;color:#9A9CA6"><span style="display:flex;align-items:center;gap:7px">LocalNet</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px">offset 18422</span></div>
+      <div style="padding:0 10px 4px;font-size:11.5px;color:#676A75">Ledger synced · 2026-10-01 14:32:05 UTC</div>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="flex:none;display:flex;align-items:center;gap:12px;height:52px;padding:0 20px;border-bottom:1px solid rgba(255,255,255,.07);background:#101116">
+      <button class="d-menu" onClick="{{ toggleNav }}" aria-label="Menu" style="display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#F4F5F7;font-size:16px;cursor:pointer">≡</button>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden">
+        <button onClick="{{ crumbGo }}" style="border:none;background:transparent;color:#9A9CA6;font-size:13.5px;padding:0;cursor:pointer" style-hover="color:#F4F5F7">{{ crumbRoot }}</button>
+        <sc-if value="{{ hasLeaf }}" hint-placeholder-val="{{ false }}"><span style="color:#4E515B">/</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">{{ crumbLeaf }}</span></sc-if>
+      </div>
+      <div style="flex:1"></div>
+      <div class="d-hide" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;width:260px;border-radius:7px;border:1px solid rgba(255,255,255,.08);background:#0C0D11;color:#676A75;font-size:13px"><span style="font-size:12px">⌕</span><input placeholder="Search accessible records" style="flex:1;min-width:0;border:none;background:transparent;color:#F4F5F7;font-size:13px;outline:none;padding:0"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:1px 5px">⌘K</span></div>
+      <span class="d-hide" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:6px;border:1px solid rgba(255,255,255,.1);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.04em;color:#9A9CA6">LocalNet</span>
+      <button aria-label="Notifications" style="position:relative;width:32px;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#9A9CA6;font-size:13px;cursor:pointer" style-hover="color:#F4F5F7;background:rgba(255,255,255,.05)">◔</button>
+      <span style="width:32px;height:32px;border-radius:50%;background:#1E1F27;border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:#F4F5F7">{{ initials }}</span>
+    </header>
+
+    <sc-if value="{{ navOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:flex" onClick="{{ toggleNav }}">
+        <div style="width:260px;background:#0C0D11;border-right:1px solid rgba(255,255,255,.08);padding:16px 10px;display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center;gap:9px;padding:0 6px 14px"><img src="assets/collara-mark.png" alt="Collara" style="width:26px;height:26px"><span style="font-weight:600;font-size:15.5px">Collara</span></div>
+          <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+            <button onClick="{{ n.go }}" style="display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 12px;border-radius:7px;border:none;background:{{ n.bg }};color:{{ n.color }};font-size:15px;font-weight:500;cursor:pointer;text-align:left"><span>{{ n.label }}</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ n.count }}</span></button>
+          </sc-for>
+          <div style="margin-top:auto;padding:10px 12px;font-size:12px;color:#9A9CA6">Demo Lender A · {{ mandate }}<br>LocalNet · offset 18422</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div class="d-pad" style="flex:1;min-height:0;overflow:auto;padding:24px 28px 40px">
+
+      <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Overview" style="display:flex;flex-direction:column;gap:22px;max-width:1240px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em">Overview</h1><p style="margin:6px 0 0;font-size:13.5px;color:#9A9CA6">Work that needs a decision or an action from Demo Lender A. Counts include only records your organization is permitted to see.</p></div>
+          <span style="font-size:12px;color:#676A75">Projected from ledger offset 18422 · 14:32:05 UTC</span>
+        </div>
+        <div class="d-tiles" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+          <button onClick="{{ viewReady }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Cases awaiting review</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ counts.review }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open queue →</div></button>
+          <button onClick="{{ viewEvidence }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Missing evidence</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ counts.evidence }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open queue →</div></button>
+          <button onClick="{{ viewApproval }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Decisions awaiting approval</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ counts.approval }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open queue →</div></button>
+          <button onClick="{{ goPledge }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Active pledges</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ counts.active }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open pledges →</div></button>
+          <button onClick="{{ viewRelease }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Release requests</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ counts.release }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open queue →</div></button>
+        </div>
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:14px;font-weight:500">Needs your action</span><span style="font-size:12px;color:#676A75">{{ actionCount }} items</span></div>
+            <sc-for list="{{ actions }}" as="a" hint-placeholder-count="3">
+              <button onClick="{{ a.go }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;border:none;border-bottom:1px solid rgba(255,255,255,.06);background:transparent;color:#F4F5F7;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.03)">
+                <span style="display:flex;align-items:center;gap:14px;min-width:0"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;flex:none">{{ a.id }}</span><span style="min-width:0"><span style="display:block;font-size:13.5px">{{ a.title }}</span><span style="display:block;font-size:12px;color:#676A75;margin-top:2px">{{ a.sub }}</span></span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#9A9CA6;flex:none;white-space:nowrap">{{ a.state }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px">
+              <div style="font-size:12.5px;color:#9A9CA6">Recorded financing principal</div>
+              <div style="margin-top:8px;font-size:24px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ principal.amount }} <span style="font-size:13px;color:#9A9CA6;font-family:Geist,system-ui,sans-serif">USD</span></div>
+              <div style="margin-top:8px;font-size:12px;color:#676A75;line-height:1.5">Coverage: {{ principal.coverage }} · Source: accepted proposals, ledger-committed · Not a valuation, balance, or TVL figure.</div>
+              <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:#9A9CA6">Recorded collateral valuation</div>
+              <div style="margin-top:6px;font-size:18px;font-weight:500;font-family:'Red Hat Mono',ui-monospace,monospace">{{ principal.valuation }} <span style="font-size:12px;color:#9A9CA6;font-family:Geist,system-ui,sans-serif">USD</span></div>
+              <div style="margin-top:6px;font-size:12px;color:#676A75">Source: verifier inspection reports · dated per attestation</div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:13.5px;font-weight:500">Recent committed events</span><button onClick="{{ goAudit }}" style="border:none;background:transparent;color:#9A9CA6;font-size:12px;cursor:pointer;padding:0" style-hover="color:#F4F5F7">Audit center →</button></div>
+              <sc-for list="{{ recent }}" as="e" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px"><span style="min-width:0"><span style="display:block">{{ e.e }}</span><span style="display:block;color:#676A75;margin-top:2px">{{ e.a }}</span></span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75;white-space:nowrap">{{ e.t }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCases }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Case Queue" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em">Cases</h1><p style="margin:6px 0 0;font-size:13.5px;color:#9A9CA6">Cases shared with Demo Lender A. Borrower and pledge columns show only what your organization is authorized to see.</p></div>
+          <button style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Export accessible records</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto">
+          <sc-for list="{{ caseViews }}" as="v" hint-placeholder-count="6">
+            <button onClick="{{ v.select }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ v.border }};margin-bottom:-1px;background:transparent;color:{{ v.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ v.label }}<span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75">{{ v.count }}</span></button>
+          </sc-for>
+        </div>
+        <div class="d-wrap" style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;width:240px;border-radius:7px;border:1px solid rgba(255,255,255,.08);background:#0C0D11;color:#676A75;font-size:13px"><span style="font-size:12px">⌕</span><input placeholder="Search case ID or asset" style="flex:1;min-width:0;border:none;background:transparent;color:#F4F5F7;font-size:13px;outline:none;padding:0"></div>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Stage ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Missing evidence ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Updated ▾</button>
+          <span style="flex:1"></span>
+          <span style="font-size:12px;color:#676A75">{{ queueCount }} of {{ queueTotal }} accessible cases</span>
+        </div>
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:980px;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Case ID</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Asset</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Borrower</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Verification</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Lender review</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Pledge</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Next actor</th>
+              <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Last update</th>
+            </tr></thead>
+            <tbody>
+            <sc-for list="{{ queue }}" as="r" hint-placeholder-count="4">
+              <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(255,255,255,.03)">
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;white-space:nowrap">{{ r.id }}</td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>{{ r.asset }}</div><div style="font-size:11.5px;color:#676A75;margin-top:2px;font-family:'Red Hat Mono',ui-monospace,monospace">{{ r.assetId }}</div></td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;white-space:nowrap">{{ r.borrower }}</td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">{{ r.ver.l }}</span></td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">{{ r.rev.l }}</span></td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">{{ r.pl.l }}</span></td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6;white-space:nowrap">{{ r.next }}</td>
+                <td style="padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#676A75;text-align:right;white-space:nowrap">{{ r.upd }}</td>
+              </tr>
+            </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:36px;text-align:center;font-size:13.5px;color:#9A9CA6">No cases require your action.</div></sc-if>
+        </div>
+        <p style="margin:0;font-size:12px;color:#676A75">Bulk approval and bulk release are not available. Sensitive decisions are recorded per case.</p>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCase }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Case Workspace" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div class="d-hdr" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-weight:500">CL-001</span> · Used CNC financing</h1><span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12.5px">{{ cs.stage.l }}</span></div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6;line-height:1.5">CNC machining center · DEMO-CNC-500 · <button onClick="{{ goAsset }}" style="border:none;background:transparent;padding:0;color:#F4F5F7;font-size:13.5px;cursor:pointer;font-family:'Red Hat Mono',ui-monospace,monospace" style-hover="text-decoration:underline">ASSET-DEMO-001</button> · Borrower: Demo Manufacturer · Selected lender: Demo Lender A</p>
+            <sc-if value="{{ showTech }}" hint-placeholder-val="{{ false }}"><div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;color:#676A75"><span>case:00c4f1…9b2e</span><span>control:ASSET-DEMO-001#{{ cs.controlVersion }}</span><span>attestation:ATT-001</span><span>package:PKG-001 v2</span><span>offset:18422</span></div></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <div style="font-size:12.5px;color:#9A9CA6">Next actor · <span style="color:#F4F5F7">{{ cs.nextActor }}</span></div>
+            <button onClick="{{ cs.nextGo }}" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">{{ cs.nextAction }} →</button>
+            <div style="font-size:11.5px;color:#676A75">Ledger synced · offset 18422 · 14:32:05 UTC</div>
+          </div>
+        </div>
+        <div class="d-tiles" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px"><div style="font-size:11.5px;color:#676A75">Evidence</div><div style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px">{{ cs.st.evidence.l }}</div></div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px"><div style="font-size:11.5px;color:#676A75">Verification</div><div style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px">{{ cs.st.verification.l }}</div></div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px"><div style="font-size:11.5px;color:#676A75">Lender review</div><div style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px">{{ cs.st.review.l }}</div></div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px"><div style="font-size:11.5px;color:#676A75">Proposal</div><div style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px">{{ cs.st.proposal.l }}</div></div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px"><div style="font-size:11.5px;color:#676A75">Pledge</div><div style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px">{{ cs.st.pledge.l }}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto">
+          <sc-for list="{{ caseTabs }}" as="t" hint-placeholder-count="8">
+            <button onClick="{{ t.select }}" style="height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ t.border }};margin-bottom:-1px;background:transparent;color:{{ t.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ t.label }}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ caseTabIs.Summary }}" hint-placeholder-val="{{ true }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Current step</div>
+              <div style="margin-top:8px;font-size:16px;font-weight:500;letter-spacing:-0.01em">{{ cs.currentStep }}</div>
+              <div style="margin-top:16px;display:grid;grid-template-columns:150px 1fr;row-gap:10px;column-gap:14px;font-size:13.5px">
+                <span style="color:#676A75">Responsible party</span><span>{{ cs.nextActor }}</span>
+                <span style="color:#676A75">Permitted next action</span><span>{{ cs.nextAction }}</span>
+                <span style="color:#676A75">Blocker</span><span>{{ cs.blocker }}</span>
+              </div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Prerequisites for pledge activation</div>
+              <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ cs.prereqs }}" as="p" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="display:flex;align-items:center;gap:10px"><span style="width:16px;height:16px;border-radius:50%;border:1px solid {{ p.c }};color:{{ p.c }};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex:none">{{ p.mark }}</span>{{ p.l }}</span><span style="font-size:12px;color:#9A9CA6;white-space:nowrap">{{ p.s }}</span></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+              <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:500">Participants</div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span>Demo Manufacturer</span><span style="color:#9A9CA6">Borrower · asset owner</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span>Demo CNC Dealer</span><span style="color:#9A9CA6">Dealer · contributor</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span>Demo Verifier</span><span style="color:#9A9CA6">Verifier · ATT-001 issued</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span>Demo Lender A <span style="font-size:11px;color:oklch(88% 0.1 80);margin-left:4px">you</span></span><span style="color:#9A9CA6">Selected lender</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;font-size:13px"><span>Demo Auditor</span><span style="color:#9A9CA6">{{ cs.auditorGrant }}</span></div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+              <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:500">References</div>
+              <button onClick="{{ goAsset }}" style="width:100%;display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border:none;border-bottom:1px solid rgba(255,255,255,.05);background:transparent;color:#F4F5F7;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.03)"><span style="color:#9A9CA6">Asset passport</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">ASSET-DEMO-001 →</span></button>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span style="color:#9A9CA6">Attestation</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">ATT-001 · valid to 2027-03-10</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span style="color:#9A9CA6">Evidence package</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">PKG-001 v2 · 5 documents</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span style="color:#9A9CA6">Proposal</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">{{ cs.proposalRef }}</span></div>
+              <button onClick="{{ goPledge }}" style="width:100%;display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border:none;background:transparent;color:#F4F5F7;font-size:13px;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.03)"><span style="color:#9A9CA6">Pledge</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">{{ cs.pledgeRef }} →</span></button>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Evidence }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+            <table style="width:100%;min-width:900px;border-collapse:collapse">
+              <thead><tr>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Document</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Source</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Version</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Uploaded</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Integrity</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Review</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Sharing scope</th>
+                <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"></th>
+              </tr></thead>
+              <tbody>
+              <sc-for list="{{ docs }}" as="d" hint-placeholder-count="5">
+                <tr style-hover="background:rgba(255,255,255,.03)">
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>{{ d.name }}</div><div style="font-size:11.5px;color:#676A75;margin-top:2px">{{ d.type }}</div></td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><div>{{ d.org }}</div><div style="font-size:11.5px;color:#676A75;margin-top:2px">{{ d.by }}</div></td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ d.v }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;white-space:nowrap">{{ d.date }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">Hash verified</span></td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">{{ d.review }}</span></td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">{{ d.scope }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;white-space:nowrap"><button style="height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Download</button> <button style="height:28px;padding:0 10px;border-radius:6px;border:none;background:transparent;color:#9A9CA6;font-size:12px;cursor:pointer" style-hover="color:#F4F5F7">Request correction</button></td>
+                </tr>
+              </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">A hash match confirms the file bytes match the committed integrity reference. It does not establish that a document is original, genuine, or legally enforceable. Downloads use short-lived links issued after a server-side access check.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Verification }}" hint-placeholder-val="{{ false }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:13px">ATT-001</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">Valid</span></div>
+            <div style="margin-top:14px;display:grid;grid-template-columns:130px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px">
+              <span style="color:#676A75">Issuer</span><span>Demo Verifier (active, assigned)</span>
+              <span style="color:#676A75">Outcome</span><span>Attestation issued</span>
+              <span style="color:#676A75">Inspection method</span><span>On-site inspection + document review</span>
+              <span style="color:#676A75">Inspected</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-09-10</span>
+              <span style="color:#676A75">Valid until</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2027-03-10</span>
+              <span style="color:#676A75">Supporting versions</span><span>Inspection report v2 · Dealer invoice v1 · Equipment photos v1 · Maintenance log v1</span>
+              <span style="color:#676A75">Replacement</span><span>None · not superseded or revoked</span>
+            </div>
+            <div style="margin-top:16px;padding:12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6;line-height:1.55"><span style="color:#F4F5F7">Limitations.</span> Ownership and lien status were reviewed from submitted documents only. No UCC, title, or registry search was performed. Maintenance history verified for Q3 2025 onward.</div>
+          </div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+            <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:500">Checked items</div>
+            <sc-for list="{{ checks }}" as="k" hint-placeholder-count="7">
+              <div style="display:grid;grid-template-columns:170px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start"><span style="color:#9A9CA6">{{ k.item }}</span><span>{{ k.finding }}</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap">{{ k.status }}</span></div>
+            </sc-for>
+            <p style="margin:0;padding:12px 16px;font-size:12px;color:#676A75;line-height:1.5">This attestation records the checks listed above. It does not approve financing or establish legal lien priority.</p>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Review }}" hint-placeholder-val="{{ false }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Collateral review · Demo Lender A</div><div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500">{{ cs.reviewHeadline }}</div></div>
+              <button onClick="{{ goReview }}" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Open collateral review →</button>
+            </div>
+            <div style="margin-top:16px;display:grid;grid-template-columns:160px 1fr;row-gap:10px;column-gap:14px;font-size:13.5px">
+              <span style="color:#676A75">Analyst</span><span>Dana Reyes · Demo Lender A</span>
+              <span style="color:#676A75">Approver mandate</span><span>Morgan Hale · Head of Credit</span>
+              <span style="color:#676A75">Evidence snapshot</span><span>PKG-001 v2 · matches attested versions</span>
+              <span style="color:#676A75">Assessment</span><span>{{ cs.assessmentState }}</span>
+              <span style="color:#676A75">Decision</span><span>{{ cs.decisionState }}</span>
+            </div>
+          </div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:13px;color:#9A9CA6;line-height:1.55">
+            <div style="font-size:13.5px;font-weight:500;color:#F4F5F7">Scope of this review</div>
+            <p style="margin:8px 0 0">Eligibility applies to Demo Lender A and case CL-001 only. It does not make the passport eligible elsewhere and it does not promise funding.</p>
+            <p style="margin:8px 0 0">Internal assessment notes and the internal risk view are visible to Demo Lender A only. Feedback shared with the borrower is recorded separately.</p>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Proposal }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ cs.hasProposal }}" hint-placeholder-val="{{ false }}">
+          <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:13px">FP-001 · v2</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">Accepted · exact version v2</span></div>
+              <div style="margin-top:14px;display:grid;grid-template-columns:170px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px">
+                <span style="color:#676A75">Lender</span><span>Demo Lender A</span>
+                <span style="color:#676A75">Borrower</span><span>Demo Manufacturer</span>
+                <span style="color:#676A75">Case · Asset</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">CL-001 · ASSET-DEMO-001</span>
+                <span style="color:#676A75">Financing reference</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">LOAN-DEMO-001 (external)</span>
+                <span style="color:#676A75">Principal</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">USD 105,000.00</span>
+                <span style="color:#676A75">Term metadata</span><span>36 months · metadata only</span>
+                <span style="color:#676A75">Proposal expiry</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-10-05</span>
+                <span style="color:#676A75">Legal document reference</span><span>Executed financing documents held by Demo Lender A (external)</span>
+                <span style="color:#676A75">Authorized approver</span><span>Morgan Hale · Demo Lender A</span>
+                <span style="color:#676A75">Accepted by</span><span>Demo Manufacturer · 2026-09-21 16:40 UTC · committed</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:13px;color:#9A9CA6;line-height:1.55"><div style="font-size:13.5px;font-weight:500;color:#F4F5F7">Version history</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;gap:10px"><span>v2 · issued 2026-09-20 · expiry corrected</span><span style="color:oklch(74% 0.13 155)">Accepted</span></div><div style="display:flex;justify-content:space-between;gap:10px"><span>v1 · issued 2026-09-19</span><span>Withdrawn</span></div></div></div>
+              <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:12.5px;color:#9A9CA6;line-height:1.55">Accepting this workflow proposal does not itself disburse funds or replace executed financing documents.</div>
+            </div>
+          </div>
+          </sc-if>
+          <sc-if value="{{ cs.noProposal }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:32px;display:flex;flex-direction:column;align-items:flex-start;gap:10px">
+            <div style="font-size:15px;font-weight:500">No proposal issued</div>
+            <p style="margin:0;font-size:13.5px;color:#9A9CA6;line-height:1.55;max-width:560px">A financing proposal can be issued by an authorized approver after the collateral decision for this case is recorded. Issuing a proposal creates a workflow record; it does not disburse funds.</p>
+            <button disabled style="margin-top:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#676A75;font-size:13.5px;cursor:not-allowed">Issue proposal · requires recorded decision</button>
+          </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Pledge }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Collateral control · ASSET-DEMO-001</div><div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500">{{ pl.headline }}</div><div style="margin-top:6px;font-size:13px;color:#9A9CA6">{{ pl.sub }}</div></div>
+          <button onClick="{{ goPledge }}" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Open pledge detail →</button>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Sharing }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+            <table style="width:100%;min-width:900px;border-collapse:collapse">
+              <thead><tr>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Recipient</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Purpose</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Scope</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Permission</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Expiry</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Status</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Consenting parties</th>
+              </tr></thead>
+              <tbody>
+                <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px">Demo Lender A <span style="font-size:11px;color:oklch(88% 0.1 80);margin-left:4px">you</span></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">Lender review</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">PKG-001 v2 · 5 documents · loan terms</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">View + download</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">2026-12-31</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="display:inline-flex;align-items:center;gap:7px">Active</span></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">Demo Manufacturer · Demo CNC Dealer</td></tr>
+                <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px">Demo Verifier</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">Verification scope</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">Assigned evidence · 4 documents · no loan terms</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">View</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">Until attestation issued</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="display:inline-flex;align-items:center;gap:7px">Completed</span></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">Demo Manufacturer</td></tr>
+                <tr><td style="padding:12px 14px;font-size:13.5px">Demo Auditor</td><td style="padding:12px 14px;font-size:13px">Scoped audit</td><td style="padding:12px 14px;font-size:13px">{{ cs.auditScope }}</td><td style="padding:12px 14px;font-size:13px">{{ cs.auditPerm }}</td><td style="padding:12px 14px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">{{ cs.auditExpiry }}</td><td style="padding:12px 14px;font-size:13px"><span style="display:inline-flex;align-items:center;gap:7px">{{ cs.auditGrant }}</span></td><td style="padding:12px 14px;font-size:12.5px;color:#9A9CA6">{{ cs.auditConsent }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button style="height:32px;padding:0 12px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Review package</button><button disabled style="height:32px;padding:0 12px;border-radius:7px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#676A75;font-size:13px;cursor:not-allowed">Grant access · controller only</button></div>
+          <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">Loan terms are disclosed only to the borrower and the selected lender. Revoking a grant limits future document access; previously shared copies may still exist.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ caseTabIs.Activity }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <sc-for list="{{ activity }}" as="e" hint-placeholder-count="8">
+            <div style="display:grid;grid-template-columns:150px minmax(0,1fr) 120px;gap:14px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start">
+              <span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#676A75">{{ e.t }}</span>
+              <span style="min-width:0"><span style="display:block">{{ e.e }}</span><span style="display:block;font-size:12px;color:#9A9CA6;margin-top:2px">{{ e.a }} · {{ e.chg }}</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;justify-self:end">{{ e.kind }}</span>
+            </div>
+          </sc-for>
+          <p style="margin:0;padding:12px 16px;font-size:12px;color:#676A75">Committed events are ledger transactions. Operational events are application actions and are not evidence of a state change.</p>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isAsset }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Asset Passport" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div class="d-hdr" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em"><span style="font-family:'Red Hat Mono',ui-monospace,monospace">ASSET-DEMO-001</span> · CNC machining center</h1><span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12.5px">Registered</span></div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6">DEMO-CNC-500 · Serial SYNTH-CNC-001 · Owner claim: Demo Manufacturer (submitted evidence) · Passport version v3</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+            <button onClick="{{ goCase }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Open case CL-001</button>
+            <button style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Review sharing</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;background:oklch(82% 0.12 75 / .08);border:1px solid oklch(82% 0.12 75 / .25);font-size:12.5px;color:oklch(90% 0.08 80)"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.05em">NOTE</span>Ownership and lien status were reviewed from submitted documents by the verifier. This is not a legal title or lien check.</div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto">
+          <sc-for list="{{ assetTabs }}" as="t" hint-placeholder-count="5">
+            <button onClick="{{ t.select }}" style="height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ t.border }};margin-bottom:-1px;background:transparent;color:{{ t.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ assetTabIs.Overview }}" hint-placeholder-val="{{ true }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+            <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Equipment identity</div>
+            <div class="d-g2" style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13.5px">
+              <div><div style="font-size:12px;color:#676A75">Equipment class</div><div style="margin-top:3px">CNC machining center</div></div>
+              <div><div style="font-size:12px;color:#676A75">Manufacturer</div><div style="margin-top:3px">Demo Machine Works (synthetic)</div></div>
+              <div><div style="font-size:12px;color:#676A75">Model</div><div style="margin-top:3px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">DEMO-CNC-500</div></div>
+              <div><div style="font-size:12px;color:#676A75">Serial number</div><div style="margin-top:3px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">SYNTH-CNC-001</div></div>
+              <div><div style="font-size:12px;color:#676A75">Year of manufacture</div><div style="margin-top:3px">2019</div></div>
+              <div><div style="font-size:12px;color:#676A75">Asset ID · namespace</div><div style="margin-top:3px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">ASSET-DEMO-001 · collara-localnet</div></div>
+              <div><div style="font-size:12px;color:#676A75">Owner organization</div><div style="margin-top:3px">Demo Manufacturer · claim source: purchase agreement v1, dealer invoice v1</div></div>
+              <div><div style="font-size:12px;color:#676A75">Location scope</div><div style="margin-top:3px">Demo Manufacturer facility · Ohio, US (declared)</div></div>
+              <div><div style="font-size:12px;color:#676A75">Registered</div><div style="margin-top:3px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-09-01 08:40 UTC · committed</div></div>
+              <div><div style="font-size:12px;color:#676A75">Last update</div><div style="margin-top:3px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ assetLastUpdate }}</div></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Verification and evidence</div>
+              <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;font-size:13.5px">
+                <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Attestation</span><span style="display:inline-flex;align-items:center;gap:7px">ATT-001 · valid to 2027-03-10</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Scope</span><span>Serial, photos, documents, condition, location, maintenance</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Evidence validity</span><span>5 documents · all hashes verified</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Collateral control</span><span style="display:inline-flex;align-items:center;gap:7px">{{ pl.short }}</span></div>
+              </div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Permitted actions · Demo Lender A</div>
+              <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;font-size:13px">
+                <div style="display:flex;justify-content:space-between;gap:10px"><span>Open case · Review sharing</span><span style="color:oklch(74% 0.13 155)">Available</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px;color:#9A9CA6"><span>Add evidence · Request verification</span><span>Owner only</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px;color:#9A9CA6"><span>Transfer ownership</span><span>Planned · blocked while locked</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ assetTabIs.Evidence }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:820px;border-collapse:collapse">
+            <thead><tr><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Document</th><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Source</th><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Version</th><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Uploaded</th><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Integrity</th><th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Sharing scope</th></tr></thead>
+            <tbody>
+            <sc-for list="{{ docs }}" as="d" hint-placeholder-count="5">
+              <tr style-hover="background:rgba(255,255,255,.03)"><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>{{ d.name }}</div><div style="font-size:11.5px;color:#676A75;margin-top:2px">{{ d.type }}</div></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">{{ d.org }}</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ d.v }}</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">{{ d.date }}</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="display:inline-flex;align-items:center;gap:7px">Hash verified</span></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">{{ d.scope }}</td></tr>
+            </sc-for>
+            </tbody>
+          </table>
+        </div>
+        </sc-if>
+        <sc-if value="{{ assetTabIs.Verification }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:13.5px;font-weight:500">ATT-001 · Demo Verifier · inspected 2026-09-10 · valid until 2027-03-10</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">Valid · not superseded</span></div>
+          <sc-for list="{{ checks }}" as="k" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:170px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start"><span style="color:#9A9CA6">{{ k.item }}</span><span>{{ k.finding }}</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap">{{ k.status }}</span></div>
+          </sc-for>
+          <p style="margin:0;padding:12px 16px;font-size:12px;color:#676A75;line-height:1.5">Limitations: ownership and lien status reviewed from submitted documents only; no UCC, title, or registry search performed.</p>
+        </div>
+        </sc-if>
+        <sc-if value="{{ assetTabIs.Cases }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <button onClick="{{ goCase }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border:none;border-bottom:1px solid rgba(255,255,255,.06);background:transparent;color:#F4F5F7;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.03)"><span style="display:flex;align-items:center;gap:14px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">CL-001</span><span>Used CNC financing · Demo Manufacturer → Demo Lender A</span></span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">{{ cs.stage.l }} →</span></button>
+          <p style="margin:0;padding:12px 16px;font-size:12px;color:#676A75">Only cases your organization is permitted to see are listed.</p>
+        </div>
+        </sc-if>
+        <sc-if value="{{ assetTabIs.Activity }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <sc-for list="{{ activity }}" as="e" hint-placeholder-count="8">
+            <div style="display:grid;grid-template-columns:150px minmax(0,1fr) 120px;gap:14px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#676A75">{{ e.t }}</span><span style="min-width:0"><span style="display:block">{{ e.e }}</span><span style="display:block;font-size:12px;color:#9A9CA6;margin-top:2px">{{ e.a }} · {{ e.chg }}</span></span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;justify-self:end">{{ e.kind }}</span></div>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Collateral Review" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div class="d-hdr" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em">Collateral review · <span style="font-family:'Red Hat Mono',ui-monospace,monospace">CL-001</span></h1><span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12.5px">{{ cs.st.review.l }}</span></div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6">CNC machining center · DEMO-CNC-500 · ASSET-DEMO-001 · Analyst: Dana Reyes · Approver: Morgan Hale · Evidence snapshot PKG-001 v2</p>
+          </div>
+          <button onClick="{{ goCase }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer;white-space:nowrap" style-hover="background:rgba(255,255,255,.05)">Back to case</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto">
+          <sc-for list="{{ reviewTabs }}" as="t" hint-placeholder-count="5">
+            <button onClick="{{ t.select }}" style="height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ t.border }};margin-bottom:-1px;background:transparent;color:{{ t.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ reviewTabIs.Evidence }}" hint-placeholder-val="{{ false }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+            <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:500">Evidence completeness · policy CP-2026-CNC-01</div>
+            <sc-for list="{{ completeness }}" as="c" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13.5px"><span style="display:flex;align-items:center;gap:10px"><span style="width:16px;height:16px;border-radius:50%;border:1px solid {{ c.c }};color:{{ c.c }};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex:none">{{ c.mark }}</span>{{ c.l }}</span><span style="font-size:12px;color:#9A9CA6;white-space:nowrap">{{ c.s }}</span></div>
+            </sc-for>
+          </div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:13.5px">
+            <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Snapshot</div>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Package</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">PKG-001 v2</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Matches attested versions</span><span style="color:oklch(74% 0.13 155)">Yes</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Attestation validity</span><span>Valid to 2027-03-10</span></div>
+              <div style="display:flex;justify-content:space-between;gap:10px"><span style="color:#9A9CA6">Stale evidence</span><span>None detected</span></div>
+            </div>
+            <p style="margin:14px 0 0;font-size:12px;color:#676A75;line-height:1.5">If the reviewed evidence changes, this review returns to Needs information until the new version is acknowledged.</p>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ reviewTabIs.Scope }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:13.5px;font-weight:500">ATT-001 · Demo Verifier · on-site inspection + document review · 2026-09-10</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">Valid to 2027-03-10</span></div>
+          <sc-for list="{{ checks }}" as="k" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:170px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start"><span style="color:#9A9CA6">{{ k.item }}</span><span>{{ k.finding }}</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap">{{ k.status }}</span></div>
+          </sc-for>
+          <p style="margin:0;padding:12px 16px;font-size:12px;color:#676A75;line-height:1.5">Limitations: ownership and lien status reviewed from submitted documents only. No UCC, title, or registry search performed. The attestation does not approve financing or establish legal lien priority.</p>
+        </div>
+        </sc-if>
+        <sc-if value="{{ reviewTabIs.Assessment }}" hint-placeholder-val="{{ true }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px">
+            <div class="d-g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Valuation amount<input defaultValue="150,000.00" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;font-family:'Red Hat Mono',ui-monospace,monospace;outline:none" style-focus="border-color:rgba(255,255,255,.3)"></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Currency<select defaultValue="USD" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;outline:none"><option>USD</option><option>EUR</option></select></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Valuation source<input defaultValue="Verifier inspection report v2 · dealer invoice v1" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;outline:none" style-focus="border-color:rgba(255,255,255,.3)"></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Valuation date<input defaultValue="2026-09-10" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;font-family:'Red Hat Mono',ui-monospace,monospace;outline:none" style-focus="border-color:rgba(255,255,255,.3)"></label>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Valuation limitations<textarea rows="2" defaultValue="Desktop review of dealer invoice; no independent market comparables obtained. Condition per verifier inspection on 2026-09-10." style="padding:9px 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;line-height:1.5;resize:vertical;outline:none" style-focus="border-color:rgba(255,255,255,.3)"></textarea></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6"><span style="display:flex;align-items:center;gap:8px">Internal assessment notes<span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.05em;padding:2px 6px;border-radius:4px;background:oklch(82% 0.12 75 / .12);color:oklch(88% 0.1 80)">INTERNAL · DEMO LENDER A ONLY</span></span><textarea rows="3" defaultValue="Serial matches invoice and photos. Maintenance log gap Q2 2025 noted by verifier; borrower explanation received 2026-09-14. Advance rate under policy CP-2026-CNC-01: 70% of valuation." style="padding:9px 10px;background:#0F1014;border:1px solid oklch(82% 0.12 75 / .3);border-radius:7px;color:#F4F5F7;font-size:13.5px;line-height:1.5;resize:vertical;outline:none" style-focus="border-color:oklch(82% 0.12 75 / .6)"></textarea></label>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Required external checks
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#F4F5F7">
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:#0F1014"><span>UCC lien search</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#9A9CA6">Pending · external</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:#0F1014"><span>Title and ownership confirmation</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#9A9CA6">Outside Collara</span></div>
+              </div>
+            </div>
+            <div class="d-g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Collateral outcome<select defaultValue="{{ cs.outcomeDefault }}" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;outline:none"><option>Needs information</option><option>Eligible for this case</option><option>Rejected for this case</option></select></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#9A9CA6">Policy reference<input defaultValue="CP-2026-CNC-01" style="height:36px;padding:0 10px;background:#0F1014;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#F4F5F7;font-size:13.5px;font-family:'Red Hat Mono',ui-monospace,monospace;outline:none" style-focus="border-color:rgba(255,255,255,.3)"></label>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px solid rgba(255,255,255,.07)">
+              <sc-if value="{{ cs.reviewOpen }}" hint-placeholder-val="{{ true }}">
+                <button style="height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Request information</button>
+                <button style="height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Save assessment</button>
+                <span style="flex:1"></span>
+                <sc-if value="{{ isApprover }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ openReject }}" style="height:34px;padding:0 13px;border-radius:8px;border:1px solid oklch(70% 0.17 25 / .4);background:transparent;color:oklch(80% 0.14 25);font-size:13.5px;cursor:pointer" style-hover="background:oklch(70% 0.17 25 / .1)">Reject for this case</button>
+                  <button onClick="{{ openApprove }}" style="height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Approve eligibility</button>
+                </sc-if>
+                <sc-if value="{{ isAnalyst }}" hint-placeholder-val="{{ false }}">
+                  <button style="height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Submit for approval</button>
+                </sc-if>
+              </sc-if>
+              <sc-if value="{{ cs.reviewClosed }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12.5px;color:#9A9CA6">Assessment recorded with the decision on 2026-09-18. Changes require a new assessment version.</span>
+              </sc-if>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:13px;color:#9A9CA6;line-height:1.55">
+              <div style="font-size:13.5px;font-weight:500;color:#F4F5F7">Derived figures</div>
+              <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;justify-content:space-between;gap:10px"><span>Requested principal</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">USD 105,000.00</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px"><span>Principal / valuation</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">70.0%</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px"><span>Policy maximum</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">70.0%</span></div>
+              </div>
+              <p style="margin:12px 0 0;font-size:12px;color:#676A75">Valuation and principal are separate fields. Neither is summed with other cases or currencies.</p>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:12.5px;color:#9A9CA6;line-height:1.55">Eligible for this lender and case. Financing is not yet active. Eligibility does not make the passport globally eligible or promise funding.</div>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ reviewTabIs.Decision }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ cs.reviewOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:12px;max-width:720px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500">Decision pending</div>
+            <p style="margin:0;font-size:13.5px;color:#9A9CA6;line-height:1.55">The assessment recommends <span style="color:#F4F5F7">Eligible for this case</span> under policy CP-2026-CNC-01. A decision requires the approver mandate; the analyst cannot record it.</p>
+            <sc-if value="{{ isApprover }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:6px"><button onClick="{{ openApprove }}" style="height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Approve eligibility</button><button onClick="{{ openReject }}" style="height:34px;padding:0 13px;border-radius:8px;border:1px solid oklch(70% 0.17 25 / .4);background:transparent;color:oklch(80% 0.14 25);font-size:13.5px;cursor:pointer" style-hover="background:oklch(70% 0.17 25 / .1)">Reject for this case</button><button style="height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Request information</button></div></sc-if>
+            <sc-if value="{{ isAnalyst }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">Your mandate (Lender Analyst) does not include collateral approval. Submit the assessment for approval by Morgan Hale.</div></sc-if>
+          </div>
+          </sc-if>
+          <sc-if value="{{ cs.reviewClosed }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:12px;max-width:720px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500">Eligible for this lender and case. Financing is not yet active.</div>
+            <div style="display:grid;grid-template-columns:160px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px">
+              <span style="color:#676A75">Recorded by</span><span>Morgan Hale · Lender Approver · Demo Lender A</span>
+              <span style="color:#676A75">Recorded</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-09-18 15:22 UTC · committed</span>
+              <span style="color:#676A75">Evidence snapshot</span><span>PKG-001 v2 · ATT-001</span>
+              <span style="color:#676A75">Policy reference</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">CP-2026-CNC-01</span>
+              <span style="color:#676A75">Commit reference</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">CA-001 · 7c1d…40ab · offset 18207</span>
+            </div>
+          </div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{ reviewTabIs.Activity }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+          <sc-for list="{{ reviewActivity }}" as="e" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:150px minmax(0,1fr) 120px;gap:14px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;align-items:start"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#676A75">{{ e.t }}</span><span style="min-width:0"><span style="display:block">{{ e.e }}</span><span style="display:block;font-size:12px;color:#9A9CA6;margin-top:2px">{{ e.a }} · {{ e.chg }}</span></span><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;justify-self:end">{{ e.kind }}</span></div>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isPledge }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Pledge Detail and Release" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div class="d-hdr" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em"><span style="font-family:'Red Hat Mono',ui-monospace,monospace">{{ pl.id }}</span> · Collateral control for ASSET-DEMO-001</h1><span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12.5px">{{ pl.state }}</span></div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6">Linked case <button onClick="{{ goCase }}" style="border:none;background:transparent;padding:0;color:#F4F5F7;font-size:13.5px;cursor:pointer;font-family:'Red Hat Mono',ui-monospace,monospace" style-hover="text-decoration:underline">CL-001</button> · Registered asset <button onClick="{{ goAsset }}" style="border:none;background:transparent;padding:0;color:#F4F5F7;font-size:13.5px;cursor:pointer;font-family:'Red Hat Mono',ui-monospace,monospace" style-hover="text-decoration:underline">ASSET-DEMO-001</button> · Lender authority: Demo Lender A · Approver mandate</p>
+          </div>
+          <div style="font-size:11.5px;color:#676A75;text-align:right">Ledger synced · offset 18422<br>2026-10-01 14:32:05 UTC</div>
+        </div>
+
+        <sc-if value="{{ pl.available }}" hint-placeholder-val="{{ true }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500">No active Collara lock</div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6;line-height:1.55">Asset control ASSET-DEMO-001 v3 is available. Activation consumes the available control and requires the authorizations below. Two concurrent activations cannot both commit.</p>
+            <div style="margin-top:16px;display:flex;flex-direction:column">
+              <sc-for list="{{ cs.prereqs }}" as="p" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06)"><span style="display:flex;align-items:center;gap:10px"><span style="width:16px;height:16px;border-radius:50%;border:1px solid {{ p.c }};color:{{ p.c }};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex:none">{{ p.mark }}</span>{{ p.l }}</span><span style="font-size:12px;color:#9A9CA6;white-space:nowrap">{{ p.s }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:13px;color:#9A9CA6;line-height:1.55">
+            <div style="font-size:13.5px;font-weight:500;color:#F4F5F7">Lender actions</div>
+            <p style="margin:8px 0 0">Activation becomes available after the collateral decision is recorded and the borrower accepts an issued proposal. No lender action is available on this control right now.</p>
+            <div style="margin-top:14px;display:grid;grid-template-columns:130px 1fr;row-gap:8px;column-gap:12px;font-size:13px">
+              <span style="color:#676A75">Control</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">ASSET-DEMO-001 · v3 · AVAILABLE</span>
+              <span style="color:#676A75">Namespace</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#F4F5F7">collara-localnet</span>
+              <span style="color:#676A75">Prior locks</span><span style="color:#F4F5F7">None recorded</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ pl.locked }}" hint-placeholder-val="{{ false }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Lock and activation evidence</div>
+              <div style="margin-top:12px;display:grid;grid-template-columns:170px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px">
+                <span style="color:#676A75">Lock state</span><span style="display:inline-flex;align-items:center;gap:7px">{{ pl.lockLine }}</span>
+                <span style="color:#676A75">Activated</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-09-22 14:05 UTC · committed</span>
+                <span style="color:#676A75">Authorized by</span><span>Demo Manufacturer (borrower mandate) · Demo Lender A (approver mandate)</span>
+                <span style="color:#676A75">Proposal</span><span>FP-001 v2 · accepted 2026-09-21 · USD 105,000.00</span>
+                <span style="color:#676A75">Attestation</span><span>ATT-001 · valid to 2027-03-10</span>
+                <span style="color:#676A75">Evidence snapshot</span><span>PKG-001 v2 · matched attested versions at activation</span>
+                <span style="color:#676A75">Asset control</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">ASSET-DEMO-001 v3 → v4 (consumed on activation)</span>
+                <span style="color:#676A75">Commit reference</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">PL-001 · 3f9a…c21e · offset 18310</span>
+              </div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Release request · RR-001</div><span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px">{{ pl.rrState }}</span></div>
+              <div style="margin-top:12px;display:grid;grid-template-columns:170px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px">
+                <span style="color:#676A75">Requested by</span><span>Demo Manufacturer · Borrower mandate</span>
+                <span style="color:#676A75">Requested</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">2026-09-30 09:12 UTC · committed</span>
+                <span style="color:#676A75">Reason</span><span>External loan completion</span>
+                <span style="color:#676A75">Borrower note</span><span style="color:#9A9CA6">"Final payment confirmed by your servicing team on 2026-09-29. Requesting release of the Collara lock."</span>
+                <span style="color:#676A75">Servicing reference</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">LOAN-DEMO-001 · external repayment confirmed (synthetic manual input)</span>
+              </div>
+              <div style="margin-top:14px;padding:10px 12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6">{{ pl.note }}</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-size:13.5px;font-weight:500">Release decision</div>
+              <sc-if value="{{ pl.decisionPending }}" hint-placeholder-val="{{ false }}">
+                <sc-if value="{{ isApprover }}" hint-placeholder-val="{{ true }}">
+                  <p style="margin:8px 0 0;font-size:13px;color:#9A9CA6;line-height:1.55">You hold the approver mandate for Demo Lender A, the designated lender on this lock. Only this authority can release it.</p>
+                  <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+                    <button onClick="{{ openRelease }}" style="height:36px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Authorize release</button>
+                    <button onClick="{{ openRejectRelease }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid oklch(70% 0.17 25 / .4);background:transparent;color:oklch(80% 0.14 25);font-size:13.5px;cursor:pointer" style-hover="background:oklch(70% 0.17 25 / .1)">Reject release</button>
+                    <button style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Request information</button>
+                  </div>
+                  <p style="margin:14px 0 0;font-size:12px;color:#676A75;line-height:1.5">This releases the Collara workflow lock. Any required legal lien termination must be completed separately.</p>
+                </sc-if>
+                <sc-if value="{{ isAnalyst }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6;line-height:1.5">Release requires the designated lender's authorization. Your mandate (Lender Analyst) does not include release approval. Approver: Morgan Hale.</div>
+                  <button style="margin-top:12px;height:36px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer;width:100%" style-hover="background:rgba(255,255,255,.05)">Request information</button>
+                </sc-if>
+              </sc-if>
+              <sc-if value="{{ pl.decided }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:14px">{{ pl.decisionLine }}</div>
+                <div style="margin-top:12px;display:grid;grid-template-columns:110px 1fr;row-gap:8px;column-gap:12px;font-size:13px">
+                  <span style="color:#676A75">Decided by</span><span>Morgan Hale · Lender Approver · Demo Lender A</span>
+                  <span style="color:#676A75">Recorded</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ pl.decidedAt }}</span>
+                  <span style="color:#676A75">Control</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ pl.controlAfter }}</span>
+                </div>
+                <p style="margin:14px 0 0;font-size:12px;color:#676A75;line-height:1.5">{{ pl.afterNote }}</p>
+              </sc-if>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;font-size:12.5px;color:#9A9CA6;line-height:1.55">
+              <div style="font-size:13.5px;font-weight:500;color:#F4F5F7">What does not release this lock</div>
+              <p style="margin:8px 0 0">A maturity date, an uploaded proof of repayment, case cancellation, or an operator or governance action. Only the designated lender's authorization does.</p>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Audit Center" style="display:flex;flex-direction:column;gap:18px;max-width:1240px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em">Audit center</h1><p style="margin:6px 0 0;font-size:13.5px;color:#9A9CA6">Scoped projection of committed ledger events and application actions for records Demo Lender A can access.</p></div>
+          <button onClick="{{ openExport }}" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Export case report</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08)">
+          <sc-for list="{{ auditTabs }}" as="t" hint-placeholder-count="2">
+            <button onClick="{{ t.select }}" style="height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ t.border }};margin-bottom:-1px;background:transparent;color:{{ t.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ auditTabIs.Events }}" hint-placeholder-val="{{ true }}">
+        <div class="d-wrap" style="display:flex;align-items:center;gap:8px">
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#F4F5F7;font-size:12.5px;cursor:pointer">Case: CL-001 ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Event type: All ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Actor: All visible ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">2026-09-01 → today ▾</button>
+          <button style="height:32px;padding:0 11px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9A9CA6;font-size:12.5px;cursor:pointer" style-hover="color:#F4F5F7">Committed + operational ▾</button>
+          <span style="flex:1"></span>
+          <span style="font-size:12px;color:#676A75">{{ auditCount }} events · through offset 18422</span>
+        </div>
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:1040px;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Event time (UTC)</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Reference</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Event type</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Authorized actor</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">State change</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Version</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Commit</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Status</th>
+            </tr></thead>
+            <tbody>
+            <sc-for list="{{ activity }}" as="e" hint-placeholder-count="8">
+              <tr style-hover="background:rgba(255,255,255,.03)">
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;white-space:nowrap">{{ e.t }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;white-space:nowrap">{{ e.ref }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">{{ e.e }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6">{{ e.a }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;white-space:nowrap">{{ e.chg }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#9A9CA6;white-space:nowrap">{{ e.ver }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11.5px;color:#9A9CA6;white-space:nowrap">{{ e.commit }}</td>
+                <td style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:7px">{{ e.kind }}</span></td>
+              </tr>
+            </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">Operational events (uploads, drafts, views) are application actions. Only ledger-committed events change workflow state. Failed or unknown commands never appear as successful lifecycle events.</p>
+        </sc-if>
+        <sc-if value="{{ auditTabIs.Exports }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:900px;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Report</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Scope</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Requested by</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Generated (UTC)</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Coverage watermark</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Checksum</th>
+              <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"></th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>RPT-0007 · CL-001</div><div style="font-size:11.5px;color:#676A75;margin-top:2px">JSON · schema v0.3</div></td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">Own scope · Demo Lender A</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">Dana Reyes · Analyst</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">2026-09-30 14:02:11</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">offset 18402 · cutoff 2026-09-30 14:00</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">sha256 9b12…e7a0</td><td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right"><button style="height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Download</button></td></tr>
+              <tr><td style="padding:12px 14px;font-size:13.5px"><div>RPT-0004 · CL-003</div><div style="font-size:11.5px;color:#676A75;margin-top:2px">CSV · schema v0.3</div></td><td style="padding:12px 14px;font-size:13px">Own scope · Demo Lender A</td><td style="padding:12px 14px;font-size:13px">Morgan Hale · Approver</td><td style="padding:12px 14px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">2026-09-24 09:41:57</td><td style="padding:12px 14px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">offset 18344 · cutoff 2026-09-24 09:40</td><td style="padding:12px 14px;font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">sha256 41cc…08d9</td><td style="padding:12px 14px;text-align:right"><button style="height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Download</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#676A75;line-height:1.5"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.04em;color:#9A9CA6">Case workflow report — not a legal title or lien certificate.</span><span>This report includes only records available within your access scope. Access is re-evaluated at generation and at download. Reports carry a cut-off, a retention caveat, and a ledger coverage watermark.</span></div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isGov }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Governance" style="display:flex;flex-direction:column;gap:22px;max-width:1240px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">BitSafe governance · UI simulation</div>
+            <h1 style="margin:6px 0 0;font-size:22px;font-weight:500;letter-spacing:-0.02em">Governance</h1>
+            <p style="margin:6px 0 0;font-size:13.5px;color:#9A9CA6;max-width:720px;line-height:1.5">Verifier-registry administration by a three-seat governance set with a 2-of-3 approval threshold. Proposals add or suspend verifiers. Nothing here touches collateral.</p>
+          </div>
+          <span style="font-size:12px;color:#676A75;text-align:right;line-height:1.5">Decentralization Manager · not connected<br>Simulated locally · 3 seats · threshold 2 of 3</span>
+        </div>
+        <div style="display:flex;gap:14px;align-items:flex-start;padding:11px 14px;border-radius:9px;background:oklch(74% 0.1 250 / .08);border:1px solid oklch(74% 0.1 250 / .28);font-size:12.5px;line-height:1.5;color:#C9CBD3">
+          <span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.06em;color:oklch(84% 0.08 250);white-space:nowrap;padding-top:2px">SIMULATION</span>
+          <span>Votes and execution are recorded locally until the Decentralization Manager integration is implemented. Governance administers the verifier registry only (add, suspend). It never authorizes collateral release; that stays with the lender approver mandate on each pledge.</span>
+        </div>
+        <div class="d-tiles" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+          <button onClick="{{ govRegistryTab }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Active verifiers</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ govCounts.active }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Assignable to verification requests</div></button>
+          <button onClick="{{ govRegistryTab }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Suspended verifiers</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ govCounts.suspended }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">No new assignments accepted</div></button>
+          <button onClick="{{ govProposalsTab }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Open proposals</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">{{ govCounts.open }}</div><div style="margin-top:8px;font-size:12px;color:#676A75">Open proposals →</div></button>
+          <button onClick="{{ govMembersTab }}" style="text-align:left;background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;color:#F4F5F7" style-hover="border-color:rgba(255,255,255,.16)"><div style="font-size:12.5px;color:#9A9CA6">Approval threshold</div><div style="margin-top:10px;font-size:26px;font-weight:500;letter-spacing:-0.02em;font-family:'Red Hat Mono',ui-monospace,monospace">2 <span style="font-size:14px;color:#9A9CA6">of 3</span></div><div style="margin-top:8px;font-size:12px;color:#676A75">Fixed in simulation →</div></button>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto">
+          <sc-for list="{{ govTabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.select }}" style="height:38px;padding:0 12px;border:none;border-bottom:2px solid {{ t.border }};margin-bottom:-1px;background:transparent;color:{{ t.color }};font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap">{{ t.label }}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ govTabIs.Verifier }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:1000px;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Verifier</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Registry ID</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Status</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Scope</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Since · via</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Assignments</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Attestations</th>
+              <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"></th>
+            </tr></thead>
+            <tbody>
+            <sc-for list="{{ regRows }}" as="r" hint-placeholder-count="3">
+              <tr style-hover="background:rgba(255,255,255,.03)">
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>{{ r.org }}</div><sc-if value="{{ r.hasNote }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:oklch(82% 0.12 75);margin-top:2px">{{ r.note }}</div></sc-if></td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;white-space:nowrap">{{ r.id }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap;color:{{ r.c }}">{{ r.status }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6">{{ r.scope }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;white-space:nowrap">{{ r.since }} · {{ r.via }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap">{{ r.assignments }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap">{{ r.attest }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;white-space:nowrap"><sc-if value="{{ r.canSuspend }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.propose }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Propose suspension</button></sc-if></td>
+              </tr>
+            </sc-for>
+            <sc-for list="{{ pendingAdds }}" as="p" hint-placeholder-count="1">
+              <tr style-hover="background:rgba(255,255,255,.03)">
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div style="color:#9A9CA6">{{ p.org }}</div><div style="font-size:11.5px;color:oklch(82% 0.12 75);margin-top:2px">Addition proposed · {{ p.via }} · {{ p.progress }} approvals</div></td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#676A75;white-space:nowrap">{{ p.id }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6;white-space:nowrap">Proposed</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#676A75">{{ p.scope }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#676A75;white-space:nowrap">— · {{ p.via }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#676A75">—</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#676A75">—</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;white-space:nowrap"><button onClick="{{ p.go }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Open proposal</button></td>
+              </tr>
+            </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">Registry changes take effect only when a passed proposal is executed. Suspension blocks new assignments; attestations already issued remain valid and are not reopened by governance.</p>
+        </sc-if>
+
+        <sc-if value="{{ govTabIs.Proposals }}" hint-placeholder-val="{{ false }}">
+        <div class="d-wrap" style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:#676A75">{{ proposalCount }} proposals · {{ govCounts.open }} open · expiry 14 days after opening</span>
+          <span style="flex:1"></span>
+          <sc-if value="{{ canProposeAdd }}" hint-placeholder-val="{{ true }}"><button onClick="{{ proposeAdd }}" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Propose verifier</button></sc-if>
+        </div>
+        <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;min-width:1000px;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Proposal</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Type</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Target</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Proposed by</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Opened (UTC)</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Approvals</th>
+              <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">State</th>
+              <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"></th>
+            </tr></thead>
+            <tbody>
+            <sc-for list="{{ proposals }}" as="p" hint-placeholder-count="4">
+              <tr onClick="{{ p.go }}" style="cursor:pointer" style-hover="background:rgba(255,255,255,.03)">
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;white-space:nowrap">{{ p.id }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap">{{ p.type }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px"><div>{{ p.target }}</div><div style="font-size:11.5px;color:#676A75;margin-top:2px;font-family:'Red Hat Mono',ui-monospace,monospace">{{ p.targetId }}</div></td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6;white-space:nowrap">{{ p.proposer }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;white-space:nowrap">{{ p.opened }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap"><div style="display:flex;align-items:center;gap:10px"><div style="display:flex;gap:3px;width:72px"><sc-for list="{{ p.members }}" as="m" hint-placeholder-count="3"><span style="flex:1;height:5px;border-radius:2px;background:{{ m.seg }}"></span></sc-for></div><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px">{{ p.progress }}</span></div></td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;white-space:nowrap">{{ p.stateLabel }}</td>
+                <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;color:#676A75">→</td>
+              </tr>
+            </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">A proposal passes when 2 of 3 seats approve and closes when 2 seats reject. Approval alone does not change the registry; a member must execute the passed proposal.</p>
+        </sc-if>
+
+        <sc-if value="{{ govTabIs.Members }}" hint-placeholder-val="{{ false }}">
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow-x:auto">
+            <table style="width:100%;min-width:560px;border-collapse:collapse">
+              <thead><tr>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Seat</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Organization</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Mandate holder</th>
+                <th style="text-align:left;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Member since</th>
+                <th style="text-align:right;font-weight:500;font-size:12px;color:#9A9CA6;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap">Votes cast</th>
+              </tr></thead>
+              <tbody>
+              <sc-for list="{{ seatRows }}" as="m" hint-placeholder-count="3">
+                <tr>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;white-space:nowrap">{{ m.seat }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px">{{ m.org }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:#9A9CA6">{{ m.holder }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6;white-space:nowrap">{{ m.since }}</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;text-align:right">{{ m.votes }}</td>
+                </tr>
+              </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+            <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Decentralization Manager</div>
+            <div style="margin-top:12px;display:grid;grid-template-columns:140px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px;line-height:1.45">
+              <span style="color:#676A75">Integration</span><span>Not connected · UI simulation</span>
+              <span style="color:#676A75">Governance set</span><span>3 seats · fixed in simulation</span>
+              <span style="color:#676A75">Threshold</span><span>2 of 3 approvals · 2 rejections close a proposal</span>
+              <span style="color:#676A75">Proposal types</span><span>Add verifier · Suspend verifier</span>
+              <span style="color:#676A75">Expiry</span><span>14 days after opening if not executed</span>
+              <span style="color:#676A75">Out of scope</span><span style="color:#9A9CA6">Collateral decisions, financing proposals, pledge activation and release. These remain under lender mandates and are never governed here.</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isGovP }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Governance proposal" style="display:flex;flex-direction:column;gap:22px;max-width:1240px">
+        <div class="d-hdr" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start">
+          <div style="min-width:0">
+            <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Governance proposal · UI simulation</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px"><h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-0.02em"><span style="font-family:'Red Hat Mono',ui-monospace,monospace">{{ gp.id }}</span> · {{ gp.type }} · {{ gp.target }}</h1><span style="font-size:12.5px;color:#9A9CA6;padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.1);white-space:nowrap">{{ gp.stateLabel }}</span></div>
+            <p style="margin:8px 0 0;font-size:13.5px;color:#9A9CA6;line-height:1.5">Proposed by {{ gp.proposer }} · opened {{ gp.opened }} UTC · expires {{ gp.expires }} UTC</p>
+          </div>
+          <button onClick="{{ goGov }}" style="height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer;white-space:nowrap" style-hover="background:rgba(255,255,255,.05)">← All proposals</button>
+        </div>
+        <div class="d-g2" style="display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span style="font-size:14px;font-weight:500">Approval progress</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">{{ gp.progress }} approvals · threshold 2 of 3</span></div>
+              <div style="margin-top:14px;display:flex;gap:4px"><sc-for list="{{ gp.members }}" as="m" hint-placeholder-count="3"><span style="flex:1;height:6px;border-radius:3px;background:{{ m.seg }}"></span></sc-for></div>
+              <div style="margin-top:10px;display:flex;flex-direction:column">
+                <sc-for list="{{ gp.members }}" as="m" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:60px minmax(0,1fr);gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13.5px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#676A75;padding-top:2px">{{ m.seat }}</span><span style="min-width:0;display:flex;flex-direction:column;gap:3px"><span>{{ m.org }}</span><span style="display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px"><span style="color:{{ m.vc }}">{{ m.vote }}</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">{{ m.at }}</span></span></span></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-size:14px;font-weight:500">Execution</div>
+              <div style="margin-top:12px;display:grid;grid-template-columns:140px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px;line-height:1.45">
+                <span style="color:#676A75">State</span><span>{{ gp.execLine }}</span>
+                <span style="color:#676A75">Registry effect</span><span>{{ gp.effect }}</span>
+                <span style="color:#676A75">Target</span><span>{{ gp.target }} · <span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px;color:#9A9CA6">{{ gp.targetId }}</span></span>
+              </div>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px">
+              <div style="font-size:14px;font-weight:500">Proposal</div>
+              <div style="margin-top:12px;display:grid;grid-template-columns:140px 1fr;row-gap:9px;column-gap:12px;font-size:13.5px;line-height:1.45">
+                <span style="color:#676A75">Type</span><span>{{ gp.type }}</span>
+                <span style="color:#676A75">Verifier scope</span><span>{{ gp.scope }}</span>
+                <span style="color:#676A75">Proposed by</span><span>{{ gp.proposer }}</span>
+                <span style="color:#676A75">Rationale</span><span style="color:#C9CBD3">{{ gp.rationale }}</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#676A75">Your seat · Demo Lender A · seat 1</div>
+              <sc-if value="{{ gp.canVote }}" hint-placeholder-val="{{ false }}">
+                <p style="margin:0;font-size:13px;color:#9A9CA6;line-height:1.55">Approve or reject on behalf of Demo Lender A. Two approvals pass the proposal; two rejections close it.</p>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <button onClick="{{ gp.approve }}" style="height:36px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Approve proposal</button>
+                  <button onClick="{{ gp.reject }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid oklch(70% 0.17 25 / .4);background:transparent;color:oklch(80% 0.14 25);font-size:13.5px;cursor:pointer" style-hover="background:oklch(70% 0.17 25 / .1)">Reject proposal</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ gp.canExecute }}" hint-placeholder-val="{{ false }}">
+                <p style="margin:0;font-size:13px;color:#9A9CA6;line-height:1.55">Threshold met. Executing applies the registry change in the simulation. Any seat may execute a passed proposal.</p>
+                <button onClick="{{ gp.execute }}" style="height:36px;padding:0 14px;border-radius:8px;border:none;background:#F4F5F7;color:#0C0D11;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#FFFFFF">Execute proposal</button>
+              </sc-if>
+              <sc-if value="{{ gp.hasNote }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#9A9CA6;line-height:1.5">{{ gp.note }}</div></sc-if>
+              <p style="margin:0;font-size:12px;color:#676A75;line-height:1.5">UI simulation. No Decentralization Manager transaction is submitted. This seat administers the verifier registry only and cannot authorize collateral release.</p>
+            </div>
+            <div style="background:#16171D;border:1px solid rgba(255,255,255,.08);border-radius:10px">
+              <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:500">Activity</div>
+              <sc-for list="{{ gp.activity }}" as="e" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:128px 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12px;color:#9A9CA6">{{ e.t }}</span><span><span style="display:block">{{ e.e }}</span><span style="display:block;font-size:12px;color:#676A75;margin-top:2px">{{ e.a }}</span></span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </main>
+</div>
+
+<sc-if value="{{ hasModal }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div role="dialog" style="width:100%;max-width:520px;background:#16171D;border:1px solid rgba(255,255,255,.1);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.6);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:16px;font-weight:500;letter-spacing:-0.01em">{{ modal.title }}</div>
+      <div style="font-size:13.5px;color:#9A9CA6;line-height:1.55">{{ modal.body }}</div>
+      <div style="display:grid;grid-template-columns:130px 1fr;row-gap:8px;column-gap:12px;font-size:13px;padding:12px;border-radius:8px;background:#0F1014;border:1px solid rgba(255,255,255,.06)">
+        <span style="color:#676A75">Acting party</span><span>Demo Lender A · {{ mandate }}</span>
+        <span style="color:#676A75">Record</span><span style="font-family:'Red Hat Mono',ui-monospace,monospace;font-size:12.5px">{{ modal.record }}</span>
+        <span style="color:#676A75">Effect</span><span>{{ modal.effect }}</span>
+      </div>
+      <div style="font-size:12px;color:#676A75;line-height:1.5">{{ modal.caveat }}</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+        <button onClick="{{ closeModal }}" style="height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#F4F5F7;font-size:13.5px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">Cancel</button>
+        <button onClick="{{ modal.confirm }}" style="height:34px;padding:0 14px;border-radius:8px;border:none;background:{{ modal.bg }};color:{{ modal.fg }};font-size:13.5px;font-weight:500;cursor:pointer">{{ modal.confirmLabel }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;right:20px;bottom:20px;z-index:90;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;background:#1C1D24;border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 40px rgba(0,0,0,.5);font-size:13.5px;animation:d-toast .25s ease-out">{{ toast.text }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;demoMoment&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Lender review&quot;,&quot;tsType&quot;:&quot;'Lender review' | 'Release review'&quot;,&quot;options&quot;:[&quot;Lender review&quot;,&quot;Release review&quot;],&quot;section&quot;:&quot;Demo walkthrough&quot;},&quot;mandate&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Lender Approver&quot;,&quot;tsType&quot;:&quot;'Lender Approver' | 'Lender Analyst'&quot;,&quot;options&quot;:[&quot;Lender Approver&quot;,&quot;Lender Analyst&quot;],&quot;section&quot;:&quot;Demo walkthrough&quot;},&quot;showTechnicalIds&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo walkthrough&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 'overview', caseTab: 'Summary', assetTab: 'Overview', reviewTab: 'Assessment', auditTab: 'Events', caseView: 'All', navOpen: false, modal: null, toast: null, releaseOutcome: null, reviewOutcome: null, govTab: 'Verifier registry', govProposal: 'GP-004', govVotes: {}, govExec: {}, govNew: [] };
+  C = { ok: 'oklch(74% 0.13 155)', pend: 'oklch(82% 0.12 75)', neu: '#6F727D', bad: 'oklch(70% 0.17 25)', info: 'oklch(74% 0.1 250)' };
+  chip(l, k) { return { l, c: this.C[k] || this.C.neu, k }; }
+  go(screen, extra) { this.setState(Object.assign({ screen, navOpen: false }, extra || {})); }
+  tabs(list, cur, key) {
+    return list.map(label => ({ label, select: () => this.setState({ [key]: label }), color: label === cur ? '#F4F5F7' : '#9A9CA6', border: label === cur ? '#F4F5F7' : 'transparent' }));
+  }
+  is(list, cur) { const o = {}; list.forEach(l => { o[l.replace(/\s.*/, '')] = l === cur; }); return o; }
+  commit(after, doneText, pendingText) {
+    this.setState({ modal: null, toast: { text: pendingText || 'Submitted. Waiting for ledger confirmation.', c: this.C.pend } });
+    clearTimeout(this._t1); clearTimeout(this._t2);
+    this._t1 = setTimeout(() => this.setState(Object.assign({ toast: { text: doneText || 'Confirmed on the ledger.', c: this.C.ok } }, after)), 1600);
+    this._t2 = setTimeout(() => this.setState({ toast: null }), 5200);
+  }
+  componentWillUnmount() { clearTimeout(this._t1); clearTimeout(this._t2); }
+
+  renderVals() {
+    const s = this.state, C = this.C, chip = this.chip.bind(this);
+    const moment = this.props.demoMoment ?? 'Lender review';
+    const mandate = this.props.mandate ?? 'Lender Approver';
+    const showTech = this.props.showTechnicalIds ?? false;
+    const isApprover = mandate === 'Lender Approver';
+    const B = moment === 'Release review';
+    const released = B && s.releaseOutcome === 'released';
+    const rejected = B && s.releaseOutcome === 'rejected';
+    const approvedNow = !B && s.reviewOutcome === 'eligible';
+    const rejectedNow = !B && s.reviewOutcome === 'rejected';
+    const reviewClosed = B || approvedNow || rejectedNow;
+
+    const goCase = () => this.go('case', { caseTab: 'Summary' });
+    const goAsset = () => this.go('asset');
+    const goReview = () => this.go('review');
+    const goPledge = () => this.go('pledge');
+    const goAudit = () => this.go('audit');
+    const goCases = (view) => this.go('cases', { caseView: view || 'All' });
+
+    // ---- CL-001 moment data
+    const reviewChip = rejectedNow ? chip('Rejected for this case', 'bad') : (B || approvedNow) ? chip('Eligible for this case', 'ok') : chip('In review', 'pend');
+    const pledgeChip = released ? chip('Released', 'neu') : rejected ? chip('Active · release rejected', 'ok') : B ? chip('Active · release requested', 'pend') : chip('Available · no lock', 'neu');
+    const stage = released ? chip('Closed · released', 'neu') : B ? chip('Release review', 'pend') : rejectedNow ? chip('Rejected', 'bad') : approvedNow ? chip('Proposal', 'pend') : chip('Lender review', 'pend');
+    const prereq = (l, done, s2) => ({ l, mark: done ? '✓' : '·', c: done ? C.ok : C.pend, s: s2 });
+    const cs = {
+      stage, controlVersion: B ? 'v4' : 'v3',
+      nextActor: released ? '—' : B ? 'Demo Lender A · Approver' : approvedNow ? 'Demo Lender A · Approver' : 'Demo Lender A · Analyst',
+      nextAction: released ? 'Export case history' : B ? 'Decide release request' : approvedNow ? 'Issue proposal' : 'Open collateral review',
+      nextGo: released ? goAudit : B ? goPledge : approvedNow ? () => this.setState({ caseTab: 'Proposal' }) : goReview,
+      st: { evidence: chip('Complete · 5 documents', 'ok'), verification: chip('Attested · valid to 2027-03-10', 'ok'), review: reviewChip, proposal: B ? chip('Accepted · v2', 'ok') : chip('Not issued', 'neu'), pledge: pledgeChip },
+      currentStep: released ? 'Lock released. Case can be closed after dependency check.' : B ? 'Lender decision on release request RR-001.' : approvedNow ? 'Collateral decision recorded. Proposal can be issued by the approver.' : 'Lender review of the shared evidence package PKG-001 v2.',
+      blocker: released ? 'None' : B ? 'None · awaiting approver decision' : approvedNow ? 'Proposal not yet issued' : 'Assessment not yet submitted for approval',
+      prereqs: [
+        prereq('Lender-authorized collateral decision', B || approvedNow, B ? 'CA-001 · 2026-09-18' : approvedNow ? 'CA-001 · just now' : 'Pending approver'),
+        prereq('Proposal issued and accepted (exact version)', B, B ? 'FP-001 v2 · 2026-09-21' : 'Not issued'),
+        prereq('Attestation valid at activation', true, 'ATT-001 · to 2027-03-10'),
+        prereq('Evidence snapshot matches attested versions', true, 'PKG-001 v2'),
+        prereq('Asset control available (no active lock)', !B, B ? 'Consumed 2026-09-22' : 'ASSET-DEMO-001 v3'),
+      ],
+      reviewHeadline: reviewChip.l, assessmentState: reviewClosed ? 'Recorded · v1' : 'Draft saved 2026-10-01 12:30 UTC',
+      decisionState: rejectedNow ? 'Rejected for this case · just now' : approvedNow ? 'Eligible · recorded just now' : B ? 'Eligible · recorded 2026-09-18' : 'Pending approver mandate',
+      hasProposal: B, noProposal: !B, proposalRef: B ? 'FP-001 v2 · accepted' : 'Not issued',
+      pledgeRef: released ? 'PL-001 · released' : B ? 'PL-001 · active' : 'Control v3 · available',
+      auditorGrant: released ? 'Scoped grant · CL-001 · to 2026-12-31' : 'No grant',
+      auditScope: released ? 'CL-001 history · evidence manifest' : '—', auditPerm: released ? 'View + export' : '—', auditExpiry: released ? '2026-12-31' : '—',
+      auditC: released ? C.ok : C.neu, auditConsent: released ? 'Demo Manufacturer · Demo Lender A' : '—',
+      outcomeDefault: reviewClosed ? (rejectedNow ? 'Rejected for this case' : 'Eligible for this case') : 'Needs information',
+      reviewOpen: !reviewClosed, reviewClosed,
+    };
+
+    // ---- pledge detail
+    const pl = B ? {
+      id: 'PL-001', available: false, locked: true,
+      state: released ? 'RELEASED' : rejected ? 'ACTIVE · RELEASE_REJECTED' : 'ACTIVE · RELEASE_REQUESTED',
+      c: released ? C.neu : rejected ? C.ok : C.pend,
+      headline: released ? 'Released · control available again' : 'Active lock · release requested',
+      sub: released ? 'Lock PL-001 is historical. New workflows are subject to fresh checks.' : 'The collateral lock remains active while the request is reviewed.',
+      short: released ? 'Released' : 'Active · PL-001',
+      lockLine: released ? 'RELEASED · historical' : 'ACTIVE · one lock per canonical control',
+      rrState: released ? 'Authorized' : rejected ? 'Rejected · lock remains active' : 'Pending lender decision',
+      rrC: released ? C.ok : rejected ? C.bad : C.pend,
+      note: released ? 'Release authorized. The Collara workflow lock is released; any legal lien termination is completed separately.' : rejected ? 'Release rejected. The collateral lock remains active. The borrower may reapply with a new reason or evidence.' : 'Release requested. The collateral lock remains active.',
+      decisionPending: !released && !rejected, decided: released || rejected,
+      decisionLine: released ? 'Release authorized' : 'Release rejected · lock remains active',
+      decidedAt: '2026-10-01 14:33 UTC · committed', controlAfter: released ? 'ASSET-DEMO-001 v4 → v5 · AVAILABLE' : 'ASSET-DEMO-001 v4 · ACTIVE',
+      afterNote: released ? 'Any required legal lien termination must be completed separately. Historical lock records are retained.' : 'A new release request requires a new reason or evidence from the borrower.',
+    } : { id: 'CONTROL-ASSET-DEMO-001', available: true, locked: false, state: 'AVAILABLE', c: C.neu, headline: 'No active Collara lock', sub: 'Activation requires an approved decision, an accepted proposal, and a valid attestation.', short: 'Available · v3' };
+
+    // ---- documents & checks
+    const docs = [
+      { name: 'Inspection report', type: 'PDF · 4 pages', org: 'Demo Verifier', by: 'Verifier seat 1', v: 'v2', date: '2026-09-08', review: 'Attested', rc: C.ok, scope: 'PKG-001 · Demo Lender A' },
+      { name: 'Dealer invoice', type: 'PDF · 1 page', org: 'Demo CNC Dealer', by: 'Sales desk', v: 'v1', date: '2026-09-02', review: 'Reviewed', rc: C.ok, scope: 'PKG-001 · Demo Lender A · Demo Verifier' },
+      { name: 'Equipment photos', type: 'JPEG · 6 files', org: 'Demo Manufacturer', by: 'Plant manager', v: 'v1', date: '2026-09-01', review: 'Reviewed', rc: C.ok, scope: 'PKG-001 · Demo Lender A · Demo Verifier' },
+      { name: 'Maintenance log', type: 'PDF · 12 pages', org: 'Demo Manufacturer', by: 'Plant manager', v: 'v1', date: '2026-09-03', review: 'Reviewed · gap noted', rc: C.pend, scope: 'PKG-001 · Demo Lender A · Demo Verifier' },
+      { name: 'Purchase agreement', type: 'PDF · 6 pages', org: 'Demo Manufacturer', by: 'Finance', v: 'v1', date: '2026-09-01', review: 'Reviewed', rc: C.ok, scope: 'PKG-001 · Demo Lender A' },
+    ];
+    const checks = [
+      { item: 'Serial consistency', finding: 'SYNTH-CNC-001 matches dealer invoice and nameplate photo', status: 'Checked', c: C.ok },
+      { item: 'Photos', finding: '6 photos reviewed · nameplate, spindle, control panel, table, enclosure, site', status: 'Checked', c: C.ok },
+      { item: 'Document consistency', finding: 'Invoice, purchase agreement and photos consistent', status: 'Checked', c: C.ok },
+      { item: 'Inspected condition', finding: 'Operational · minor wear on spindle housing · 4,120 h', status: 'Checked', c: C.ok },
+      { item: 'Location evidence', finding: 'Site visit · Demo Manufacturer facility, Ohio', status: 'Checked', c: C.ok },
+      { item: 'Maintenance evidence', finding: 'Log reviewed · gap Q2 2025 · borrower explanation attached', status: 'Checked · noted', c: C.pend },
+      { item: 'Ownership / lien', finding: 'Purchase agreement and invoice reviewed · no registry search', status: 'Reviewed documents', c: C.neu },
+    ];
+    const completeness = [
+      { l: 'Inspection report · attested', mark: '✓', c: C.ok, s: 'v2 · ATT-001' }, { l: 'Dealer invoice', mark: '✓', c: C.ok, s: 'v1' }, { l: 'Equipment photos', mark: '✓', c: C.ok, s: 'v1 · 6 files' },
+      { l: 'Maintenance log', mark: '✓', c: C.pend, s: 'v1 · gap noted' }, { l: 'Purchase agreement', mark: '✓', c: C.ok, s: 'v1' }, { l: 'Insurance certificate', mark: '·', c: C.neu, s: 'Not required · policy' },
+    ];
+
+    // ---- activity / audit
+    const ev = (t, ref, e, a, chg, ver, commit, kind) => ({ t, ref, e, a, chg, ver, commit, kind, kc: kind === 'Committed' ? C.ok : kind === 'Pending' ? C.pend : C.neu });
+    let activity = [
+      ev('2026-09-01 08:40', 'ASSET-DEMO-001', 'Passport registered', 'Demo Manufacturer · Owner', 'DRAFT → REGISTERED', 'passport v1', '19ee…02c4 · 18011', 'Committed'),
+      ev('2026-09-01 09:05', 'DOC-001, DOC-002', 'Evidence uploaded · Equipment photos, Purchase agreement', 'Demo Manufacturer · Owner', '—', 'v1', '—', 'Operational'),
+      ev('2026-09-02 11:20', 'DOC-003', 'Evidence uploaded · Dealer invoice', 'Demo CNC Dealer · Contributor', '—', 'v1', '—', 'Operational'),
+      ev('2026-09-03 10:00', 'VR-001', 'Verification requested', 'Demo Manufacturer · Owner', '— → REQUESTED', 'scope v1', '2b71…8e10 · 18042', 'Committed'),
+      ev('2026-09-04 08:15', 'VR-001', 'Assignment accepted', 'Demo Verifier', 'REQUESTED → IN_REVIEW', '—', '5d20…1af3 · 18058', 'Committed'),
+      ev('2026-09-06 16:30', 'VR-001', 'Changes requested · spindle photos and maintenance log', 'Demo Verifier', 'IN_REVIEW → CHANGES_REQUESTED', '—', '77a9…c0d2 · 18090', 'Committed'),
+      ev('2026-09-08 09:48', 'DOC-004', 'Evidence version added · Inspection report v2', 'Demo Verifier', '—', 'v1 → v2', '—', 'Operational'),
+      ev('2026-09-10 17:02', 'ATT-001', 'Attestation issued', 'Demo Verifier', 'IN_REVIEW → ATTESTED', 'evidence v2', '9c4e…77b1 · 18131', 'Committed'),
+      ev('2026-09-12 10:10', 'CL-001', 'Case created', 'Demo Manufacturer · Borrower', '— → DRAFT', 'case v1', 'a01f…3d9e · 18160', 'Committed'),
+      ev('2026-09-12 10:35', 'PKG-001', 'Package shared with Demo Lender A · 5 documents', 'Demo Manufacturer + Demo CNC Dealer (consent)', 'NOT_SUBMITTED → SUBMITTED', 'package v2', 'b8c2…5f77 · 18162', 'Committed'),
+      ev('2026-09-13 09:00', 'CA-001', 'Review started', 'Demo Lender A · Analyst', 'SUBMITTED → IN_REVIEW', '—', 'c3d0…9a12 · 18175', 'Committed'),
+    ];
+    if (B) activity = activity.concat([
+      ev('2026-09-18 15:22', 'CA-001', 'Collateral decision recorded · Eligible for this case', 'Demo Lender A · Approver', 'IN_REVIEW → ELIGIBLE', 'assessment v1', '7c1d…40ab · 18207', 'Committed'),
+      ev('2026-09-19 11:05', 'FP-001', 'Proposal issued', 'Demo Lender A · Approver', 'DRAFT → ISSUED', 'v1', 'e5f6…22c8 · 18231', 'Committed'),
+      ev('2026-09-20 08:50', 'FP-001', 'Proposal withdrawn and reissued · expiry corrected', 'Demo Lender A · Approver', 'ISSUED → WITHDRAWN · ISSUED', 'v1 → v2', 'f00a…61d3 · 18240', 'Committed'),
+      ev('2026-09-21 16:40', 'FP-001', 'Proposal accepted · exact version', 'Demo Manufacturer · Borrower', 'ISSUED → ACCEPTED', 'v2', '11b7…9e4c · 18266', 'Committed'),
+      ev('2026-09-22 14:05', 'PL-001', 'Pledge activated', 'Demo Manufacturer + Demo Lender A', 'AVAILABLE → ACTIVE', 'control v3 → v4', '3f9a…c21e · 18310', 'Committed'),
+      ev('2026-09-30 09:12', 'RR-001', 'Release requested · external loan completion', 'Demo Manufacturer · Borrower', 'ACTIVE → RELEASE_REQUESTED', '—', '6ad8…0b3f · 18402', 'Committed'),
+    ]);
+    else activity = activity.concat([ev('2026-10-01 12:30', 'CA-001', 'Assessment draft saved', 'Demo Lender A · Analyst', '—', 'draft', '—', 'Operational')]);
+    if (released) activity.push(ev('2026-10-01 14:33', 'RR-001', 'Release authorized', 'Demo Lender A · Approver', 'RELEASE_REQUESTED → RELEASED', 'control v4 → v5', '8e2b…d410 · 18423', 'Committed'));
+    if (rejected) activity.push(ev('2026-10-01 14:33', 'RR-001', 'Release rejected · lock remains active', 'Demo Lender A · Approver', 'RELEASE_REQUESTED → RELEASE_REJECTED', '—', '8e2b…d410 · 18423', 'Committed'));
+    if (approvedNow) activity.push(ev('2026-10-01 14:33', 'CA-001', 'Collateral decision recorded · Eligible for this case', 'Demo Lender A · Approver', 'IN_REVIEW → ELIGIBLE', 'assessment v1', '8e2b…d410 · 18423', 'Committed'));
+    if (rejectedNow) activity.push(ev('2026-10-01 14:33', 'CA-001', 'Collateral decision recorded · Rejected for this case', 'Demo Lender A · Approver', 'IN_REVIEW → REJECTED', 'assessment v1', '8e2b…d410 · 18423', 'Committed'));
+    activity = activity.slice().reverse();
+    const reviewActivity = activity.filter(e => /^CA-|^PKG-/.test(e.ref));
+
+    // ---- queue
+    const row = (id, asset, assetId, borrower, ver, rev, pl2, next, upd, views, open) => ({ id, asset, assetId, borrower, ver, rev, pl: pl2, next, upd, views, open });
+    const cl001 = row('CL-001', 'CNC machining center · DEMO-CNC-500', 'ASSET-DEMO-001', 'Demo Manufacturer', chip('Attested', 'ok'), reviewChip, pledgeChip,
+      cs.nextActor, released || rejected || approvedNow || rejectedNow ? 'just now' : B ? '1d ago' : '2h ago',
+      released ? [] : B ? (rejected ? ['mine'] : ['mine', 'release']) : approvedNow ? ['mine'] : rejectedNow ? [] : ['mine', 'review'], goCase);
+    const noop = () => this.setState({ toast: { text: 'This record is unavailable in the demo walkthrough. Only CL-001 is fully modelled.', c: C.neu } }, () => { clearTimeout(this._t2); this._t2 = setTimeout(() => this.setState({ toast: null }), 3200); });
+    const queueAll = [
+      cl001,
+      row('CL-004', 'CNC machining center · DEMO-CNC-500', 'ASSET-DEMO-004', 'Demo Tooling Inc', chip('Attested', 'ok'), chip('Awaiting approval', 'pend'), chip('Available', 'neu'), 'Demo Lender A · Approver', '5h ago', ['mine', 'approval'], noop),
+      row('CL-002', 'CNC vertical mill · DEMO-CNC-320', 'ASSET-DEMO-002', 'Demo Machining Co', chip('Changes requested', 'pend'), chip('Needs information', 'pend'), chip('Available', 'neu'), 'Demo Machining Co · Borrower', '1d ago', ['evidence'], noop),
+      row('CL-003', 'CNC turning center · DEMO-CNC-200', 'ASSET-DEMO-003', 'Demo Fabrication LLC', chip('Attested', 'ok'), chip('Eligible', 'ok'), chip('Active', 'ok'), '— · Monitoring', '3d ago', [], noop),
+      row('CL-005', 'CNC machining center · DEMO-CNC-500', 'ASSET-DEMO-005', 'Demo Manufacturer', chip('Attested', 'ok'), chip('Eligible', 'ok'), chip('Released', 'neu'), '— · Closed', '2w ago', [], noop),
+    ];
+    const viewDefs = [['All', null], ['My actions', 'mine'], ['Ready for review', 'review'], ['Needs evidence', 'evidence'], ['Awaiting approval', 'approval'], ['Release requests', 'release']];
+    const filterBy = tag => tag ? queueAll.filter(r => r.views.includes(tag)) : queueAll;
+    const caseViews = viewDefs.map(([label, tag]) => ({ label, count: filterBy(tag).length, select: () => this.setState({ caseView: label }), color: s.caseView === label ? '#F4F5F7' : '#9A9CA6', border: s.caseView === label ? '#F4F5F7' : 'transparent' }));
+    const curTag = (viewDefs.find(v => v[0] === s.caseView) || viewDefs[0])[1];
+    const queue = filterBy(curTag);
+    const counts = { review: filterBy('review').length, evidence: filterBy('evidence').length, approval: filterBy('approval').length, release: filterBy('release').length, active: queueAll.filter(r => /^Active/.test(r.pl.l)).length };
+
+    // ---- governance (BitSafe · UI simulation)
+    const mk = (title, body, record, effect, caveat, confirmLabel, danger, confirm) => ({ title, body, record, effect, caveat, confirmLabel, confirm, bg: danger ? 'oklch(70% 0.17 25)' : '#F4F5F7', fg: danger ? '#FFFFFF' : '#0C0D11' });
+    const seats = [[1, 'Demo Lender A', true], [2, 'Demo Lender B', false], [3, 'Demo Auditor', false]];
+    const THRESH = 2;
+    const govCaveat = 'UI simulation. No Decentralization Manager transaction is submitted. Governance administers the verifier registry only; it cannot authorize collateral release.';
+    const govDone = 'Recorded in the governance simulation.', govPending = 'Submitting to the simulated governance set…';
+    const gpBase = [
+      { id: 'GP-004', type: 'Add verifier', target: 'Demo Calibration Lab', targetId: 'VER-004 (reserved)', scope: 'Industrial equipment inspection · calibration', proposer: 'Demo Lender B', opened: '2026-09-28 10:14', expires: '2026-10-12 10:14', rationale: 'Second inspection capacity for CNC equipment in the Midwest region. Onboarding checklist complete; sample inspection reviewed by Demo Lender B.', effect: 'Demo Calibration Lab is added to the registry as ACTIVE and becomes assignable to verification requests.', votes: { 2: ['Approved', '2026-09-28 10:14'] } },
+      { id: 'GP-003', type: 'Suspend verifier', target: 'Demo Inspection Partners', targetId: 'VER-002', scope: 'Industrial equipment inspection', proposer: 'Demo Auditor', opened: '2026-09-20 09:30', expires: '2026-10-04 09:30', rationale: 'Late response on a sample re-inspection request. Two seats judged the issue operational rather than a competence or integrity concern.', effect: 'None. VER-002 remains ACTIVE.', votes: { 3: ['Approved', '2026-09-20 09:30'], 1: ['Rejected', '2026-09-21 15:02'], 2: ['Rejected', '2026-09-22 08:45'] }, closed: '2026-09-22 08:45' },
+      { id: 'GP-002', type: 'Suspend verifier', target: 'Demo Field Audit Co', targetId: 'VER-003', scope: 'Site audit · asset location', proposer: 'Demo Lender A', opened: '2026-09-12 14:00', expires: '2026-09-26 14:00', rationale: 'Inspector accreditation lapsed on 2026-09-10. Suspension until renewed accreditation is filed.', effect: 'VER-003 set to SUSPENDED. Existing attestations remain valid; no new assignments can be accepted.', votes: { 1: ['Approved', '2026-09-12 14:00'], 2: ['Approved', '2026-09-15 11:20'] }, executed: ['Demo Lender B', '2026-09-15 11:21'] },
+      { id: 'GP-001', type: 'Add verifier', target: 'Demo Inspection Partners', targetId: 'VER-002', scope: 'Industrial equipment inspection', proposer: 'Demo Lender A', opened: '2026-08-20 09:00', expires: '2026-09-03 09:00', rationale: 'First registry expansion after LocalNet genesis. Onboarding checklist and sample inspection reviewed.', effect: 'VER-002 added as ACTIVE.', votes: { 1: ['Approved', '2026-08-20 09:00'], 3: ['Approved', '2026-08-21 10:05'] }, executed: ['Demo Lender A', '2026-08-21 10:06'] },
+    ];
+    const vcol = v => v === 'Approved' ? C.ok : v === 'Rejected' ? C.bad : null;
+    const gpAll = s.govNew.concat(gpBase).map(p => {
+      const votes = Object.assign({}, p.votes);
+      if (s.govVotes[p.id]) votes[1] = [s.govVotes[p.id], 'just now'];
+      const executed = p.executed || (s.govExec[p.id] ? ['Demo Lender A', 'just now'] : null);
+      const vs = seats.map(([n]) => votes[n]);
+      const approvals = vs.filter(v => v && v[0] === 'Approved').length;
+      const rejections = vs.filter(v => v && v[0] === 'Rejected').length;
+      const status = executed ? 'Executed' : rejections > seats.length - THRESH ? 'Rejected' : approvals >= THRESH ? 'Threshold met' : 'Open';
+      const open = status === 'Open' || status === 'Threshold met';
+      const stateLabel = status === 'Executed' ? 'Executed · ' + executed[1] : status === 'Rejected' ? 'Rejected · ' + rejections + ' of 3' : status === 'Threshold met' ? 'Threshold met · ready to execute' : 'Open · ' + approvals + ' of 3 approvals';
+      const members = seats.map(([n, org, you]) => { const v = votes[n]; const vote = v ? v[0] : 'Pending'; return { seat: 'Seat ' + n, org: you ? org + ' (you)' : org, vote, at: v ? v[1] : '—', vc: vcol(vote) || '#9A9CA6', seg: vcol(vote) || 'rgba(255,255,255,.1)' }; });
+      const myVote = votes[1] ? votes[1][0] : null;
+      const pendingOrgs = seats.filter(([n]) => !votes[n]).map(([, org]) => org);
+      const canVote = isApprover && status === 'Open' && !myVote;
+      const canExecute = isApprover && status === 'Threshold met';
+      const need = THRESH - approvals;
+      const execLine = executed ? 'Executed · ' + executed[0] + ' · ' + executed[1] : status === 'Threshold met' ? 'Not executed · any seat may execute' : status === 'Rejected' ? 'Not executed · proposal closed' : 'Not executed · ' + need + ' more approval' + (need === 1 ? '' : 's') + ' needed';
+      const note = !isApprover ? 'The governance seat for Demo Lender A is held by the approver mandate. Your mandate can view proposals but cannot vote or execute.' : status === 'Executed' ? 'Executed by ' + executed[0] + ' at ' + executed[1] + '. The registry change is applied in the simulation.' : status === 'Rejected' ? 'Closed. ' + rejections + ' of 3 seats rejected, so the 2-of-3 threshold cannot be reached.' : status === 'Threshold met' ? '' : myVote ? 'Your vote: ' + myVote + '. Awaiting ' + pendingOrgs.join(' and ') + '.' : '';
+      let activity = [{ t: p.opened, e: 'Proposal opened', a: p.proposer }].concat(seats.filter(([n]) => votes[n]).map(([n, org]) => ({ t: votes[n][1], e: votes[n][0] === 'Approved' ? 'Approval recorded' : 'Rejection recorded', a: org + ' · seat ' + n })));
+      if (status === 'Rejected' && p.closed) activity.push({ t: p.closed, e: 'Proposal closed · threshold unreachable', a: 'Governance set' });
+      if (executed) activity.push({ t: executed[1], e: 'Executed · registry updated', a: executed[0] });
+      activity.sort((x, y) => ((x.t === 'just now') - (y.t === 'just now')) || x.t.localeCompare(y.t));
+      const d = Object.assign({}, p, { status, open, stateLabel, members, approvals, rejections, progress: approvals + ' of 3', canVote, canExecute, hasNote: !!note, note, execLine, executedFlag: !!executed, activity: activity.reverse(), go: () => this.go('govp', { govProposal: p.id }) });
+      d.approve = () => this.setState({ modal: mk('Approve ' + p.id, 'Records your approval as seat 1 (Demo Lender A) for ' + p.type.toLowerCase() + ' · ' + p.target + '. ' + (approvals + 1 >= THRESH ? 'This reaches the 2-of-3 threshold; any seat can then execute.' : (THRESH - approvals - 1) + ' more approval is needed after yours.'), p.id + ' · seat 1', 'Approvals ' + approvals + ' → ' + (approvals + 1) + ' of 3' + (approvals + 1 >= THRESH ? ' · threshold met' : ''), govCaveat, 'Approve proposal', false, () => this.commit({ govVotes: Object.assign({}, s.govVotes, { [p.id]: 'Approved' }) }, govDone, govPending)) });
+      d.reject = () => this.setState({ modal: mk('Reject ' + p.id, 'Records your rejection as seat 1 (Demo Lender A). ' + (rejections + 1 > seats.length - THRESH ? 'This closes the proposal; the threshold can no longer be reached.' : 'The proposal stays open until a second seat rejects or two seats approve.'), p.id + ' · seat 1', 'Rejections ' + rejections + ' → ' + (rejections + 1) + ' of 3' + (rejections + 1 > seats.length - THRESH ? ' · proposal closes' : ''), govCaveat, 'Reject proposal', true, () => this.commit({ govVotes: Object.assign({}, s.govVotes, { [p.id]: 'Rejected' }) }, govDone, govPending)) });
+      d.execute = () => this.setState({ modal: mk('Execute ' + p.id, 'Applies the passed proposal to the verifier registry: ' + p.effect, p.id + ' · ' + p.targetId, p.type === 'Add verifier' ? p.target + ' → ACTIVE' : p.targetId + ' ACTIVE → SUSPENDED', govCaveat, 'Execute proposal', false, () => this.commit({ govExec: Object.assign({}, s.govExec, { [p.id]: true }) }, 'Executed in the governance simulation. Registry updated.', govPending)) });
+      return d;
+    });
+    const gp = gpAll.find(p => p.id === s.govProposal) || gpAll[0];
+    const regBase = [
+      { id: 'VER-001', org: 'Demo Verifier', status: 'Active', since: '2026-08-01', via: 'genesis', scope: 'Industrial equipment inspection', assignments: '1 active · VR-001', attest: '1 · ATT-001' },
+      { id: 'VER-002', org: 'Demo Inspection Partners', status: 'Active', since: '2026-08-21', via: 'GP-001', scope: 'Industrial equipment inspection', assignments: '0', attest: '0' },
+      { id: 'VER-003', org: 'Demo Field Audit Co', status: 'Suspended', since: '2026-09-15', via: 'GP-002', scope: 'Site audit · asset location', assignments: '0', attest: '0' },
+    ];
+    const registry = regBase.map(r => Object.assign({}, r));
+    gpAll.filter(p => s.govExec[p.id]).forEach(p => {
+      if (p.type === 'Add verifier') registry.push({ id: p.targetId.replace(' (reserved)', ''), org: p.target, status: 'Active', since: 'just now', via: p.id, scope: p.scope, assignments: '0', attest: '0' });
+      else { const r = registry.find(x => x.org === p.target); if (r) Object.assign(r, { status: 'Suspended', since: 'just now', via: p.id }); }
+    });
+    const nextGpId = () => 'GP-00' + (5 + s.govNew.length);
+    const newProposal = (type, r) => ({ id: nextGpId(), type, target: r.org, targetId: r.id, scope: r.scope, proposer: 'Demo Lender A', opened: 'just now', expires: '2026-10-15 14:33', rationale: type === 'Add verifier' ? 'Proposed by Demo Lender A from the governance screen. Onboarding checklist attached for review by the other seats.' : 'Proposed by Demo Lender A from the verifier registry. Operational review requested; reason attached for the other seats.', effect: type === 'Add verifier' ? r.org + ' is added to the registry as ACTIVE.' : r.id + ' set to SUSPENDED. Existing attestations remain valid; no new assignments can be accepted.', votes: { 1: ['Approved', 'just now'] } });
+    const openPropose = (type, r) => this.setState({ modal: mk('Propose ' + (type === 'Add verifier' ? 'verifier · ' : 'suspension · ') + r.org, (type === 'Add verifier' ? 'Opens an Add verifier proposal for ' + r.org + ' (' + r.scope + '). ' : 'Opens a Suspend verifier proposal for ' + r.id + ' · ' + r.org + '. ') + 'Your approval as seat 1 is recorded with the proposal; one more approval reaches threshold.', nextGpId() + ' · ' + r.id, 'New proposal · Open · 1 of 3 approvals', govCaveat, 'Open proposal', false, () => this.commit({ govNew: [newProposal(type, r)].concat(s.govNew) }, 'Proposal opened in the governance simulation.', govPending)) });
+    const openSusp = org => gpAll.find(p => p.open && p.type === 'Suspend verifier' && p.target === org);
+    const regRows = registry.map(r => { const sp = openSusp(r.org); return Object.assign({}, r, { c: r.status === 'Active' ? '#F4F5F7' : '#9A9CA6', hasNote: !!sp, note: sp ? 'Suspension proposed · ' + sp.id + ' · ' + sp.progress + ' approvals' : '', canSuspend: isApprover && r.status === 'Active' && !sp, propose: () => openPropose('Suspend verifier', r) }); });
+    const pendingAdds = gpAll.filter(p => p.open && p.type === 'Add verifier').map(p => ({ id: p.targetId, org: p.target, scope: p.scope, via: p.id, progress: p.progress, go: p.go }));
+    const addCandidate = { id: 'VER-005 (reserved)', org: 'Demo Metrology Services', scope: 'Dimensional metrology · CNC equipment' };
+    const canProposeAdd = isApprover && !gpAll.some(p => p.target === addCandidate.org);
+    const govCounts = { active: registry.filter(r => r.status === 'Active').length, suspended: registry.filter(r => r.status === 'Suspended').length, open: gpAll.filter(p => p.open).length };
+    const seatRows = seats.map(([n, org, you]) => ({ seat: 'Seat ' + n, org: you ? org + ' (you)' : org, holder: n === 3 ? 'Audit lead mandate' : 'Approver mandate', since: '2026-08-01 · genesis', votes: String(gpAll.filter(p => p.members[n - 1].vote !== 'Pending').length) }));
+    const govTabList = ['Verifier registry', 'Proposals', 'Members'];
+    const goGov = () => this.go('gov');
+    const govTabGo = t => () => this.go('gov', { govTab: t });
+
+    // ---- overview
+    const actions = [];
+    const gp4 = gpAll.find(p => p.id === 'GP-004');
+    if (gp4.canVote) actions.push({ id: 'GP-004', title: 'Vote on governance proposal · Add verifier Demo Calibration Lab', sub: 'BitSafe governance · ' + gp4.progress + ' approvals · UI simulation', state: 'Open', c: C.pend, go: gp4.go });
+    else if (gp4.canExecute) actions.push({ id: 'GP-004', title: 'Execute governance proposal · Add verifier Demo Calibration Lab', sub: 'BitSafe governance · threshold met · UI simulation', state: 'Ready to execute', c: C.pend, go: gp4.go });
+    if (!B && !approvedNow && !rejectedNow) actions.push({ id: 'CL-001', title: 'Review evidence package and record assessment', sub: 'PKG-001 v2 · attestation valid · analyst Dana Reyes', state: 'In review', c: C.pend, go: goReview });
+    if (approvedNow) actions.push({ id: 'CL-001', title: 'Issue financing proposal', sub: 'Collateral decision recorded · approver mandate required', state: 'Eligible', c: C.ok, go: goCase });
+    if (B && !released && !rejected) actions.push({ id: 'CL-001', title: 'Decide release request RR-001', sub: 'External loan completion · requested 2026-09-30 · lock remains active', state: 'Release requested', c: C.pend, go: goPledge });
+    actions.push({ id: 'CL-004', title: 'Approve or reject collateral eligibility', sub: 'Assessment submitted by analyst · policy CP-2026-CNC-01', state: 'Awaiting approval', c: C.pend, go: noop });
+    actions.push({ id: 'CL-002', title: 'Waiting on borrower · maintenance log requested', sub: 'No lender action until new evidence version is submitted', state: 'Needs information', c: C.neu, go: noop });
+    const principal = { amount: B && !released ? '285,000.00' : '180,000.00', coverage: B && !released ? '2 of 2 active pledges reconciled' : '1 of 1 active pledge reconciled', valuation: B && !released ? '410,000.00' : '260,000.00' };
+    const recent = activity.filter(e => e.kind === 'Committed').slice(0, 4);
+
+    const navDefs = [['overview', 'Overview', '', C.pend], ['cases', 'Cases', String(queueAll.length), C.info], ['asset', 'Assets', '1', C.ok], ['pledge', 'Pledges', String(counts.active), '#B5B5BF'], ['audit', 'Audit', '', '#6F727D'], ['gov', 'Governance', String(govCounts.open), C.info]];
+    const nav = navDefs.map(([key, label, count, dot]) => ({ label, count, dot, markOpacity: s.screen === key ? 1 : 0.45, go: () => key === 'cases' ? goCases('All') : this.go(key), bg: s.screen === key ? 'rgba(255,255,255,.07)' : 'transparent', color: s.screen === key ? '#F4F5F7' : '#9A9CA6' }));
+    const crumbs = { overview: ['Overview', ''], cases: ['Cases', ''], case: ['Cases', 'CL-001'], asset: ['Assets', 'ASSET-DEMO-001'], review: ['Cases', 'CL-001 · Collateral review'], pledge: ['Pledges', pl.id], audit: ['Audit', ''], gov: ['Governance', ''], govp: ['Governance', gp.id] };
+    const crumbRoots = { overview: 'overview', cases: 'cases', case: 'cases', asset: 'asset', review: 'cases', pledge: 'pledge', audit: 'audit', gov: 'gov', govp: 'gov' };
+
+    const caseTabList = ['Summary', 'Evidence', 'Verification', 'Review', 'Proposal', 'Pledge', 'Sharing', 'Activity'];
+    const assetTabList = ['Overview', 'Evidence', 'Verification', 'Cases', 'Activity'];
+    const reviewTabList = ['Evidence', 'Verification scope', 'Assessment', 'Decision', 'Activity'];
+    const auditTabList = ['Events', 'Exports'];
+    const reviewTabIs = this.is(reviewTabList, s.reviewTab); reviewTabIs.Scope = s.reviewTab === 'Verification scope';
+
+    const modal = s.modal;
+
+    return {
+      mandate, showTech, isApprover, isAnalyst: !isApprover, initials: 'MH',
+      navOpen: s.navOpen, toggleNav: () => this.setState(st => ({ navOpen: !st.navOpen })),
+      nav, counts, queue, queueCount: queue.length, queueTotal: queueAll.length, queueEmpty: queue.length === 0, caseViews,
+      isOverview: s.screen === 'overview', isCases: s.screen === 'cases', isCase: s.screen === 'case', isAsset: s.screen === 'asset', isReview: s.screen === 'review', isPledge: s.screen === 'pledge', isAudit: s.screen === 'audit', isGov: s.screen === 'gov', isGovP: s.screen === 'govp',
+      govTabs: this.tabs(govTabList, s.govTab, 'govTab'), govTabIs: this.is(govTabList, s.govTab), govRegistryTab: govTabGo('Verifier registry'), govProposalsTab: govTabGo('Proposals'), govMembersTab: govTabGo('Members'),
+      govCounts, regRows, pendingAdds, proposals: gpAll, proposalCount: gpAll.length, gp, seatRows, goGov, canProposeAdd, proposeAdd: () => openPropose('Add verifier', addCandidate),
+      crumbRoot: crumbs[s.screen][0], crumbLeaf: crumbs[s.screen][1], hasLeaf: !!crumbs[s.screen][1], crumbGo: () => crumbRoots[s.screen] === 'cases' ? goCases('All') : this.go(crumbRoots[s.screen]),
+      goCase, goAsset, goReview, goPledge, goAudit,
+      viewReady: () => goCases('Ready for review'), viewEvidence: () => goCases('Needs evidence'), viewApproval: () => goCases('Awaiting approval'), viewRelease: () => goCases('Release requests'),
+      cs, pl, docs, checks, completeness, activity, reviewActivity, auditCount: activity.length, actions, actionCount: actions.length, principal, recent,
+      assetLastUpdate: released ? '2026-10-01 14:33 UTC · committed' : B ? '2026-09-30 09:12 UTC · committed' : '2026-09-12 10:35 UTC · committed',
+      caseTabs: this.tabs(caseTabList, s.caseTab, 'caseTab'), caseTabIs: this.is(caseTabList, s.caseTab),
+      assetTabs: this.tabs(assetTabList, s.assetTab, 'assetTab'), assetTabIs: this.is(assetTabList, s.assetTab),
+      reviewTabs: this.tabs(reviewTabList, s.reviewTab, 'reviewTab'), reviewTabIs,
+      auditTabs: this.tabs(auditTabList, s.auditTab, 'auditTab'), auditTabIs: this.is(auditTabList, s.auditTab),
+      hasModal: !!modal, modal: modal || {}, closeModal: () => this.setState({ modal: null }),
+      openRelease: () => this.setState({ modal: mk('Authorize release of PL-001', 'Release request RR-001 from Demo Manufacturer cites external loan completion. Authorizing releases the Collara workflow lock on ASSET-DEMO-001.', 'PL-001 · RR-001 · control v4', 'ACTIVE → RELEASED · control becomes AVAILABLE (v5)', 'This releases the Collara workflow lock. Any required legal lien termination must be completed separately.', 'Authorize release', false, () => this.commit({ releaseOutcome: 'released' })) }),
+      openRejectRelease: () => this.setState({ modal: mk('Reject release request RR-001', 'The collateral lock on ASSET-DEMO-001 remains active. The borrower can reapply with a new reason or evidence.', 'PL-001 · RR-001', 'RELEASE_REQUESTED → RELEASE_REJECTED · lock stays ACTIVE', 'A rejection is a release-request outcome. It does not change the active lock or the case eligibility.', 'Reject release', true, () => this.commit({ releaseOutcome: 'rejected' })) }),
+      openApprove: () => this.setState({ modal: mk('Approve collateral eligibility · CL-001', 'Records the assessment outcome Eligible for this case for Demo Lender A under policy CP-2026-CNC-01, against evidence snapshot PKG-001 v2 and attestation ATT-001.', 'CA-001 · assessment v1', 'IN_REVIEW → ELIGIBLE (this lender, this case)', 'Eligible for this lender and case. Financing is not yet active. This does not issue a proposal, disburse funds, or make the passport eligible elsewhere.', 'Approve eligibility', false, () => this.commit({ reviewOutcome: 'eligible', reviewTab: 'Decision' })) }),
+      openReject: () => this.setState({ modal: mk('Reject collateral for this case · CL-001', 'Records the outcome Rejected for this case. The borrower receives the shared feedback; internal notes stay with Demo Lender A.', 'CA-001 · assessment v1', 'IN_REVIEW → REJECTED (this lender, this case)', 'Rejection applies to this case only. The asset passport, attestation, and other cases are unaffected.', 'Reject for this case', true, () => this.commit({ reviewOutcome: 'rejected', reviewTab: 'Decision' })) }),
+      openExport: () => this.setState({ modal: mk('Export case report · CL-001', 'Generates a permission-scoped JSON export of the evidence manifest, attestation scope, review decisions, pledge and release events, and access scope.', 'RPT-0008 · schema v0.3', 'Export job created · cut-off at ledger offset 18422', 'Case workflow report — not a legal title or lien certificate. This report includes only records available within your access scope.', 'Generate export', false, () => this.commit({ auditTab: 'Exports' }, 'Export completed. Access is re-checked at download.')) }),
+      hasToast: !!s.toast, toast: s.toast || {},
+    };
+  }
+}
+</script>
+</body>
+</html>

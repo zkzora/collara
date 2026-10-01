@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+.turbo/
+
+# daml
+.daml/
+daml/**/.daml/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# local runtime state
+.local/
+.vendor/
+.spike/
+*.log
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
