@@ -27,6 +27,28 @@ export {
   type VisibleContractsQuery,
   type VisibleEventsQuery,
 } from "./queries";
+export {
+  applyNotes,
+  isValidNoteBody,
+  loadCommittedNotes,
+  NOTE_KINDS,
+  NOTE_RULES,
+  noteDigest,
+  noteReadable,
+  NoteStoreError,
+  putPendingNote,
+  settleNotes,
+  settleNotesOfCommand,
+  withNotes,
+  type CommittedNote,
+  type NoteAudience,
+  type NoteKind,
+  type NoteReader,
+  type NoteState,
+  type NoteSubjectParties,
+  type PendingNoteInput,
+} from "./notes";
+export { toLogSafeError } from "./log-safety";
 // Worker projection (ledger updates → ledger_* tables) and the stakeholder-filtered read model.
 export * from "./projection";
 export * from "./read-model";

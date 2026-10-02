@@ -422,6 +422,55 @@ export const commands = pgTable(
   ],
 );
 
+/**
+ * Private off-ledger notes (synthesis §1.4.2 item 5): free text never goes on the ledger, into logs or into
+ * notifications. A note belongs to one command (the request that carried it; unique per command and kind, so a
+ * replay never duplicates) and is readable only once that command is COMMITTED/PROJECTED; a REJECTED, FAILED or
+ * still-pending command never shows its text. Where a Daml field exists (ReleaseRequest.noteRef, questionRef,
+ * responseNoteRef) the ledger carries the note id as an opaque reference. Read rules: `notes.ts`.
+ */
+export const notes = pgTable(
+  "notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** NoteKind: ASSESSMENT_INTERNAL | ASSESSMENT_SHARED_FEEDBACK | RELEASE_REQUEST_NOTE | RELEASE_SERVICING_REF | RELEASE_QUESTION | RELEASE_RESPONSE. */
+    kind: text("kind").notNull(),
+    /** The author's organization (the owner of the text). */
+    ownerOrgId: text("owner_org_id")
+      .notNull()
+      .references(() => organizations.id),
+    /** ORG_ONLY (the owner org's lender members) | CASE_COUNTERPARTIES (the two parties of the subject). */
+    audience: text("audience").notNull(),
+    caseRef: text("case_ref").notNull(),
+    /** The record the note is about: the assessment (CA-…) or the release request (RR-…). */
+    subjectRef: text("subject_ref").notNull(),
+    /** Plain text, length-limited per kind; "" records that the author cleared the text. */
+    body: text("body").notNull(),
+    commandId: uuid("command_id")
+      .notNull()
+      .references(() => commands.id),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** NoteState: PENDING (command not settled) → ATTACHED (committed) | DISCARDED (rejected). */
+    state: text("state").notNull().default("PENDING"),
+    createdAt: createdAt(),
+    settledAt: tsz("settled_at"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("notes_command_kind_key").on(t.commandId, t.kind),
+    index("notes_case_idx").on(t.caseRef, t.subjectRef),
+    check(
+      "notes_kind",
+      sql`${t.kind} in ('ASSESSMENT_INTERNAL', 'ASSESSMENT_SHARED_FEEDBACK', 'RELEASE_REQUEST_NOTE', 'RELEASE_SERVICING_REF', 'RELEASE_QUESTION', 'RELEASE_RESPONSE')`,
+    ),
+    check("notes_audience", sql`(${t.kind} = 'ASSESSMENT_INTERNAL') = (${t.audience} = 'ORG_ONLY') and ${t.audience} in ('ORG_ONLY', 'CASE_COUNTERPARTIES')`),
+    check("notes_state", sql`${t.state} in ('PENDING', 'ATTACHED', 'DISCARDED')`),
+    check("notes_body_length", sql`char_length(${t.body}) <= 4000`),
+  ],
+);
+
 // --- Ledger projections (written by the worker) ----------------------------------------------------
 
 /** One row per participant source the worker reads (/v2/updates), with its durable checkpoint. */
@@ -666,6 +715,7 @@ export type PilotRequestRow = typeof pilotRequests.$inferSelect;
 export type CaseRow = typeof cases.$inferSelect;
 export type EvidenceDocumentRow = typeof evidenceDocuments.$inferSelect;
 export type CommandRow = typeof commands.$inferSelect;
+export type NoteRow = typeof notes.$inferSelect;
 export type LedgerSourceRow = typeof ledgerSources.$inferSelect;
 export type LedgerContractRow = typeof ledgerContracts.$inferSelect;
 export type LedgerEventRow = typeof ledgerEvents.$inferSelect;
