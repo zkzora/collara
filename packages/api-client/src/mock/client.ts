@@ -434,6 +434,7 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
           throw ApiError.problem("forbidden", ERROR_COPY.FORBIDDEN);
         }
         if (DEMO_ORGANIZATIONS[input.selectedLenderOrgId]?.type !== "LENDER") throw invalid("Select a lender organization.");
+        if (input.dealerOrgId !== undefined && DEMO_ORGANIZATIONS[input.dealerOrgId]?.type !== "DEALER") throw invalid("Select a dealer organization.");
         if (asset.lifecycle !== "REGISTERED") throw conflict("Register the asset before creating a case.");
         const active = casesOf(asset).some((c) => !c.cancelledAt && !c.closedAt && c.lock?.state !== "RELEASED" && c.review.state !== "REJECTED");
         if (active) throw conflict("This asset already has an active case workflow.");
@@ -451,7 +452,7 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
               createdAt: at,
               createdByUserId: a.userId,
               borrowerOrgId: a.orgId,
-              dealerOrgId: null,
+              dealerOrgId: input.dealerOrgId ?? null,
               selectedLenderOrgId: input.selectedLenderOrgId,
               requestedPrincipal: input.requestedPrincipal ?? null,
               policyRef: "CP-2026-CNC-01",

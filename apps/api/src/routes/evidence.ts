@@ -2,7 +2,8 @@
 //   POST /upload-intents   → version row UPLOAD_PENDING (owner or invited dealer of the asset)
 //   PUT  /:id/content      → streamed bytes (20 MB cap, PDF/JPEG/PNG by magic bytes) → quarantine/ → QUARANTINED
 //   POST /:id/finalize     → server re-reads + SHA-256 + checks → evidence/ → AVAILABLE (scan: NOT_SCANNED)
-//   GET  /:id, /:id/download → owner or contributing organization (share-based access arrives with projections)
+//   GET  /:id, /:id/download → owner or contributing organization; package-share recipients through the read model
+//                              (metadata) and a fresh ledger check of an active share at every download
 // Each mutation is an APPLICATION command (Idempotency-Key required); none claims a ledger confirmation.
 import { randomUUID } from "node:crypto";
 import { allocateRef, cases, evidenceDocuments, users, type CommandRow, type Db, type EvidenceDocumentRow } from "@collara/db";
@@ -32,6 +33,7 @@ import type { CommandService } from "../services/commands";
 import { detectContentType, EVIDENCE_ERRORS, isAsyncIterable, readCapped } from "../services/evidence";
 import type { ProjectionReader } from "../services/ledger";
 import type { StorageService } from "../services/storage";
+import { presentSharedEvidence, sharedDownloadVersion } from "../workflow/sharing/evidence-access";
 
 export const INTENT_TTL_MS = 15 * 60_000;
 export const DOWNLOAD_URL_TTL_SECONDS = 60;
@@ -335,7 +337,14 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     },
     async (request) => {
       const actor = await request.requireActor();
-      return present(await authorizedVersions(request.params.id, actor, request.id), actor);
+      const rows = await versionsOf(request.params.id);
+      const latest = rows.at(-1);
+      if (latest && can(actor, "evidence.view", documentContext(latest))) return present(rows, actor);
+      // Package-share recipients and other related parties: the read model decides which documents and versions
+      // they may see (workflow/sharing/evidence-access.ts). The evidence DTO does not depend on the runtime mode.
+      const shared = latest ? await presentSharedEvidence(db, actor, request.params.id, "LOCALNET", clock()) : null;
+      if (shared) return shared.doc;
+      return authorizedVersions(request.params.id, actor, request.id).then((r) => present(r, actor));
     },
   );
 
@@ -353,9 +362,24 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     async (request) => {
       const actor = await request.requireActor();
       const store = requireStorage();
-      const rows = await authorizedVersions(request.params.id, actor, request.id);
+      const docRef = request.params.id;
+      const rows = await versionsOf(docRef);
+      const latest = rows.at(-1);
       const available = rows.filter((r) => r.status === "AVAILABLE" && r.storageKey);
-      const target = request.query.version ? available.find((r) => r.version === request.query.version) : available.at(-1);
+      let target: EvidenceDocumentRow | undefined;
+      if (latest && !can(actor, "evidence.view", documentContext(latest))) {
+        // Not the owner or contributor: an active, unexpired package share covering the exact version, re-checked
+        // against the recipient's fresh ledger view at every download (daml-model.md §4.6).
+        const decision = await sharedDownloadVersion({ db, workflow: app.workflow, member: actor, docRef, requested: request.query.version, mode: "LOCALNET", now: clock() });
+        if ("problem" in decision) {
+          await recordAudit(db, { actor, action: "evidence.download", resourceType: "evidence", resourceRef: docRef, outcome: "DENIED", requestId: request.id });
+          throw decision.problem;
+        }
+        target = available.find((r) => r.version === decision.version);
+      } else {
+        await authorizedVersions(docRef, actor, request.id);
+        target = request.query.version ? available.find((r) => r.version === request.query.version) : available.at(-1);
+      }
       if (!target?.storageKey) throw problems.unavailable();
       const url = await store.presignGet(target.storageKey, {
         expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,

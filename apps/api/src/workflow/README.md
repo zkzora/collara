@@ -11,6 +11,11 @@ How endpoint builders write LOCALNET routes. Rules: ADR-0001 §2.6, `docs/archit
 | `http.ts` | `IdempotencyHeadersSchema`, `workflowResponseSchemas`, `replyWithOutcome`, `lastSync`, `withProjectionState` |
 | `problems.ts` | `workflowProblems`: `ledgerUnavailable`, `stateChanged`, `attestationExpired`, `unavailable` |
 | `registrar.ts` | `RegistrarService` (`workflow.registrar`) |
+| `governance/` | Tier A governance (DM `GovernanceRules` 2-of-3): `GovernanceService` (propose + auto-confirm, confirm, execute + registrar sync, cancel; always `as: "seat"`), fresh seat reads and GP-refs from the ledger (`ledger.ts`), DM confirmation/staleness rules (`rules.ts`), `GET /verifiers` directory (`read.ts`). Routes: `routes/workflow/governance.ts` |
+| `cases/` | Read side of the case/asset/verification/access routes: `loadViewerWorld` (read world + presenter context; registry refs and verifier status from the registrar's projected directory), `assertCheck`, `commandExists`, `allocateFreshRef` (DB counter, skipping refs already on the ledger), `createdField` |
+| `assets/manifest.ts` | Evidence linkage: the owner's `EvidenceManifest` from the finalized documents (create + `Manifest_Anchor` in one create-and-exercise, or `Manifest_NewVersion`), as the first step of a verification request, evidence resubmission or share |
+| `verification/` | Owner verification request sequence (`requestVerification`), registry verifier resolution (registrar view), verifier ACS inputs |
+| `sharing/` | Owner share sequence and dealer consent (`shareWithLender`, `dealerConsent`), share revocation, share-based evidence access (metadata via the read model, download re-checked on the recipient's fresh ACS), and **`ensureLenderAssessment`**: the M18 trigger (the lender's own CollateralAssessment, created on the selected lender's first `GET /cases/:id`; idempotent, callable from any lender-side route) |
 | `../ledger/*` | `AcsReader`, `ledgerCommands` (builders), payload schemas, `TEMPLATES`, `CantonLedgerGateway`, `LedgerAccess` |
 
 ## Adding routes to a module
@@ -86,6 +91,8 @@ app.post("/cases/:id/sharing", {
 | Missing or invalid `Idempotency-Key` | `400 validation_error` |
 
 **Headers.** Every mutation needs `Idempotency-Key` (8–200 characters; use `IdempotencyHeadersSchema`). There is no CSRF token. `plugins/security.ts` rejects unsafe requests whose `Sec-Fetch-Site` is not `same-origin`/`none`, or whose `Origin` is untrusted.
+
+**Submission context.** Before submitting, the runner records `ledgerUserId`, `actAs`, `ledgerSource` and (once, before the first attempt) `ledgerEndAtSubmit` on the command row, so the worker reconciles an `UNKNOWN_OUTCOME` from exactly that user's completions.
 
 **Replays.** A replay returns the stored status and result without resubmitting. The ledger `commandId` is deterministic: it is computed from org, user, operation, key and payload hash. `UNKNOWN_OUTCOME` resubmits the same stored submission with the same `commandId`, and the ledger deduplicates it.
 

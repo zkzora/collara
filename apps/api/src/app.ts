@@ -9,7 +9,6 @@ import {
   hasZodFastifySchemaValidationErrors,
   isResponseSerializationError,
   jsonSchemaTransform,
-  serializerCompiler,
   validatorCompiler,
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
@@ -19,9 +18,10 @@ import { isProblemError, problemError, PROBLEM_CONTENT_TYPE, problems, type Prob
 import { loggerOptions } from "./logger";
 import { actorResolution } from "./plugins/actor";
 import { security } from "./plugins/security";
+import { parseSerializerCompiler } from "./serializer";
 import { sessions } from "./plugins/session";
 import { authRoutes } from "./routes/auth";
-import { commandRoutes, verifierRoutes } from "./routes/commands";
+import { commandRoutes } from "./routes/commands";
 import { evidenceRoutes } from "./routes/evidence";
 import { pilotRoutes } from "./routes/pilot";
 import { demoRoutes, meRoutes } from "./routes/session";
@@ -142,7 +142,7 @@ export async function buildApp(options: BuildAppOptions) {
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
-  app.setSerializerCompiler(serializerCompiler);
+  app.setSerializerCompiler(parseSerializerCompiler);
 
   app.setErrorHandler((error, request, reply) => {
     const { problem, log } = toProblem(error);
@@ -220,10 +220,9 @@ export async function buildApp(options: BuildAppOptions) {
     rateLimit: { max: config.PILOT_RATE_LIMIT_MAX, timeWindowMs: config.PILOT_RATE_LIMIT_WINDOW_MS },
   });
   await app.register(commandRoutes, { prefix: "/api/commands", commands });
-  await app.register(verifierRoutes, { prefix: "/api/verifiers", projections, indexed: false });
   await app.register(evidenceRoutes, { prefix: "/api/evidence", db: db.db, storage, commands, projections, clock });
   // Workflow modules (cases, assets, verification, reviews, proposals, pledges, release, access, audit,
-  // reports, governance): one registration; each module declares its full paths under /api.
+  // reports, governance incl. GET /verifiers): one registration; each module declares its full paths under /api.
   await app.register(workflowRoutes, { prefix: "/api", services, workflow, mode: config.COLLARA_MODE });
 
   return app;

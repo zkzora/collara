@@ -23,6 +23,10 @@ export const REF_KINDS = {
   verifier: { prefix: "VER", digits: 3 },
   // Not defined by any source; inferred for access/audit grants.
   accessGrant: { prefix: "AG", digits: 3 },
+  // Ledger-only references named in daml-model.md §7 (W4 LDN-001, W7 AUTH-001, W10 RD-001); never shown as ids.
+  decisionNotice: { prefix: "LDN", digits: 3 },
+  activationAuthorization: { prefix: "AUTH", digits: 3 },
+  releaseDecision: { prefix: "RD", digits: 3 },
 } as const;
 
 export type RefKind = keyof typeof REF_KINDS;

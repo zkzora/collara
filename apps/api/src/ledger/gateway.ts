@@ -38,6 +38,11 @@ export class CantonLedgerGateway implements LedgerGateway {
     return this.#access;
   }
 
+  /** Ledger end of the user's participant (recorded before a first submission for exact reconciliation). */
+  async ledgerEnd(request: { readonly ledgerUserId: string; readonly source?: string }): Promise<number> {
+    return this.#access.client(request.ledgerUserId, request.source).ledgerEnd();
+  }
+
   async submit(_command: CommandRow, request: LedgerSubmitRequest): Promise<LedgerSubmitOutcome> {
     try {
       await this.#access.assertSameLedger(request.ledgerUserId);

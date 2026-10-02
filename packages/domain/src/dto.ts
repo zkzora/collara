@@ -363,6 +363,8 @@ export const CreateCaseRequestSchema = z.object({
   selectedLenderOrgId: OrgIdSchema,
   purpose: z.string().trim().max(500).optional(),
   requestedPrincipal: MoneySchema.optional(),
+  /** The dealer organization invited to contribute its own records to the case (optional; INFERRED field). */
+  dealerOrgId: OrgIdSchema.optional(),
 });
 export type CreateCaseRequest = z.input<typeof CreateCaseRequestSchema>;
 

@@ -78,7 +78,10 @@ export function buildGovernance(view: LedgerView, parties: PartyDirectory): Gove
   // Governed proposals (Add / Suspend). Confirmations and execution come from DM contracts in the same view.
   const confirmations = of(T.GovernanceConfirmation);
   const results = of(T.GovernanceExecutionResult);
-  const governed = [...of(T.AddVerifierProposal), ...of(T.SuspendVerifierProposal)].sort(byOffset);
+  // Seat proposals only: anyone can create a proposal observed by the governance party (DM checks the proposer
+  // at confirm time), so a non-member's proposal is neither listed nor numbered. The API numbers the same way
+  // (apps/api/src/workflow/governance/ledger.ts).
+  const governed = [...of(T.AddVerifierProposal), ...of(T.SuspendVerifierProposal)].filter((c) => seatOf(str(c.payload.proposer)) !== null).sort(byOffset);
   const proposals: GovernanceProposalFacts[] = governed.map((c, i) => {
     const p = decode.governanceProposal(c.payload);
     const isAdd = c.templateRef === T.AddVerifierProposal;

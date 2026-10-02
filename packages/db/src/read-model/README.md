@@ -110,7 +110,7 @@ never 0). Terminal outcomes without a successor contract (daml-model D14) come f
 | `CollateralLock` | `case.lock` (ref, lender/borrower orgs, versions consumed/locked, attestation, package) |
 | `ReleaseRequest` / `ReleaseDecision` | `case.releaseRequests[]` (`AUTHORIZED`/`REJECTED` from the decision or the archiving choice, `WITHDRAWN`, `INFORMATION_REQUESTED`, else `REQUESTED`); `decisionReason` = `sharedReason` |
 | `AuditGrant` | `case.auditGrants[]` (`grantorSide` OWNER when the grantor is the borrower org; `EXPORT` → `VIEW_EXPORT`; `Grant_Revoke` → `revokedAt`) and auditor delegation (above) |
-| `GovernanceRules`, `VerifierRegistry`, `VerifierAccreditation`, `*Proposal`, `GovernanceConfirmation`, `GovernanceExecutionResult`, `VerifierStatusMirror`, `CollaraConfig` | `GovernanceFacts` (`governance.ts`): seats, threshold, timeout, registry version, verifiers (`via` genesis/governed/mirror), proposals with confirmations |
+| `GovernanceRules`, `VerifierRegistry`, `VerifierAccreditation`, `*Proposal`, `GovernanceConfirmation`, `GovernanceExecutionResult`, `VerifierStatusMirror`, `CollaraConfig` | `GovernanceFacts` (`governance.ts`): seats, threshold, timeout, registry version, verifiers (`via` genesis/governed/mirror), proposals with confirmations (only proposals whose proposer is a seat party; numbered GP-001… in creation order, the same numbering the API derives from the ledger) |
 
 Events (`events.ts`, `mapLedgerEvent`): created and exercised nodes map to domain `EventFacts` (type, ref,
 actor from `actorRef`, from/to state, commit `{ offset, updateId }`). Asset-level events (passport, evidence,

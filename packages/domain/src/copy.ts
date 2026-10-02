@@ -131,7 +131,8 @@ export const FIGURE_LABELS = {
  */
 export const GOVERNANCE_INTEGRATION_LABELS = {
   SIMULATED: "Simulated",
-  PARTIAL_TIER_A: "Partial — governance contracts on one local participant",
+  // Synthesis §3 (BitSafe DM, Tier A) UI label.
+  PARTIAL_TIER_A: "Partial — governance contracts on one local participant; decentralized party not demonstrated",
   DM_TIER_B: "Decentralization Manager · local 3-node topology · one operator",
   UNAVAILABLE: "Unavailable",
 } as const;

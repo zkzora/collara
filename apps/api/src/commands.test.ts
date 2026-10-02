@@ -155,10 +155,11 @@ describe("GET /api/commands/:id", () => {
     expect(row?.status).toBe("PREPARED");
   });
 
-  it("GET /api/verifiers is an empty, labelled placeholder until projections exist", async () => {
+  it("GET /api/verifiers reads the projected registry: empty before anything is projected, 401 without a session", async () => {
+    // Served by the governance route module (routes/workflow/governance.ts); LocalNet coverage in governance.it.test.ts.
     const res = await t.app.inject({ method: "GET", url: "/api/verifiers", headers: { cookie: await loginAs(t.app, "manufacturer-owner") } });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([]);
-    expect(res.headers["x-collara-projection"]).toBe("not-indexed");
+    expect((await t.app.inject({ method: "GET", url: "/api/verifiers" })).statusCode).toBe(401);
   });
 });

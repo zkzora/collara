@@ -1069,8 +1069,11 @@ export function presentVerifierEntries(gov: GovernanceFacts, assets: readonly As
         : null,
     };
   });
+  // A re-accreditation (Add for a ref already in the registry, e.g. after a suspension) stays one entry; its
+  // pendingProposal above shows the open Add.
+  const known = new Set(gov.verifiers.map((v) => v.ref));
   const proposedAdds: VerifierEntry[] = gov.proposals
-    .filter((p) => p.type === "ADD_VERIFIER" && isOpenGovernanceProposal(governanceProposalState(p, gov, pctx.now)))
+    .filter((p) => p.type === "ADD_VERIFIER" && !known.has(p.target.verifierRef) && isOpenGovernanceProposal(governanceProposalState(p, gov, pctx.now)))
     .map((p) => ({
       ref: p.target.verifierRef,
       orgName: p.target.orgName,

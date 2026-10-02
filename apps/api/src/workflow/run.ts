@@ -267,6 +267,7 @@ export class WorkflowRunner {
       };
       current = await this.#storeResult(current, { submission });
     }
+    current = await this.#recordSubmissionContext(current, submission);
 
     await hooks.beforeSubmit?.();
     let captured: LedgerSubmitOutcome | undefined;
@@ -355,6 +356,25 @@ export class WorkflowRunner {
       current = await this.commands.transition(current.id, "FAILED", { error: { kind: "UNAVAILABLE", message: COMMAND_COPY.LEDGER_UNAVAILABLE } });
     }
     return { command: this.commands.toStatus(current), record: current, committed: false, replayed: false, result: null, step: null };
+  }
+
+  /**
+   * Records who submits (ledger user, actAs, participant source) and the ledger end observed before the
+   * FIRST submission on the command row, so the worker can reconcile an UNKNOWN_OUTCOME from exactly that
+   * user's completions after that offset (packages/db projection/commands.ts). A resubmission keeps the
+   * first ledger end. The ledger end is best effort: without it the worker scans from offset 0.
+   */
+  async #recordSubmissionContext(record: CommandRow, submission: StoredSubmission): Promise<CommandRow> {
+    let ledgerEndAtSubmit = record.ledgerEndAtSubmit;
+    if (ledgerEndAtSubmit === null && this.#gateway.ledgerEnd) {
+      ledgerEndAtSubmit = await this.#gateway.ledgerEnd({ ledgerUserId: submission.ledgerUserId, source: submission.source }).catch(() => null);
+    }
+    const [row] = await this.db
+      .update(commandsTable)
+      .set({ ledgerUserId: submission.ledgerUserId, actAs: [...submission.actAs], ledgerSource: submission.source, ledgerEndAtSubmit })
+      .where(eq(commandsTable.id, record.id))
+      .returning();
+    return row ?? record;
   }
 
   async #storeResult(record: CommandRow, patch: Partial<StoredResult>): Promise<CommandRow> {

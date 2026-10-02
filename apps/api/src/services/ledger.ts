@@ -56,6 +56,12 @@ export type LedgerSubmitOutcome =
 
 export interface LedgerGateway {
   submit(command: CommandRow, request: LedgerSubmitRequest): Promise<LedgerSubmitOutcome>;
+  /**
+   * Current ledger end as seen by a ledger user (optional). The runner records it on the command row before
+   * the first submission, so the worker reads that user's completions only after it (UNKNOWN_OUTCOME
+   * reconciliation, packages/db projection/commands.ts).
+   */
+  ledgerEnd?(request: { readonly ledgerUserId: string; readonly source?: string }): Promise<number>;
 }
 
 /** UI_MOCK, or LOCALNET without a bootstrap state: every submission fails before reaching a ledger (never simulated). */

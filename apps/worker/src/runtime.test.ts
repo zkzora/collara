@@ -120,7 +120,9 @@ describe("worker runtime (PGlite + in-memory ledger)", () => {
     // UNKNOWN_OUTCOME → COMMITTED (completion found) → PROJECTED (its update is in ledger_updates).
     expect(rows.get("cmd-unknown")).toMatchObject({ status: "PROJECTED", updateId: reconciledTx.updateId, reconcileAttempts: 1 });
     const [job] = await handle.db.select().from(exportJobs);
-    expect(job).toMatchObject({ state: "FAILED", errorMessage: "Export generation not implemented", leaseOwner: null });
+    // The export handler ran and settled the job (it cannot produce a report here: no case facts or no storage).
+    expect(job).toMatchObject({ state: "FAILED", leaseOwner: null });
+    expect(job?.errorMessage).toBeTruthy();
 
     // New ledger activity after the worker caught up is picked up by the running loop.
     const extra = ledger.tx((tx) => tx.foreign(P.owner));
