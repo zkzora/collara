@@ -120,9 +120,9 @@ never 0). Terminal outcomes without a successor contract (daml-model D14) come f
 | `RetiredControl` | `asset.lifecycle = ARCHIVED` |
 | `EvidenceManifest` | `asset.package` (ref, version, entries, history); documents' `ledgerState` (`COMMITTED` when in the current manifest); ledger-only document references when no app row is visible |
 | `DealerContribution` | dealer's ledger-only document reference; dealer org of the case |
-| `PackageShareProposal` / `PackageShare` | `case.shares[]` (proposal → `REQUESTED`/`DECLINED`; share → `GRANTED`, `EXPIRED` past `expiresAt`, archived → `REVOKED`); recipient's package entries; which app document rows a recipient may see |
-| `VerificationRequest` | `asset.verifications[]` grouped by `requestRef`, latest `version`; active → `status` (`REQUESTED`/`IN_REVIEW`/`CHANGES_REQUESTED`); archived by `VR_IssueAttestation` → `ATTESTED`, `VR_Reject` → `REJECTED`, `VR_DeclineAssignment` → `DECLINED`, `VR_Cancel` → `CANCELLED`; `lastMessage` = terminal reason or `changeNote` |
-| `VerificationAttestation` / `AttestationDisclosure` | `asset.attestations[]` (original preferred over recipient copies); `supersededBy` (`supersedesRef`, `Att_Supersede`); `revokedAt` (`RevokedAttestation`, `Att_Revoke`, a disclosure withdrawn without supersession) |
+| `PackageShareProposal` / `PackageShare` | `case.shares[]` (proposal → `REQUESTED`/`DECLINED`; share → `GRANTED`, `EXPIRED` past `expiresAt`, archived → `REVOKED`); recipient's package entries; which app document rows a recipient may see. **Verification grants** (purpose `VERIFICATION`, `shareRef` `<requestRef>-G<v>[-D<n>]`) are never case shares: they fill the request's `documentRefs`/`documentVersions` and give the verifier the app rows of exactly the granted versions while active and unexpired (daml-model.md §4.6) |
+| `VerificationRequest` | `asset.verifications[]` grouped by `requestRef`, latest `version`; active → `status` (`REQUESTED`/`IN_REVIEW`/`CHANGES_REQUESTED`); archived by `VR_IssueAttestation` → `ATTESTED`, `VR_Reject` → `REJECTED`, `VR_DeclineAssignment` → `DECLINED`, `VR_Cancel` → `CANCELLED`; `lastMessage` = terminal reason or `changeNote`; `documentRefs`/`documentVersions` = the request's live verification grants for its current anchor (owner and assigned verifier; empty for the verifier once declined or cancelled), or, for a request without any grant, the owner-only manifest listing |
+| `VerificationAttestation` / `AttestationDisclosure` | `asset.attestations[]` (original preferred over recipient copies; `supportingVersions` = the versions granted to the verifier for the attested anchor when the viewer sees the grants, else the package entries of that anchor); `supersededBy` (`supersedesRef`, `Att_Supersede`); `revokedAt` (`RevokedAttestation`, `Att_Revoke`, a disclosure withdrawn without supersession) |
 | `CollateralAssessment` | lender's `case.review` (latest `version`; `status` → `ReviewState`; valuation → `assessment`; snapshot → `evidenceSnapshot`/`snapshotPackageVersion`; analyst/approver from the `Assessment_*` choice `actorRef`s) |
 | `LenderDecisionNotice` | borrower's `case.review` (state = `outcome`), `sharedFeedback`, `informationRequest`, `decision` (both sides) |
 | `FinancingProposal` | `case.proposals[]` per version (active → `ISSUED`; `Proposal_Decline` → `DECLINED`; `Proposal_Withdraw`/`Proposal_Revise` → `WITHDRAWN`) |
@@ -136,6 +136,13 @@ never 0). Terminal outcomes without a successor contract (daml-model D14) come f
 Events (`events.ts`, `mapLedgerEvent`): created and exercised nodes map to domain `EventFacts` (type, ref,
 actor from `actorRef`, from/to state, commit `{ offset, updateId }`). Asset-level events (passport, evidence,
 verification) land on `asset.events`, case events on `case.events`; the presenters apply the audiences.
+
+Private notes (`../notes.ts`, table `notes`): `loadReadWorld` finally overlays the off-ledger notes the viewer may
+read onto its case facts (`withNotes`): `review.internalNotes` (the lender org's analyst/approver), `review.sharedFeedback`
+(lender + borrower; the newer of the saved feedback and the lender's notice; a borrower with feedback but no notice
+gets `review.ref` from the note), and per release request `note`, `servicingRef`, `informationRequest` (open question)
+and `thread` (the lock's owner and designated lender). Only notes of committed commands; viewers without roles read
+none (the presenters' field omission still applies on top).
 
 Application records: the `cases` row supplies title, purpose, requested principal (borrower org and the
 selected lender only, enforced by the presenters), policy and lifecycle dates; a case also exists for its

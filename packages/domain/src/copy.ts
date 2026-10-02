@@ -137,3 +137,25 @@ export const GOVERNANCE_INTEGRATION_LABELS = {
   UNAVAILABLE: "Unavailable",
 } as const;
 export type GovernanceIntegrationStatus = keyof typeof GOVERNANCE_INTEGRATION_LABELS;
+
+/**
+ * Private off-ledger notes (internal lender notes, borrower-shared feedback, release notes and Q&A).
+ * INFERRED (needs copy approval).
+ */
+export const NOTE_COPY = {
+  PLAIN_TEXT_ONLY: "Use plain text without control characters.",
+  /** Hint on note fields: the text is stored off-ledger; the ledger records a reference only. */
+  STORED_OFF_LEDGER: "Stored as a private application record. The ledger records a reference only, never the text.",
+  /** Shown while the command that carries a note is not yet confirmed. */
+  PENDING: "The note is shown once the action is confirmed.",
+  THREAD_TITLE: "Notes and questions",
+  THREAD_EMPTY: "No notes or questions on this request.",
+  THREAD_SCOPE: "Visible to the borrower and the designated lender only.",
+} as const;
+
+/** Release note thread entry labels. INFERRED (needs copy approval). */
+export const RELEASE_THREAD_LABELS = {
+  NOTE: "Request note",
+  QUESTION: "Lender question",
+  RESPONSE: "Borrower response",
+} as const;

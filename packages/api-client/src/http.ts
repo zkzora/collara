@@ -17,6 +17,8 @@ import {
   GovernanceProposalSchema,
   GovernanceStateSchema,
   MeSchema,
+  OrgRefSchema,
+  OverviewSchema,
   pageSchema,
   PilotRequestReceiptSchema,
   PledgeSchema,
@@ -161,7 +163,7 @@ export function createHttpClient(config: HttpClientOptions = {}): CollaraClient 
       get: (id, options) => call("verifications.get", VerificationRequestSchema, { id, options }),
       decideAssignment: (id, body, options) => call("verifications.decideAssignment", CommandResponseSchema, { id, body, options }),
       requestChanges: (id, body, options) => call("verifications.requestChanges", CommandResponseSchema, { id, body, options }),
-      submitEvidence: (id, options) => call("verifications.submitEvidence", CommandResponseSchema, { id, body: {}, options }),
+      submitEvidence: (id, body, options) => call("verifications.submitEvidence", CommandResponseSchema, { id, body: body ?? {}, options }),
       issueAttestation: (id, body, options) =>
         call("verifications.issueAttestation", result.attestationRef, { id, body, options }),
       reject: (id, body, options) => call("verifications.reject", CommandResponseSchema, { id, body, options }),
@@ -211,6 +213,13 @@ export function createHttpClient(config: HttpClientOptions = {}): CollaraClient 
     },
     verifiers: {
       list: (options) => call("verifiers.list", z.array(VerifierEntrySchema), { options }),
+    },
+    directory: {
+      lenders: (options) => call("directory.lenders", z.array(OrgRefSchema), { options }),
+      dealers: (options) => call("directory.dealers", z.array(OrgRefSchema), { options }),
+    },
+    overview: {
+      get: (options) => call("overview.get", OverviewSchema, { options }),
     },
     governance: {
       state: (options) => call("governance.state", GovernanceStateSchema, { options }),

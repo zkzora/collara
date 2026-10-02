@@ -25,7 +25,7 @@ import {
   type PolicyAction,
   type PolicyContext,
 } from "./policy";
-import type { Actor } from "./roles";
+import { hasMandate, type Actor } from "./roles";
 
 export const CASE_ACTIONS = [
   "evidence.upload",
@@ -65,8 +65,19 @@ export const VERIFICATION_ACTIONS = [
 ] as const;
 export type VerificationAction = (typeof VERIFICATION_ACTIONS)[number];
 
-export const ASSET_ACTIONS = ["evidence.upload", "verification.request"] as const;
+export const ASSET_ACTIONS = ["evidence.upload", "verification.request", "case.create"] as const;
 export type AssetAction = (typeof ASSET_ACTIONS)[number];
+
+/** INFERRED copy (needs approval): case creation refusals, shared by the API and the UI_MOCK client. */
+export const CASE_CREATE_COPY = {
+  NOT_REGISTERED: "Register the asset before creating a case.",
+  ACTIVE_CASE: "This asset already has an active case workflow.",
+} as const;
+
+/** One case workflow per asset: a case holds its asset until it is cancelled, closed, released or rejected. */
+export function caseHoldsAsset(facts: CaseFacts): boolean {
+  return !facts.cancelledAt && !facts.closedAt && facts.lock?.state !== "RELEASED" && facts.review.state !== "REJECTED";
+}
 
 const CASE_ACTION_POLICY: Readonly<Record<CaseAction, PolicyAction>> = {
   "evidence.upload": "evidence.upload",
@@ -260,6 +271,12 @@ export function checkAssetAction(
 ): ActionCheck {
   const ctx = assetContext(asset, cases, now, options);
   if (!isRelated(actor, ctx)) return unavailable;
+  if (action === "case.create") {
+    // Creating a case needs the borrower mandate on the asset owner organization (S §9.3).
+    if (asset.ownerOrgId !== actor.orgId || !actor.roles.includes("BORROWER") || !hasMandate(actor, "BORROWER")) return forbidden(action);
+    if (asset.lifecycle !== "REGISTERED") return conflict(CASE_CREATE_COPY.NOT_REGISTERED);
+    return cases.some((c) => c.asset.ref === asset.ref && caseHoldsAsset(c)) ? conflict(CASE_CREATE_COPY.ACTIVE_CASE) : OK;
+  }
   if (!can(actor, action, ctx)) return forbidden(action);
   if (asset.lifecycle !== "REGISTERED") return conflict();
   if (action === "verification.request" && openVerification(asset)) return conflict();

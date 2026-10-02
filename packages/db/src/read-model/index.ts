@@ -20,6 +20,7 @@ import type { MappedEvent } from "./events";
 import { buildGovernance } from "./governance";
 import { loadLedgerView, loadPartyDirectory, readLastSync, type LastSync, type LedgerView, type PartyDirectory, type VisibleContract } from "./ledger-view";
 import { buildWorld, type PendingRegistration } from "./world";
+import { withNotes } from "../notes";
 import type { ReadOptions, ReadViewer } from "./viewer";
 
 export type { LastSync, LedgerView, PartyDirectory, VisibleContract, VisibleEvent } from "./ledger-view";
@@ -132,7 +133,8 @@ export async function loadReadWorld(db: DbOrTx, viewer: ReadViewer, options: Rea
     viewer,
     now,
     assets: worldAssets,
-    cases: [...worldCases].sort((a, b) => a.ref.localeCompare(b.ref)),
+    // Private off-ledger notes the viewer may read (../notes.ts); the presenters still omit fields by role.
+    cases: (await withNotes(db, viewer, worldCases)).sort((a, b) => a.ref.localeCompare(b.ref)),
     pendingRegistrations: built.pendingRegistrations,
     governance: buildGovernance(view, parties),
     events: built.events,

@@ -17,7 +17,7 @@
 // names the passport's signatory as owner. Nobody else qualifies: Demo Lender B, a dealer or verifier without such
 // a contract, auditors (they see the identity only through the owner's AuditGrant, i.e. the grantor's view built
 // by the audit delegation) and operators. Ledger privacy is unchanged; this is a read-side disclosure.
-import type { AssetFacts, CaseFacts } from "@collara/domain";
+import { VERIFICATION_GRANT_PURPOSE, type AssetFacts, type CaseFacts } from "@collara/domain";
 import type { DbOrTx } from "../client";
 import { T } from "../projection/templates";
 import { decode } from "./decode";
@@ -51,7 +51,9 @@ export function equipmentEntitlements(view: LedgerView, viewer: ReadViewer, case
         if (!active(c)) break;
         const s = decode.share(c.payload);
         if (s.expiresAt && Date.parse(s.expiresAt) <= now.getTime()) break;
-        if (parties.has(s.recipient) || s.consenters.some((p) => parties.has(p))) entitle(caseAssets.get(s.caseRef), s.owner);
+        // A verification grant's recipient is the assigned verifier, entitled through its request (below).
+        const recipient = parties.has(s.recipient) && s.purpose !== VERIFICATION_GRANT_PURPOSE;
+        if (recipient || s.consenters.some((p) => parties.has(p))) entitle(caseAssets.get(s.caseRef), s.owner);
         break;
       }
       case T.PackageShareProposal: {

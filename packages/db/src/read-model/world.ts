@@ -10,6 +10,8 @@ import {
   orgName,
   safeParseMoney,
   userIdFromActorRef,
+  VERIFICATION_GRANT_PURPOSE,
+  verificationGrantRequestRef,
   type ActivationAuthorizationFacts,
   type AssetControlFacts,
   type AssetFacts,
@@ -161,8 +163,16 @@ export function buildWorld(input: WorldInput): BuiltWorld {
   const requests = of(T.AssetRegistrationRequest);
   const tickets = of(T.IssuanceTicket);
   const contributions = of(T.DealerContribution);
-  const shareProposals = of(T.PackageShareProposal);
-  const shares = of(T.PackageShare);
+  // Verification grants (purpose VERIFICATION, recipient = the assigned verifier) are not lender shares: they never
+  // appear in case.shares and only count while active and unexpired (daml-model.md §4.6).
+  const isVerificationGrant = (c: VisibleContract) => decode.share(c.payload).purpose === VERIFICATION_GRANT_PURPOSE;
+  const liveGrant = (c: VisibleContract) => {
+    const expiresAt = decode.share(c.payload).expiresAt;
+    return isActive(c) && (!expiresAt || Date.parse(expiresAt) > now.getTime());
+  };
+  const shareProposals = of(T.PackageShareProposal).filter((c) => !isVerificationGrant(c));
+  const verificationGrants = of(T.PackageShare).filter(isVerificationGrant);
+  const shares = [...of(T.PackageShare).filter((c) => !isVerificationGrant(c)), ...verificationGrants.filter(liveGrant)];
   const attestations = of(T.VerificationAttestation);
   const revoked = of(T.RevokedAttestation);
   const mirrors = of(T.VerifierStatusMirror);
@@ -286,6 +296,30 @@ export function buildWorld(input: WorldInput): BuiltWorld {
       }
       return entries;
     };
+    // Verification grants of one request (bound by the grant reference) for one evidence version. Only the owner
+    // and the verifier are stakeholders; any state for history (attestations), live ones for current access.
+    type Anchor = { packageRef: string; manifestVersion: number; manifestHash: string } | null;
+    const grantsOf = (r: { requestRef: string; owner: string; verifier: string; evidence: Anchor }, liveOnly: boolean) =>
+      verificationGrants.filter((c) => {
+        const s = decode.share(c.payload);
+        const e = s.evidence;
+        return (
+          (!liveOnly || liveGrant(c)) &&
+          verificationGrantRequestRef(s.shareRef) === r.requestRef &&
+          s.owner === r.owner &&
+          s.recipient === r.verifier &&
+          !!e &&
+          !!r.evidence &&
+          e.packageRef === r.evidence.packageRef &&
+          e.manifestVersion === r.evidence.manifestVersion &&
+          e.manifestHash === r.evidence.manifestHash
+        );
+      });
+    const grantedEntries = (grants: readonly VisibleContract[]): ManifestEntry[] => {
+      const entries = new Map<string, ManifestEntry>();
+      for (const g of grants) for (const d of decode.share(g.payload).documents) entries.set(`${d.docRef}#${d.docVersion}`, { documentRef: d.docRef, version: d.docVersion });
+      return [...entries.values()].sort((a, b) => a.documentRef.localeCompare(b.documentRef) || a.version - b.version);
+    };
 
     // Attestations (verifier/owner originals, recipient copies).
     const attestationFacts = new Map<string, AttestationFacts>();
@@ -320,7 +354,14 @@ export function buildWorld(input: WorldInput): BuiltWorld {
         limitations: raw.limitations,
         packageRef: raw.evidence?.packageRef ?? "",
         packageVersion: raw.evidence?.manifestVersion ?? 0,
-        supportingVersions: raw.evidence ? entriesOf(raw.evidence.packageRef, raw.evidence.manifestVersion) : [],
+        // The versions the verifier was granted for the attested evidence version (owner and verifier views);
+        // otherwise (lender copies, attestations issued without a grant) the package entries of that version.
+        supportingVersions: raw.evidence
+          ? (() => {
+              const reviewed = grantedEntries(grantsOf({ requestRef: raw.requestRef, owner: raw.owner, verifier: raw.verifier, evidence: raw.evidence }, false));
+              return reviewed.length > 0 ? reviewed : entriesOf(raw.evidence.packageRef, raw.evidence.manifestVersion);
+            })()
+          : [],
         supersedes: raw.supersedesRef,
         supersededBy: supersededByRef,
         revokedAt:
@@ -353,6 +394,23 @@ export function buildWorld(input: WorldInput): BuiltWorld {
       const issued = choice === "VR_IssueAttestation" ? str(latest.archived?.argument.attestationRef) : null;
       const attestationRef = issued || [...attestationFacts.values()].find((a) => a.verificationRef === requestRef)?.ref || null;
       const terminalNote = choice ? str(latest.archived?.argument.reason) || null : null;
+      // Documents disclosed to the verifier: exactly the live VERIFICATION grants of this request for its current
+      // evidence version (owner and assigned verifier views; never the whole package). A request recorded
+      // without any grant (seeded before grants existed) keeps the owner-only manifest listing.
+      const isVerifierView = viewer.readableParties.includes(v.verifier);
+      const everGranted = verificationGrants.some((c) => {
+        const s = decode.share(c.payload);
+        return verificationGrantRequestRef(s.shareRef) === requestRef && s.owner === v.owner && s.recipient === v.verifier;
+      });
+      let documentRefs: string[] = [];
+      let documentVersions: ManifestEntry[] | undefined;
+      if (everGranted && (isOwnerView || isVerifierView)) {
+        const ended = state === "DECLINED" || state === "CANCELLED";
+        documentVersions = ended && !isOwnerView ? [] : grantedEntries(grantsOf({ requestRef, owner: v.owner, verifier: v.verifier, evidence: v.evidence }, true));
+        documentRefs = [...new Set(documentVersions.map((e) => e.documentRef))];
+      } else if (isOwnerView && v.evidence) {
+        documentRefs = entriesOf(v.evidence.packageRef, v.evidence.manifestVersion).map((e) => e.documentRef);
+      }
       return {
         ref: requestRef,
         assetRef: ref,
@@ -361,7 +419,8 @@ export function buildWorld(input: WorldInput): BuiltWorld {
         verifierRegistryRef: verifierRefByParty.get(v.verifier) ?? "",
         requestedByOrgId: org(v.owner),
         scope: v.checklist.length > 0 ? v.checklist : [v.equipmentScope].filter(Boolean),
-        documentRefs: isOwnerView && v.evidence ? entriesOf(v.evidence.packageRef, v.evidence.manifestVersion).map((e) => e.documentRef) : [],
+        documentRefs,
+        ...(documentVersions ? { documentVersions } : {}),
         packageVersion: v.evidence?.manifestVersion ?? 0,
         state,
         requestedAt: minIso(versions.map((c) => c.createdAt)),
@@ -528,7 +587,9 @@ export function buildWorld(input: WorldInput): BuiltWorld {
   function buildCase(ref: string): CaseFacts {
     const row = caseRowByRef.get(ref) ?? null;
     const cs = (byCase.get(ref) ?? []).sort(byOffset);
-    const pick = (template: string) => cs.filter((c) => c.templateRef === template).sort(byOffset);
+    // Case shares are the lender's package shares; verification grants belong to the asset's verification facts.
+    const caseScoped = (c: VisibleContract) => (c.templateRef !== T.PackageShare && c.templateRef !== T.PackageShareProposal) || !isVerificationGrant(c);
+    const pick = (template: string) => cs.filter((c) => c.templateRef === template && caseScoped(c)).sort(byOffset);
     const firstParty = (fields: readonly string[]) => {
       for (const c of cs) for (const f of fields) if (str(c.payload[f])) return str(c.payload[f]);
       return null;

@@ -106,6 +106,26 @@ export interface EvidencePackageFacts {
 
 // --- Verification -----------------------------------------------------------------------------
 
+/**
+ * Purpose of the owner-signed PackageShare that grants the assigned verifier the documents selected for one
+ * verification request (daml-model.md §4.6, "Verification evidence grants"). Lender shares use LENDER_REVIEW.
+ */
+export const VERIFICATION_GRANT_PURPOSE = "VERIFICATION";
+
+/**
+ * Share reference of a verification grant, which binds it to one request and evidence version:
+ * `<requestRef>-G<manifestVersion>` for the owner's documents, `<requestRef>-G<manifestVersion>-D<n>` for the
+ * documents of dealer n (granted by that dealer's Consent_Grant).
+ */
+export function verificationGrantRef(requestRef: string, manifestVersion: number, dealerIndex?: number): string {
+  return `${requestRef}-G${manifestVersion}${dealerIndex === undefined ? "" : `-D${dealerIndex}`}`;
+}
+
+/** The request a verification grant reference belongs to, or null when the reference is not one. */
+export function verificationGrantRequestRef(shareRef: string): string | null {
+  return /^(.+)-G\d+(?:-D\d+)?$/.exec(shareRef)?.[1] ?? null;
+}
+
 export interface VerificationFacts {
   ref: string; // VR-001
   assetRef: string;
@@ -117,6 +137,11 @@ export interface VerificationFacts {
   scope: string[];
   /** Documents disclosed to the verifier for this assignment. */
   documentRefs: string[];
+  /**
+   * The exact versions granted to the verifier for the request's current evidence version (its active
+   * VERIFICATION grants). Absent for requests recorded without a grant (legacy fixtures): no version scoping.
+   */
+  documentVersions?: ManifestEntry[];
   packageVersion: number;
   state: VerificationState;
   requestedAt: string;
@@ -309,6 +334,17 @@ export interface ReleaseRequestFacts {
   decidedAt: string | null;
   decidedByUserId: string | null;
   decisionReason: string | null;
+  /** Private note thread (off-ledger note store): the lock's owner and designated lender only. */
+  thread?: ReleaseThreadEntryFacts[];
+}
+
+/** One entry of a release request's note thread: the request note, a lender question or a borrower response. */
+export interface ReleaseThreadEntryFacts {
+  kind: "NOTE" | "QUESTION" | "RESPONSE";
+  body: string;
+  authorOrgId: OrgId;
+  authorUserId: string;
+  at: string;
 }
 
 export const AUDIT_SCOPES = [

@@ -346,6 +346,8 @@ export const CaseDetailSchema = CaseSummarySchema.extend({
     package: z.object({ ref: z.string(), version: z.number().int(), documentCount: z.number().int() }).nullable(),
     proposal: z.object({ ref: ProposalRefSchema, version: z.number().int(), state: badgeSchema(ProposalStateSchema) }).nullable(),
     pledge: z.object({ ref: PledgeRefSchema, state: badgeSchema(PledgeDisplayStateSchema) }).nullable(),
+    /** The lender review the viewer may open (GET /reviews/:id); null when none is visible. */
+    review: z.object({ ref: z.string() }).nullable(),
   }),
   requestedPrincipal: MoneySchema.nullable(),
   dataSource: DataSourceSchema,
@@ -509,6 +511,8 @@ export const VerificationRequestSchema = z.object({
   state: badgeSchema(VerificationStateSchema),
   evidencePackage: VersionedRefSchema,
   documentIds: z.array(DocumentRefSchema),
+  /** Exact document versions granted to the verifier for the current evidence version (absent: not recorded). */
+  assignedVersions: z.array(z.object({ documentId: DocumentRefSchema, version: z.number().int() })).optional(),
   dueAt: IsoDateTimeSchema.nullable(),
   requestedAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
@@ -517,6 +521,15 @@ export const VerificationRequestSchema = z.object({
   allowedActions: z.array(VerificationActionSchema),
 });
 export type VerificationRequest = z.infer<typeof VerificationRequestSchema>;
+
+/**
+ * Evidence resubmission after a change request. `documentIds`: the documents to grant the verifier at the new
+ * evidence version; omitted, the documents granted for the previous version are granted again at their new versions.
+ */
+export const SubmitEvidenceRequestSchema = z.object({
+  documentIds: z.array(DocumentRefSchema).min(1).max(50).optional(),
+});
+export type SubmitEvidenceRequest = z.input<typeof SubmitEvidenceRequestSchema>;
 
 export const CreateVerificationRequestSchema = z.object({
   verifierRegistryRef: VerifierRefSchema,
@@ -722,6 +735,16 @@ export type DeclineProposalRequest = z.infer<typeof DeclineProposalRequestSchema
 
 // --- Pledge and release ----------------------------------------------------------------------------
 
+export const ReleaseThreadEntrySchema = z.object({
+  kind: z.enum(["NOTE", "QUESTION", "RESPONSE"]),
+  body: z.string(),
+  /** The author's organization and member label. */
+  author: OrgRefSchema,
+  by: z.string().nullable(),
+  at: IsoDateTimeSchema,
+});
+export type ReleaseThreadEntry = z.infer<typeof ReleaseThreadEntrySchema>;
+
 export const ReleaseRequestSchema = z.object({
   ref: ReleaseRequestRefSchema,
   pledgeRef: PledgeRefSchema,
@@ -735,6 +758,8 @@ export const ReleaseRequestSchema = z.object({
   decision: z
     .object({ outcome: badgeSchema(ReleaseRequestStateSchema), decidedAt: IsoDateTimeSchema, decidedBy: z.string(), reason: z.string().nullable() })
     .nullable(),
+  /** Private note thread (request note, lender questions, borrower responses): lock owner and designated lender only. */
+  thread: z.array(ReleaseThreadEntrySchema),
 });
 export type ReleaseRequest = z.infer<typeof ReleaseRequestSchema>;
 

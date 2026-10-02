@@ -34,6 +34,7 @@ import {
   SaveAssessmentRequestSchema,
   ShareCaseRequestSchema,
   SIMULATED_COPY,
+  SubmitEvidenceRequestSchema,
   UploadIntentRequestSchema,
   ASSET_NAMESPACE,
   buildCaseReport,
@@ -48,7 +49,6 @@ import {
   exportAuditScopes,
   governanceProposalState,
   governanceSeatOf,
-  hasMandate,
   isOpenGovernanceProposal,
   latestDocumentVersion,
   latestProposal,
@@ -79,6 +79,7 @@ import {
   presentReview,
   presentReviewSummary,
   presentVerification,
+  presentOverview,
   presentVerifierEntries,
   primaryRole,
   releaseReasons,
@@ -255,6 +256,13 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
 
   // --- lookups -------------------------------------------------------------------------------------
 
+  /** The onboarded directory (GET /api/directory/*): demo organizations of one type, id and name only. */
+  const directoryOf = (type: "LENDER" | "DEALER") =>
+    Object.values(DEMO_ORGANIZATIONS)
+      .filter((o) => o.type === type)
+      .map((o) => ({ id: o.id, name: o.name }))
+      .sort((x, y) => x.name.localeCompare(y.name) || x.id.localeCompare(y.id));
+
   const allEvents = () => [...world.assets.flatMap((a) => a.events), ...world.cases.flatMap((c) => c.events)];
   const casesOf = (asset: AssetFacts) => world.cases.filter((c) => c.asset.ref === asset.ref);
 
@@ -314,21 +322,52 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
     verifier: () => [...world.governance.verifiers.map((v) => v.ref), ...world.governance.proposals.map((p) => p.target.verifierRef)],
   };
 
-  /** Commit the evidence manifest from every available document; bump the version on change. */
-  function commitManifest(asset: AssetFacts): void {
-    const entries = asset.documents.flatMap((doc) => {
+  /** The manifest entries the available documents would commit (latest available version of each). */
+  function manifestEntriesOf(asset: AssetFacts): { documentRef: string; version: number }[] {
+    return asset.documents.flatMap((doc) => {
       const available = doc.versions.filter((v) => v.uploadState === "AVAILABLE");
       const latest = available.reduce<number | null>((max, v) => (max === null || v.version > max ? v.version : max), null);
       return latest === null ? [] : [{ documentRef: doc.ref, version: latest }];
     });
-    const same =
-      entries.length === asset.package.entries.length &&
-      entries.every((e) => asset.package.entries.some((p) => p.documentRef === e.documentRef && p.version === e.version));
-    if (same) return;
+  }
+
+  function manifestUnchanged(asset: AssetFacts): boolean {
+    const entries = manifestEntriesOf(asset);
+    return entries.length === asset.package.entries.length && entries.every((e) => asset.package.entries.some((p) => p.documentRef === e.documentRef && p.version === e.version));
+  }
+
+  /** Commit the evidence manifest from every available document; bump the version on change. */
+  function commitManifest(asset: AssetFacts): void {
+    const entries = manifestEntriesOf(asset);
+    if (manifestUnchanged(asset)) return;
     asset.package.version += 1;
     asset.package.entries = entries;
     asset.package.history.push({ version: asset.package.version, committedAt: now().toISOString() });
     for (const doc of asset.documents) if (entries.some((e) => e.documentRef === doc.ref)) doc.ledgerState = "COMMITTED";
+  }
+
+  /**
+   * Verification grants (same rules as the API, workflow/verification/grants.ts): every selected document must be
+   * available. INFERRED copy, same string as the API. (The API also refuses a selection with nothing grantable: no
+   * owner document and no dealer document whose dealer consented to verification use; the fixtures' dealer
+   * documents are consented, as in the LocalNet seed, so that refusal cannot occur here.)
+   */
+  function checkGrantSelection(asset: AssetFacts, documentIds: readonly string[]): void {
+    for (const id of documentIds) {
+      const doc = asset.documents.find((d) => d.ref === id);
+      if (!doc || !doc.versions.some((v) => v.uploadState === "AVAILABLE")) throw invalid(`Document ${id} is not available on ${asset.ref}.`);
+    }
+  }
+
+  /**
+   * The exact versions granted to the verifier: the selected OWNER documents at their committed package version.
+   * Dealer documents need the dealer's own consent (Consent_Grant in LOCALNET), which UI_MOCK does not simulate.
+   */
+  function grantedVersions(asset: AssetFacts, documentIds: readonly string[]): { documentRef: string; version: number }[] {
+    return asset.package.entries
+      .filter((e) => documentIds.includes(e.documentRef) && asset.documents.find((d) => d.ref === e.documentRef)?.sourceOrgId === asset.ownerOrgId)
+      .map((e) => ({ documentRef: e.documentRef, version: e.version }))
+      .sort((a, b) => a.documentRef.localeCompare(b.documentRef));
   }
 
   function requestVerificationOn(asset: AssetFacts, caseRef: string | null, body: unknown, opts?: MutationOptions) {
@@ -339,14 +378,12 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
       throw conflict("The selected verifier is not active in the verifier registry.");
     }
     const verifierOrgId = entry.orgId;
-    for (const id of input.documentIds) {
-      const doc = asset.documents.find((d) => d.ref === id);
-      if (!doc || !doc.versions.some((v) => v.uploadState === "AVAILABLE")) throw invalid(`Document ${id} is not available on ${asset.ref}.`);
-    }
+    checkGrantSelection(asset, input.documentIds);
     return mutate("verification.request", { asset: asset.ref, caseRef, input }, opts, () => {
       commitManifest(asset);
       const ref = nextFreeRef("verification", allRefs.verification());
       const at = now().toISOString();
+      const granted = grantedVersions(asset, input.documentIds);
       asset.verifications.push({
         ref,
         assetRef: asset.ref,
@@ -355,7 +392,8 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         verifierRegistryRef: entry.ref,
         requestedByOrgId: actor().orgId,
         scope: input.scope,
-        documentRefs: input.documentIds,
+        documentRefs: granted.map((e) => e.documentRef),
+        documentVersions: granted,
         packageVersion: asset.package.version,
         state: "REQUESTED",
         requestedAt: at,
@@ -429,15 +467,17 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         const asset = world.assets.find((a) => a.ref === input.assetRef);
         if (!asset || !presentAssetSummary(asset, world.cases, actor(), pctx())) throw unavailable();
         const a = actor();
-        // Creating a case needs the borrower mandate on the asset owner organization (S §9.3).
-        if (asset.ownerOrgId !== a.orgId || !a.roles.includes("BORROWER") || !hasMandate(a, "BORROWER")) {
-          throw ApiError.problem("forbidden", ERROR_COPY.FORBIDDEN);
-        }
-        if (DEMO_ORGANIZATIONS[input.selectedLenderOrgId]?.type !== "LENDER") throw invalid("Select a lender organization.");
-        if (input.dealerOrgId !== undefined && DEMO_ORGANIZATIONS[input.dealerOrgId]?.type !== "DEALER") throw invalid("Select a dealer organization.");
-        if (asset.lifecycle !== "REGISTERED") throw conflict("Register the asset before creating a case.");
-        const active = casesOf(asset).some((c) => !c.cancelledAt && !c.closedAt && c.lock?.state !== "RELEASED" && c.review.state !== "REJECTED");
-        if (active) throw conflict("This asset already has an active case workflow.");
+        // Owner organization + borrower mandate (S §9.3), registered, no case holding the asset (same check as the API).
+        const check = checkAssetAction(asset, world.cases, a, "case.create", now(), pctx());
+        if (!check.ok && check.reason !== "CONFLICT") guard(check);
+        const issues = [
+          ...(directoryOf("LENDER").some((o) => o.id === input.selectedLenderOrgId) ? [] : [{ path: "body.selectedLenderOrgId", message: "Select a lender organization." }]),
+          ...(input.dealerOrgId === undefined || directoryOf("DEALER").some((o) => o.id === input.dealerOrgId)
+            ? []
+            : [{ path: "body.dealerOrgId", message: "Select a dealer organization." }]),
+        ];
+        if (issues.length > 0) throw ApiError.problem("validation_error", ERROR_COPY.VALIDATION, issues);
+        guard(check);
         return mutate(
           "case.create",
           input,
@@ -573,8 +613,9 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
                 { label: "Title and ownership confirmation", status: "Outside Collara" },
               ],
             };
-            if (input.internalNotes !== undefined) review.internalNotes = input.internalNotes;
-            if (input.sharedFeedback !== undefined) review.sharedFeedback = input.sharedFeedback;
+            // Private notes (the API's off-ledger note store): "" clears a note; the presenters omit them by role.
+            if (input.internalNotes !== undefined) review.internalNotes = input.internalNotes || null;
+            if (input.sharedFeedback !== undefined) review.sharedFeedback = input.sharedFeedback || null;
             caseEvent(facts, { ref: review.ref, type: "ASSESSMENT_SAVED", version: "draft", kind: "OPERATIONAL" });
             return must(presentReview(facts, a, pctx()));
           },
@@ -920,14 +961,28 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         );
       },
 
-      submitEvidence: async (ref, opts) => {
+      submitEvidence: async (ref, body, opts) => {
         const { asset, vr } = verification(ref);
+        const input = parse(SubmitEvidenceRequestSchema, body ?? {});
         checkVerification(asset, vr, "verification.submitEvidence");
+        // The new grant covers the owner's selection, else the previously granted documents (never the whole package).
+        let selection = input.documentIds;
+        if (selection) checkGrantSelection(asset, selection);
+        else {
+          selection = vr.documentRefs.filter((id) => asset.documents.some((d) => d.ref === id && d.versions.some((v) => v.uploadState === "AVAILABLE")));
+          if (selection.length === 0) throw invalid("Select the documents to share with the verifier.");
+        }
+        if (manifestUnchanged(asset) && asset.package.version <= vr.packageVersion) {
+          throw conflict("Add a new document version before resubmitting the evidence.");
+        }
+        const chosen = selection;
         return asCommand(
-          mutate("verification.submitEvidence", { ref }, opts, () => {
+          mutate("verification.submitEvidence", { ref, documentIds: input.documentIds ?? null }, opts, () => {
             commitManifest(asset);
             vr.packageVersion = asset.package.version;
-            vr.documentRefs = [...new Set([...vr.documentRefs, ...asset.package.entries.map((e) => e.documentRef)])];
+            const granted = grantedVersions(asset, chosen);
+            vr.documentRefs = granted.map((e) => e.documentRef);
+            vr.documentVersions = granted;
             vr.state = "IN_REVIEW";
             vr.updatedAt = now().toISOString();
             assetEvent(asset, { ref, type: "EVIDENCE_RESUBMITTED", from: "CHANGES_REQUESTED", to: "IN_REVIEW", version: `package v${asset.package.version}` });
@@ -962,7 +1017,10 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
             limitations: input.limitations,
             packageRef: asset.package.ref,
             packageVersion: vr.packageVersion,
-            supportingVersions: asset.package.entries.filter((e) => vr.documentRefs.includes(e.documentRef)),
+            // The versions granted for the reviewed evidence version (as the LOCALNET read model derives them).
+            supportingVersions: vr.documentVersions
+              ? vr.documentVersions.map((e) => ({ ...e }))
+              : asset.package.entries.filter((e) => vr.documentRefs.includes(e.documentRef)),
             supersedes: previous?.ref ?? null,
             supersededBy: null,
             revokedAt: null,
@@ -1054,7 +1112,9 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
             const from = facts.review.state;
             facts.review.state = "NEEDS_INFORMATION";
             facts.review.informationRequest = input.message;
-            caseEvent(facts, { ref, type: "INFORMATION_REQUESTED", detail: input.message, from, to: "NEEDS_INFORMATION" });
+            facts.review.sharedFeedback = input.message;
+            // Free text stays out of activity events (as in LOCALNET).
+            caseEvent(facts, { ref, type: "INFORMATION_REQUESTED", from, to: "NEEDS_INFORMATION" });
           }),
         );
       },
@@ -1163,6 +1223,7 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         return mutate("release.request", { ref, input }, opts, () => {
           const rrRef = nextFreeRef("releaseRequest", allRefs.releaseRequest());
           const a = actor();
+          const requestedAt = now().toISOString();
           facts.releaseRequests.push({
             ref: rrRef,
             lockRef: ref,
@@ -1172,11 +1233,13 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
             servicingRef: input.servicingRef ?? null,
             requestedByOrgId: a.orgId,
             requestedByUserId: a.userId,
-            requestedAt: now().toISOString(),
+            requestedAt,
             informationRequest: null,
             decidedAt: null,
             decidedByUserId: null,
             decisionReason: null,
+            // Private note thread (lock owner and designated lender only, enforced by presentPledge).
+            thread: input.note ? [{ kind: "NOTE", body: input.note, authorOrgId: a.orgId, authorUserId: a.userId, at: requestedAt }] : [],
           });
           // The lock is not touched: a release request never unlocks (invariant 6).
           caseEvent(facts, {
@@ -1234,9 +1297,12 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         checkCase(facts, "release.requestInformation");
         return asCommand(
           mutate("release.requestInformation", { ref, input }, opts, () => {
+            const a = actor();
             rr.state = "INFORMATION_REQUESTED";
             rr.informationRequest = input.message;
-            caseEvent(facts, { ref, type: "RELEASE_INFORMATION_REQUESTED", detail: input.message, from: "REQUESTED", to: "INFORMATION_REQUESTED" });
+            rr.thread = [...(rr.thread ?? []), { kind: "QUESTION", body: input.message, authorOrgId: a.orgId, authorUserId: a.userId, at: now().toISOString() }];
+            // Free text stays out of activity events (as in LOCALNET).
+            caseEvent(facts, { ref, type: "RELEASE_INFORMATION_REQUESTED", from: "REQUESTED", to: "INFORMATION_REQUESTED" });
           }),
         );
       },
@@ -1247,8 +1313,10 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         checkCase(facts, "release.respond");
         return asCommand(
           mutate("release.respond", { ref, input }, opts, () => {
+            const a = actor();
             rr.state = "REQUESTED";
-            rr.note = rr.note ? `${rr.note}\n${input.message}` : input.message;
+            rr.informationRequest = null;
+            rr.thread = [...(rr.thread ?? []), { kind: "RESPONSE", body: input.message, authorOrgId: a.orgId, authorUserId: a.userId, at: now().toISOString() }];
             caseEvent(facts, { ref, type: "RELEASE_INFORMATION_PROVIDED", from: "INFORMATION_REQUESTED", to: "REQUESTED" });
           }),
         );
@@ -1424,6 +1492,16 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
 
     verifiers: {
       list: () => read(() => presentVerifierEntries(world.governance, world.assets, pctx())),
+    },
+
+    directory: {
+      lenders: () => read(() => directoryOf("LENDER")),
+      dealers: () => read(() => directoryOf("DEALER")),
+    },
+
+    overview: {
+      // presentOverview applies the same disclosure as the API's stakeholder-filtered read model.
+      get: () => read(() => presentOverview(world.cases, actor(), pctx())),
     },
 
     governance: {

@@ -69,6 +69,8 @@ export function createQueryKeys(scope: string) {
       list: (query?: PageQuery) => [scope, "reports", clean(query)] as const,
     },
     verifiers: () => [scope, "verifiers"] as const,
+    directory: (kind: "lenders" | "dealers") => [scope, "directory", kind] as const,
+    overview: () => [scope, "overview"] as const,
     governance: {
       all: () => [scope, "governance"] as const,
       state: () => [scope, "governance", "state"] as const,

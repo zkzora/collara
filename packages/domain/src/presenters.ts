@@ -435,6 +435,7 @@ export function presentCaseDetail(facts: CaseFacts, viewer: Actor, pctx: Present
           ? { ref: proposal.ref, version: proposal.version, state: proposalStates.badge(effectiveProposalState(proposal, pctx.now)) }
           : null,
       pledge: d.pledge && facts.lock ? { ref: facts.lock.ref, state: pledgeDisplayStates.badge(pledgeDisplayState(facts)) } : null,
+      review: d.review && facts.review.ref ? { ref: facts.review.ref } : null,
     },
     requestedPrincipal: d.terms ? facts.requestedPrincipal : null,
     dataSource: committed ? "LEDGER_COMMITTED" : "APPLICATION_RECORD",
@@ -547,7 +548,23 @@ function sharingScope(doc: EvidenceDocumentFacts, asset: AssetFacts, ad: AssetDi
   return [...new Set(scope)];
 }
 
-function presentDocument(doc: EvidenceDocumentFacts, asset: AssetFacts, viewer: Actor, ad: AssetDisclosure, pctx: PresentContext): EvidenceDocument {
+/**
+ * A verifier (not the owner) sees only the document versions its assignments grant (VerificationFacts
+ * .documentVersions, the request's active VERIFICATION grants). Requests recorded without versions (legacy
+ * fixtures) do not narrow anything.
+ */
+function verifierScopedDocument(doc: EvidenceDocumentFacts, asset: AssetFacts, viewer: Actor, ad: AssetDisclosure): EvidenceDocumentFacts {
+  if (ad.isOwner || !ad.isVerifier) return doc;
+  const granted = asset.verifications.flatMap((v) =>
+    v.verifierOrgId === viewer.orgId && v.documentRefs.includes(doc.ref) && v.documentVersions ? v.documentVersions : [],
+  );
+  const versions = new Set(granted.filter((e) => e.documentRef === doc.ref).map((e) => e.version));
+  const kept = doc.versions.filter((v) => versions.has(v.version));
+  return kept.length > 0 && kept.length < doc.versions.length ? { ...doc, versions: kept } : doc;
+}
+
+function presentDocument(input: EvidenceDocumentFacts, asset: AssetFacts, viewer: Actor, ad: AssetDisclosure, pctx: PresentContext): EvidenceDocument {
+  const doc = verifierScopedDocument(input, asset, viewer, ad);
   const latest = latestDocumentVersion(doc);
   const reviewVisible = ad.isOwner || ad.caseDisclosures.some((d) => d.isLender) || ad.isVerifier;
   return {
@@ -735,6 +752,9 @@ export function presentVerification(
     state: verificationStates.badge(verification.state),
     evidencePackage: { ref: asset.package.ref, version: verification.packageVersion },
     documentIds: verification.documentRefs,
+    ...(verification.documentVersions
+      ? { assignedVersions: verification.documentVersions.map((e) => ({ documentId: e.documentRef, version: e.version })) }
+      : {}),
     dueAt: verification.dueAt,
     requestedAt: verification.requestedAt,
     updatedAt: verification.updatedAt,
@@ -880,18 +900,24 @@ export function presentProposal(facts: CaseFacts, viewer: Actor, pctx: PresentCo
 
 // --- Pledge and release ------------------------------------------------------------------------------
 
-function presentReleaseRequest(rr: ReleaseRequestFacts, pctx: PresentContext): ReleaseRequest {
+/** `notes`: the viewer is the lock's owner or designated lender (release notes and Q&A are theirs only). */
+function presentReleaseRequest(rr: ReleaseRequestFacts, pctx: PresentContext, notes: boolean): ReleaseRequest {
   const decided = rr.state === "AUTHORIZED" || rr.state === "REJECTED";
   return {
     ref: rr.ref,
     pledgeRef: rr.lockRef,
     state: releaseRequestStates.badge(rr.state),
     reason: releaseReasons.badge(rr.reason),
-    note: rr.note,
-    servicingRef: rr.servicingRef,
+    note: notes ? rr.note : null,
+    servicingRef: notes ? rr.servicingRef : null,
     requestedBy: userLabel(pctx, rr.requestedByUserId) ?? orgName(rr.requestedByOrgId),
     requestedAt: rr.requestedAt,
-    informationRequest: rr.informationRequest,
+    informationRequest: notes ? rr.informationRequest : null,
+    thread: notes
+      ? [...(rr.thread ?? [])]
+          .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+          .map((e) => ({ kind: e.kind, body: e.body, author: org(e.authorOrgId), by: userLabel(pctx, e.authorUserId), at: e.at }))
+      : [],
     decision:
       decided && rr.decidedAt
         ? {
@@ -931,7 +957,7 @@ export function presentPledge(facts: CaseFacts, viewer: Actor, pctx: PresentCont
     },
     releaseRequests: [...facts.releaseRequests]
       .sort((a, b) => Date.parse(b.requestedAt) - Date.parse(a.requestedAt))
-      .map((rr) => presentReleaseRequest(rr, pctx)),
+      .map((rr) => presentReleaseRequest(rr, pctx, d.isOwner || d.isLender)),
     technical: d.technical
       ? {
           controlVersionConsumed: lock.controlVersionConsumed,

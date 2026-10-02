@@ -34,6 +34,8 @@ import type {
   IssueAttestationRequest,
   Me,
   MessageRequest,
+  OrgRef,
+  Overview,
   Page,
   PageQuery,
   PilotRequest,
@@ -52,6 +54,7 @@ import type {
   ReviewSummary,
   SaveAssessmentRequest,
   ShareCaseRequest,
+  SubmitEvidenceRequest,
   SystemHealth,
   UploadIntent,
   UploadIntentRequest,
@@ -126,7 +129,8 @@ export interface CollaraClient {
     get(verificationRef: string, options?: RequestOptions): Promise<VerificationRequest>;
     decideAssignment(verificationRef: string, body: AssignmentDecisionRequest, options?: MutationOptions): Promise<CommandResponse>;
     requestChanges(verificationRef: string, body: MessageRequest, options?: MutationOptions): Promise<CommandResponse>;
-    submitEvidence(verificationRef: string, options?: MutationOptions): Promise<CommandResponse>;
+    /** `body.documentIds`: the documents granted to the verifier at the new version (default: the previous grant's). */
+    submitEvidence(verificationRef: string, body?: SubmitEvidenceRequest, options?: MutationOptions): Promise<CommandResponse>;
     issueAttestation(
       verificationRef: string,
       body: IssueAttestationRequest,
@@ -193,6 +197,17 @@ export interface CollaraClient {
 
   verifiers: {
     list(options?: RequestOptions): Promise<VerifierEntry[]>;
+  };
+
+  /** Onboarded counterparties a borrower may select on a new case (organization id and name only). */
+  directory: {
+    lenders(options?: RequestOptions): Promise<OrgRef[]>;
+    dealers(options?: RequestOptions): Promise<OrgRef[]>;
+  };
+
+  /** Recorded figures for the Overview, per currency, from the viewer's own scope. */
+  overview: {
+    get(options?: RequestOptions): Promise<Overview>;
   };
 
   governance: {
@@ -279,6 +294,9 @@ export const API_ENDPOINTS = {
   "reports.create": { method: "POST", path: "/reports" },
   "reports.download": { method: "GET", path: "/reports/:id/download" },
   "verifiers.list": { method: "GET", path: "/verifiers" },
+  "directory.lenders": { method: "GET", path: "/directory/lenders" },
+  "directory.dealers": { method: "GET", path: "/directory/dealers" },
+  "overview.get": { method: "GET", path: "/overview" },
   "governance.state": { method: "GET", path: "/governance/state" },
   "governance.proposals": { method: "GET", path: "/governance/proposals" },
   "governance.proposal": { method: "GET", path: "/governance/proposals/:id" },
