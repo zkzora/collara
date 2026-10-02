@@ -13,7 +13,9 @@
     "db:migrate": "tsx --env-file-if-exists=../../.env scripts/db.ts migrate",
     "db:seed": "tsx --env-file-if-exists=../../.env scripts/db.ts seed",
     "db:bind-localnet": "tsx --env-file-if-exists=../../.env scripts/db.ts bind-localnet",
-    "openapi:export": "tsx scripts/export-openapi.ts"
+    "openapi:export": "tsx scripts/export-openapi.ts",
+    "seed:localnet": "tsx --env-file-if-exists=../../.env src/seed/cli.ts",
+    "test:localnet": "vitest run --config vitest.localnet.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

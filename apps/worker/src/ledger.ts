@@ -1,0 +1,74 @@
+// Ledger connections of the worker: one projector client per participant source (read-only, CanReadAs the
+// Collara parties: a documented privileged operator credential, ADR-0001 §2.5) and on-demand completion clients
+// for the ledger users whose UNKNOWN_OUTCOME commands are reconciled.
+import { createHmacTokenProviders, LedgerClient, loadLocalnetState, type LocalnetState } from "@collara/canton";
+import type { CompletionLedgerClient, ProjectionLedgerClient, ProjectionSourceConfig } from "@collara/db";
+import { DEV_HMAC_SECRET, type WorkerConfig } from "./config";
+
+export interface ProjectionSource {
+  readonly config: ProjectionSourceConfig;
+  readonly client: ProjectionLedgerClient;
+}
+
+export interface WorkerLedger {
+  readonly state: LocalnetState;
+  readonly sources: readonly ProjectionSource[];
+  /** Completions client for a ledger user (null when the user is not in the bootstrap state). */
+  completionClient(ledgerUserId: string, source: string | null): CompletionLedgerClient | null;
+}
+
+export class LedgerNotBootstrappedError extends Error {
+  constructor(path: string | undefined) {
+    super(`LocalNet bootstrap state not found${path ? ` at ${path}` : ""}; run node scripts/localnet/bootstrap.mjs`);
+    this.name = "LedgerNotBootstrappedError";
+  }
+}
+
+export async function connectLedger(config: WorkerConfig): Promise<WorkerLedger> {
+  const state = await loadLocalnetState(config.COLLARA_LOCALNET_STATE);
+  if (!state) throw new LedgerNotBootstrappedError(config.COLLARA_LOCALNET_STATE);
+  const tokens = createHmacTokenProviders({
+    secret: config.CANTON_JWT_HMAC_SECRET ?? DEV_HMAC_SECRET,
+    audience: config.CANTON_JWT_AUDIENCE ?? state.audience,
+  });
+  const single = Object.keys(state.participants).length === 1;
+  const urlOf = (participant: string) => {
+    const p = state.participants[participant];
+    if (!p) throw new Error(`participant ${participant} is not in the bootstrap state`);
+    return single && config.CANTON_JSON_API_URL ? config.CANTON_JSON_API_URL : p.jsonApiUrl;
+  };
+
+  const wanted = config.PROJECTION_SOURCES ?? Object.keys(state.participants);
+  const sources: ProjectionSource[] = wanted.map((source) => {
+    const projector = state.users.find(
+      (u) => u.participant === source && (config.PROJECTOR_USER ? u.id === config.PROJECTOR_USER : u.role === "projector"),
+    );
+    const userId = projector?.id ?? config.PROJECTOR_USER;
+    if (!userId) throw new Error(`no projector user for participant ${source} in the bootstrap state`);
+    const parties = config.PROJECTION_PARTIES ?? projector?.readAs ?? [];
+    if (parties.length === 0) throw new Error(`projector user ${userId} on ${source} reads no parties`);
+    const jsonApiUrl = urlOf(source);
+    return {
+      config: { source, jsonApiUrl, parties, ledgerUserId: userId },
+      client: new LedgerClient({ baseUrl: jsonApiUrl, tokenProvider: tokens(userId), timeoutMs: 30_000 }),
+    };
+  });
+
+  const completionClients = new Map<string, LedgerClient>();
+  return {
+    state,
+    sources,
+    completionClient(ledgerUserId, source) {
+      const user = state.users.find((u) => u.id === ledgerUserId);
+      const participant = source ?? user?.participant;
+      if (!user || !participant || !state.participants[participant]) return null;
+      const key = `${participant}/${ledgerUserId}`;
+      let client = completionClients.get(key);
+      if (!client) {
+        client = new LedgerClient({ baseUrl: urlOf(participant), tokenProvider: tokens(ledgerUserId), timeoutMs: 15_000 });
+        completionClients.set(key, client);
+      }
+      return client;
+    },
+  };
+}

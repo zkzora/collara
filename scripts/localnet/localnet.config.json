@@ -17,6 +17,8 @@
   "adminUser": "collara-admin",
   "dars": {
     "root": "daml/collara",
-    "excludePackages": ["collara-tests", "collara-scripts"]
+    "excludePackages": ["collara-tests", "collara-scripts"],
+    "$extraComment": "Uploaded in addition to the built DARs: DM governance-core-v1 provides GovernanceRules (daml-model.md section 1); it is not a build dependency of the contracts DAR.",
+    "extra": ["daml/collara/vendor-dars/governance-core-v1-0.1.0.dar"]
   }
 }

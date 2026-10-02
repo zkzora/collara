@@ -29,6 +29,7 @@
     "localnet:down": "node scripts/localnet/down.mjs",
     "localnet:status": "node scripts/localnet/status.mjs",
     "localnet:bootstrap": "node scripts/localnet/bootstrap.mjs",
+    "localnet:seed": "node scripts/localnet/seed.mjs",
     "daml:check": "node daml/collara/check.mjs"
   },
   "devDependencies": {

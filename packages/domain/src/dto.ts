@@ -882,7 +882,8 @@ export const GovernanceStateSchema = z.object({
   viewerSeat: GovernanceSeatSchema.nullable(),
   registryVersion: z.number().int().nonnegative(),
   proposalDeadlineDays: z.number().int().positive(),
-  confirmationTimeoutHours: z.number().int().positive(),
+  // Fractional on LOCALNET: the DM rules default to 30 minutes (0.5 h); the UI_MOCK fixture uses whole hours.
+  confirmationTimeoutHours: z.number().positive(),
   counts: z.object({
     activeVerifiers: z.number().int(),
     suspendedVerifiers: z.number().int(),

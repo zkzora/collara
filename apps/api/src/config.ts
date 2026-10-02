@@ -67,8 +67,16 @@ const ConfigSchema = z
     COLLARA_S3_ACCESS_KEY: z.string().min(1).optional(),
     COLLARA_S3_SECRET_KEY: z.string().min(1).optional(),
 
-    // LocalNet bootstrap state (party ids, topology). Defaults to <repo>/.local/localnet/state.json.
+    // LocalNet bootstrap state (party ids, topology). Defaults to <repo>/.local/localnet/state.json; an
+    // isolated namespace uses .local/localnet/state-<prefix>.json (scripts/localnet/bootstrap.mjs --prefix).
     COLLARA_LOCALNET_STATE: z.string().min(1).optional(),
+    // Canton JSON Ledger API auth (LOCALNET): HS256 secret of the sandbox's unsafe-jwt-hmac-256 auth (dev
+    // only). Unset → the public dev placeholder of infra/canton/sandbox-auth.conf; refused in production.
+    CANTON_JWT_HMAC_SECRET: z.string().min(16).optional(),
+    // Ledger token audience. Unset → the audience recorded in the bootstrap state.
+    CANTON_JWT_AUDIENCE: z.string().min(1).optional(),
+    // submit-and-wait timeout; a timeout is UNKNOWN_OUTCOME (resubmitted with the same command id), never a failure.
+    CANTON_SUBMIT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(60_000),
     // Health: a projection checkpoint older than this is reported as degraded.
     WORKER_STALE_AFTER_SECONDS: z.coerce.number().int().min(5).default(120),
 
@@ -80,6 +88,9 @@ const ConfigSchema = z
   .superRefine((config, ctx) => {
     if (config.NODE_ENV === "production" && config.DATABASE_URL && !config.SESSION_SECRET) {
       ctx.addIssue({ code: "custom", path: ["SESSION_SECRET"], message: "SESSION_SECRET is required in production" });
+    }
+    if (config.NODE_ENV === "production" && config.COLLARA_MODE === "LOCALNET" && !config.CANTON_JWT_HMAC_SECRET) {
+      ctx.addIssue({ code: "custom", path: ["CANTON_JWT_HMAC_SECRET"], message: "CANTON_JWT_HMAC_SECRET is required in production (no dev placeholder)" });
     }
     if (config.COLLARA_S3_ENDPOINT && !(config.COLLARA_S3_ACCESS_KEY && config.COLLARA_S3_SECRET_KEY)) {
       // SeaweedFS without credentials serves the bucket anonymously; never run storage that way.

@@ -31,6 +31,9 @@ import { probeLedger, type HealthCheck } from "./services/health";
 import { createDbProjectionReader, unavailableLedgerGateway, type LedgerGateway, type ProjectionReader } from "./services/ledger";
 import { createOidcService, type OidcService } from "./services/oidc";
 import { createS3Storage, type StorageService } from "./services/storage";
+import { CantonLedgerGateway, DEV_HMAC_SECRET, LedgerAccess } from "./ledger";
+import { workflowRoutes } from "./routes/workflow";
+import { createWorkflowServices } from "./workflow";
 
 export const API_VERSION = packageJson.version;
 
@@ -42,8 +45,17 @@ export interface BuildAppOptions {
   db?: DbHandle | null;
   /** Object storage; defaults to S3 from config (null when unconfigured: evidence endpoints answer 503). */
   storage?: StorageService | null;
-  /** Ledger command port; defaults to a gateway that reports the ledger as unavailable. */
+  /**
+   * Ledger command port. Default: in LOCALNET (outside NODE_ENV=test) the Canton gateway over the bootstrap
+   * state (COLLARA_LOCALNET_STATE); otherwise a gateway that reports the ledger as unavailable.
+   */
   ledger?: LedgerGateway;
+  /**
+   * Ledger connections for the workflow runner's ACS reads (and the Canton gateway when `ledger` is not
+   * given). Default: loaded from the bootstrap state in LOCALNET outside tests; null otherwise. Tests and the
+   * LocalNet harness pass it explicitly, so unit tests never reach a running sandbox by accident.
+   */
+  ledgerAccess?: LedgerAccess | null;
   projections?: ProjectionReader;
   /** OIDC client; defaults to discovery from OIDC_* config (null when unconfigured). */
   oidc?: OidcService | null;
@@ -61,6 +73,26 @@ export interface AppServices {
   readonly ledger: LedgerGateway;
   readonly oidc: OidcService | null;
   readonly clock: () => Date;
+}
+
+/**
+ * LOCALNET wiring: the Canton gateway over the bootstrap state; UI_MOCK, tests (unless injected) and a
+ * missing state file keep the unavailable gateway, so nothing is ever simulated as committed.
+ */
+async function resolveLedger(options: BuildAppOptions, log: { warn(msg: string): void }): Promise<{ gateway: LedgerGateway; access: LedgerAccess | null }> {
+  const { config } = options;
+  let access = options.ledgerAccess ?? null;
+  if (options.ledgerAccess === undefined && config.COLLARA_MODE === "LOCALNET" && config.NODE_ENV !== "test") {
+    access = await LedgerAccess.fromStateFile({
+      ...(config.COLLARA_LOCALNET_STATE ? { path: config.COLLARA_LOCALNET_STATE } : {}),
+      secret: config.CANTON_JWT_HMAC_SECRET ?? DEV_HMAC_SECRET,
+      ...(config.CANTON_JWT_AUDIENCE ? { audience: config.CANTON_JWT_AUDIENCE } : {}),
+      submitTimeoutMs: config.CANTON_SUBMIT_TIMEOUT_MS,
+    });
+    if (!access) log.warn("LOCALNET without a LocalNet bootstrap state: ledger commands are recorded as FAILED (run scripts/localnet/bootstrap.mjs)");
+  }
+  const gateway = options.ledger ?? (access ? new CantonLedgerGateway(access) : unavailableLedgerGateway);
+  return { gateway, access };
 }
 
 declare module "fastify" {
@@ -162,14 +194,18 @@ export async function buildApp(options: BuildAppOptions) {
 
   if (!db) {
     app.decorate("services", null);
+    app.decorate("workflow", null);
     return app;
   }
 
-  const ledger = options.ledger ?? unavailableLedgerGateway;
+  const { gateway: ledger, access } = await resolveLedger(options, app.log);
   const projections = options.projections ?? createDbProjectionReader(db.db);
   const commands = new CommandService(db.db, ledger, clock);
   const oidc = options.oidc === undefined ? createOidcService(config) : options.oidc;
-  app.decorate("services", { db, commands, projections, storage, ledger, oidc, clock } satisfies AppServices);
+  const services = { db, commands, projections, storage, ledger, oidc, clock } satisfies AppServices;
+  const workflow = createWorkflowServices({ db: db.db, gateway: ledger, access, clock });
+  app.decorate("services", services);
+  app.decorate("workflow", workflow);
 
   await app.register(sessions, { config, db: db.db, clock });
   await app.register(actorResolution, { db: db.db });
@@ -186,6 +222,9 @@ export async function buildApp(options: BuildAppOptions) {
   await app.register(commandRoutes, { prefix: "/api/commands", commands });
   await app.register(verifierRoutes, { prefix: "/api/verifiers", projections, indexed: false });
   await app.register(evidenceRoutes, { prefix: "/api/evidence", db: db.db, storage, commands, projections, clock });
+  // Workflow modules (cases, assets, verification, reviews, proposals, pledges, release, access, audit,
+  // reports, governance): one registration; each module declares its full paths under /api.
+  await app.register(workflowRoutes, { prefix: "/api", services, workflow, mode: config.COLLARA_MODE });
 
   return app;
 }

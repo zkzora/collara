@@ -394,6 +394,19 @@ export const commands = pgTable(
     resourceRef: text("resource_ref"),
     /** Operation result returned on idempotent replay (e.g. { evidenceId, version }). */
     result: jsonb("result"),
+    /**
+     * Ledger submission context, recorded by the gateway at submit time so the worker can reconcile an
+     * UNKNOWN_OUTCOME exactly: the ledger user that submitted, its actAs parties, the participant source and
+     * the ledger end observed just before the first submission (completions are read after it).
+     */
+    ledgerUserId: text("ledger_user_id"),
+    actAs: text("act_as").array(),
+    ledgerSource: text("ledger_source"),
+    ledgerEndAtSubmit: offset("ledger_end_at_submit"),
+    /** Worker reconciliation of UNKNOWN_OUTCOME (attempts are recorded even when the outcome stays unknown). */
+    reconcileAttempts: integer("reconcile_attempts").notNull().default(0),
+    lastReconcileAt: tsz("last_reconcile_at"),
+    reconcileNote: text("reconcile_note"),
     createdAt: createdAt(),
     submittedAt: tsz("submitted_at"),
     committedAt: tsz("committed_at"),
@@ -427,9 +440,50 @@ export const ledgerSources = pgTable("ledger_sources", {
   status: text("status").notNull().default("ACTIVE"),
   resetDetectedAt: tsz("reset_detected_at"),
   resetReason: text("reset_reason"),
+  /**
+   * Sorted parties the projection reads as (set on the first pass). A different party set would mix two
+   * histories (contracts created before a party was added are missing), so a change is treated as a reset.
+   */
+  partyFilter: text("party_filter").array(),
+  /** Ledger user the projection reads with (e.g. projector-svc). */
+  ledgerUserId: text("ledger_user_id"),
+  /** Last pass that reached the ledger end without error. */
+  lastPolledAt: tsz("last_polled_at"),
+  lastError: text("last_error"),
+  lastErrorAt: tsz("last_error_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/**
+ * One row per applied transaction (including those without Collara events), written in the same database
+ * transaction as its events and the checkpoint. Command records are matched to it by update id, so a command
+ * committed after the worker already applied its update still becomes PROJECTED.
+ */
+export const ledgerUpdates = pgTable(
+  "ledger_updates",
+  {
+    source: text("source")
+      .notNull()
+      .references(() => ledgerSources.source),
+    updateId: text("update_id").notNull(),
+    offset: offset("offset").notNull(),
+    /** Empty for non-submitting readers (the projector never submits). */
+    commandId: text("command_id"),
+    workflowId: text("workflow_id"),
+    effectiveAt: tsz("effective_at").notNull(),
+    recordTime: tsz("record_time"),
+    /** Events kept (Collara and governance packages) / events received. */
+    projectedEvents: integer("projected_events").notNull(),
+    totalEvents: integer("total_events").notNull(),
+    appliedAt: tsz("applied_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "ledger_updates_pk", columns: [t.source, t.updateId] }),
+    uniqueIndex("ledger_updates_offset_key").on(t.source, t.offset),
+    index("ledger_updates_update_idx").on(t.updateId),
+  ],
+);
 
 /** Contracts as seen by the projector, with the parties allowed to see them (witness filtering). */
 export const ledgerContracts = pgTable(
@@ -448,6 +502,18 @@ export const ledgerContracts = pgTable(
     signatories: text("signatories").array().notNull(),
     observers: text("observers").array().notNull().default(sql`'{}'::text[]`),
     witnessParties: text("witness_parties").array().notNull(),
+    /**
+     * signatories ∪ observers. Read models filter on this (stakeholder membership), never on witness
+     * parties, so a party that only witnessed a contract through divulgence or a fetch does not see it.
+     */
+    stakeholders: text("stakeholders")
+      .array()
+      .notNull()
+      .generatedAlwaysAs(sql`signatories || observers`),
+    /** Business reference extracted at projection time (requestRef, attestationRef, lockRef, …). */
+    businessRef: text("business_ref"),
+    caseRef: text("case_ref"),
+    assetRef: text("asset_ref"),
     createdUpdateId: text("created_update_id").notNull(),
     createdOffset: offset("created_offset").notNull(),
     createdNodeId: integer("created_node_id").notNull(),
@@ -456,11 +522,18 @@ export const ledgerContracts = pgTable(
     archivedUpdateId: text("archived_update_id"),
     archivedOffset: offset("archived_offset"),
     archivedAt: tsz("archived_at"),
+    /** The consuming choice that archived the contract (null for a plain ACS_DELTA archive). */
+    archivedChoice: text("archived_choice"),
+    archivedNodeId: integer("archived_node_id"),
   },
   (t) => [
     primaryKey({ name: "ledger_contracts_pk", columns: [t.source, t.contractId] }),
     index("ledger_contracts_template_idx").on(t.templateRef, t.archivedOffset),
     index("ledger_contracts_witness_gin").using("gin", t.witnessParties),
+    index("ledger_contracts_stakeholders_gin").using("gin", t.stakeholders),
+    index("ledger_contracts_case_idx").on(t.caseRef),
+    index("ledger_contracts_asset_idx").on(t.assetRef),
+    index("ledger_contracts_business_ref_idx").on(t.templateRef, t.businessRef),
   ],
 );
 
@@ -551,6 +624,9 @@ export const exportJobs = pgTable(
     sizeBytes: bigint("size_bytes", { mode: "number" }),
     errorMessage: text("error_message"),
     attempts: integer("attempts").notNull().default(0),
+    /** Worker lease: the job is GENERATING under this worker until lease_expires_at (then it can be re-claimed). */
+    leaseOwner: text("lease_owner"),
+    leaseExpiresAt: tsz("lease_expires_at"),
     requestedAt: tsz("requested_at").notNull().defaultNow(),
     generatedAt: tsz("generated_at"),
     expiresAt: tsz("expires_at"),
@@ -593,6 +669,7 @@ export type CommandRow = typeof commands.$inferSelect;
 export type LedgerSourceRow = typeof ledgerSources.$inferSelect;
 export type LedgerContractRow = typeof ledgerContracts.$inferSelect;
 export type LedgerEventRow = typeof ledgerEvents.$inferSelect;
+export type LedgerUpdateRow = typeof ledgerUpdates.$inferSelect;
 export type AuditEventRow = typeof auditEvents.$inferSelect;
 export type ExportJobRow = typeof exportJobs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

@@ -27,3 +27,6 @@ export {
   type VisibleContractsQuery,
   type VisibleEventsQuery,
 } from "./queries";
+// Worker projection (ledger updates → ledger_* tables) and the stakeholder-filtered read model.
+export * from "./projection";
+export * from "./read-model";

@@ -22,6 +22,37 @@ export const FILES = {
   cantonLog: join(LOCAL_DIR, "canton.log"),
 };
 
+// --- Isolation prefixes ---------------------------------------------------------------------------
+// Several builders and integration-test runs share one sandbox. A prefix gives each of them its own
+// parties ("<p>-DemoManufacturer"), ledger users ("<p>-borrower-svc"), Collara namespace
+// ("collara-localnet-<p>") and state file (.local/localnet/state-<p>.json). No prefix = the defaults,
+// which are reserved for the final demo.
+
+export const DEFAULT_NAMESPACE = "collara-localnet";
+const PREFIX_PATTERN = /^[a-z0-9][a-z0-9-]{0,30}$/;
+
+/** Validates a prefix; "" or undefined means "no prefix". */
+export function normalizePrefix(prefix) {
+  if (prefix === undefined || prefix === null || prefix === "") return "";
+  if (!PREFIX_PATTERN.test(prefix)) {
+    throw new Error(`invalid prefix ${JSON.stringify(prefix)}: use 1-31 lower-case letters, digits or '-', starting with a letter or digit`);
+  }
+  return prefix;
+}
+
+/** "<prefix>-<name>", or the name itself without a prefix. */
+export const prefixed = (prefix, name) => (prefix ? `${prefix}-${name}` : name);
+
+/** .local/localnet/state.json, or state-<prefix>.json. */
+export function stateFileFor(prefix) {
+  return prefix ? join(LOCAL_DIR, `state-${prefix}.json`) : FILES.state;
+}
+
+/** Default Collara namespace for a prefix. */
+export function namespaceFor(prefix) {
+  return prefix ? `${DEFAULT_NAMESPACE}-${prefix}` : DEFAULT_NAMESPACE;
+}
+
 export const CONFIG_FILES = {
   auth: join(REPO_ROOT, "infra", "canton", "sandbox-auth.conf"),
   extraParticipants: join(REPO_ROOT, "infra", "canton", "extra-participants.conf"),

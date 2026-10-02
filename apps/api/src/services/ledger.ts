@@ -1,7 +1,8 @@
 // Ports to the ledger. The API never talks to Canton directly from route handlers: commands go through a
-// LedgerGateway (implemented with @collara/canton in the next stage) and reads go through a
-// ProjectionReader over the worker's projections (ledger_contracts / ledger_events).
-import type { LedgerCommand } from "@collara/canton";
+// LedgerGateway (CantonLedgerGateway in src/ledger/gateway.ts in LOCALNET; the unavailable gateway
+// otherwise) via the workflow runner (src/workflow/run.ts), and reads go through a ProjectionReader over
+// the worker's projections (ledger_contracts / ledger_events).
+import type { LedgerCommand, LedgerTransaction } from "@collara/canton";
 import {
   ledgerCheckpoints,
   visibleContracts,
@@ -31,7 +32,18 @@ export interface LedgerSubmitRequest {
 }
 
 export type LedgerSubmitOutcome =
-  | { readonly kind: "committed"; readonly updateId: string; readonly offset: number }
+  | {
+      readonly kind: "committed";
+      readonly updateId: string;
+      readonly offset: number;
+      /**
+       * The committed transaction as seen by actAs ∪ readAs (LEDGER_EFFECTS shape: created and exercised
+       * events, including exercise results), for chaining created contract ids. Optional: a gateway may omit it.
+       */
+      readonly transaction?: LedgerTransaction;
+      /** True when the ledger reported this command id as already committed (DUPLICATE_COMMAND, accepted). */
+      readonly deduplicated?: boolean;
+    }
   | {
       /** rejected = definitely not committed; failed = never reached the ledger; unknown = may have committed. */
       readonly kind: "rejected" | "failed" | "unknown";
@@ -46,7 +58,7 @@ export interface LedgerGateway {
   submit(command: CommandRow, request: LedgerSubmitRequest): Promise<LedgerSubmitOutcome>;
 }
 
-/** Used until the Canton-backed gateway is wired: every submission fails before reaching a ledger. */
+/** UI_MOCK, or LOCALNET without a bootstrap state: every submission fails before reaching a ledger (never simulated). */
 export const unavailableLedgerGateway: LedgerGateway = {
   async submit() {
     return { kind: "failed", errorKind: "UNAVAILABLE", message: COMMAND_COPY.LEDGER_UNAVAILABLE };

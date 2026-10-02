@@ -3,18 +3,24 @@
 // ledger users and writes .local/localnet/state.json. Safe to run repeatedly; when the sandbox
 // was restarted (new participant id) it re-bootstraps from scratch.
 //
-//   node scripts/localnet/bootstrap.mjs [--dar <file>]... [--config <file>] [--json-api-url <url>]
+//   node scripts/localnet/bootstrap.mjs [--prefix <p>] [--dar <file>]... [--config <file>] [--json-api-url <url>]
+//
+// --prefix <p> isolates a namespace on the shared sandbox: party hints "<p>-DemoManufacturer", ledger
+// users "<p>-borrower-svc" (also "<p>-projector-svc", "<p>-collara-admin"), Collara namespace
+// "collara-localnet-<p>" and state file .local/localnet/state-<p>.json. The state file keys parties
+// by their logical hint ("DemoManufacturer"), so consumers do not need to know the prefix.
+// Without --prefix everything is unchanged (the defaults are reserved for the final demo).
 //
 // Default DARs: every *.dar under daml/collara/**/.daml/dist/ except the packages listed in
 // localnet.config.json `dars.excludePackages` (the test and script packages depend on daml-script
-// and are never uploaded). Uses the participant_admin token; tokens are never printed.
+// and are never uploaded), plus `dars.extra` (the vendored DM governance-core-v1 DAR).
+// Uses the participant_admin token; tokens are never printed.
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
   ADMIN_USER,
   CONFIG_FILES,
-  FILES,
   PORTS,
   REPO_ROOT,
   api,
@@ -25,18 +31,25 @@ import {
   isReady,
   jsonApiUrl,
   mintToken,
+  namespaceFor,
+  normalizePrefix,
   participantsFromPorts,
+  prefixed,
   readJson,
   readPortsFile,
   sleep,
+  stateFileFor,
   writeJsonAtomic,
 } from "./lib.mjs";
 
 const STATE_VERSION = 1;
 const adminToken = () => mintToken(ADMIN_USER, 120);
 
-export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, log = console.log } = {}) {
-  const config = loadConfig(configPath ?? CONFIG_FILES.localnet);
+export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, prefix: rawPrefix, log = console.log } = {}) {
+  const prefix = normalizePrefix(rawPrefix);
+  const config = withPrefix(loadConfig(configPath ?? CONFIG_FILES.localnet), prefix);
+  const stateFile = stateFileFor(prefix);
+  if (prefix) log(`prefix ${prefix}: parties ${prefixed(prefix, "<Hint>")}, users ${prefixed(prefix, "<user>")}, state ${relative(REPO_ROOT, stateFile)}`);
   const participants = await resolveParticipants(urlOverride);
   const multi = participants.length > 1;
 
@@ -47,7 +60,7 @@ export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, log
     if (!p.participantId) throw new Error(`${p.jsonApiUrl}: no participant id returned`);
   }
 
-  const previous = readJson(FILES.state);
+  const previous = readJson(stateFile);
   const changed = participants.filter((p) => previous?.participants?.[p.name]?.participantId !== p.participantId);
   if (!previous) {
     log("no previous state: bootstrapping");
@@ -66,8 +79,13 @@ export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, log
   const users = await ensureUsers(participants, config, parties, log);
 
   const primary = participants[0];
+  // The namespace is kept across runs on the same ledger (a seed may have moved it with
+  // --force-new-namespace); a reset ledger starts again from the default.
+  const sameLedger = !!previous && changed.length === 0;
   const state = {
     version: STATE_VERSION,
+    prefix: prefix || null,
+    namespace: (sameLedger && typeof previous.namespace === "string" && previous.namespace) || namespaceFor(prefix),
     bootstrappedAt: new Date().toISOString(),
     topology: multi ? "sandbox-3-participants" : "sandbox-1-participant",
     cantonVersion: primary.version,
@@ -87,8 +105,8 @@ export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, log
       ledgerEndAtBootstrap: end.body?.offset ?? 0,
     };
   }
-  writeJsonAtomic(FILES.state, state);
-  log(`wrote ${relative(REPO_ROOT, FILES.state)} (${Object.keys(parties).length} parties, ${users.length} users, ${packages.length} DARs)`);
+  writeJsonAtomic(stateFile, state);
+  log(`wrote ${relative(REPO_ROOT, stateFile)} (${Object.keys(parties).length} parties, ${users.length} users, ${packages.length} DARs)`);
   return state;
 }
 
@@ -110,6 +128,19 @@ function loadConfig(path) {
     }
   }
   return config;
+}
+
+/**
+ * Applies an isolation prefix: `hint` stays the logical hint (the key in state.parties), `ledgerHint`
+ * is the party id hint allocated on the ledger, and every ledger user id is prefixed.
+ */
+function withPrefix(config, prefix) {
+  return {
+    ...config,
+    projectorUser: prefixed(prefix, config.projectorUser),
+    adminUser: prefixed(prefix, config.adminUser),
+    parties: config.parties.map((party) => ({ ...party, ledgerHint: prefixed(prefix, party.hint), user: prefixed(prefix, party.user) })),
+  };
 }
 
 async function resolveParticipants(urlOverride) {
@@ -159,7 +190,8 @@ function findDefaultDars(config) {
     }
   };
   walk(root);
-  return found.filter((file) => !exclude.has(inspectDar(file).name)).sort();
+  const extra = (config.dars?.extra ?? []).map((file) => resolve(REPO_ROOT, file));
+  return [...found.filter((file) => !exclude.has(inspectDar(file).name)).sort(), ...extra];
 }
 
 async function uploadDars(participants, files, log) {
@@ -219,17 +251,17 @@ async function allocateParties(participants, config, multi, log) {
     if (!p) throw new Error(`party ${entry.hint}: participant ${host} is not running`);
     let party = existing
       .get(host)
-      .find((d) => d.isLocal && d.party.startsWith(`${entry.hint}::`))?.party;
+      .find((d) => d.isLocal && d.party.startsWith(`${entry.ledgerHint}::`))?.party;
     if (party) {
-      log(`party ${entry.hint} exists on ${host}`);
+      log(`party ${entry.ledgerHint} exists on ${host}`);
     } else {
       const response = await api(p.jsonApiUrl, "POST", "/v2/parties", {
         token: adminToken(),
-        body: { partyIdHint: entry.hint, identityProviderId: "" },
+        body: { partyIdHint: entry.ledgerHint, identityProviderId: "" },
       });
       party = response.body?.partyDetails?.party;
-      if (!party) throw new Error(`party ${entry.hint}: allocation returned no party id`);
-      log(`party ${entry.hint} allocated on ${host}`);
+      if (!party) throw new Error(`party ${entry.ledgerHint}: allocation returned no party id`);
+      log(`party ${entry.ledgerHint} allocated on ${host}`);
     }
     parties[entry.hint] = { party, participant: host, user: entry.user };
   }
@@ -324,10 +356,11 @@ if (isMain(import.meta.url)) {
       dar: { type: "string", multiple: true },
       config: { type: "string" },
       "json-api-url": { type: "string" },
+      prefix: { type: "string" },
     },
   });
   try {
-    await bootstrap({ dars: values.dar, configPath: values.config, jsonApiUrl: values["json-api-url"] });
+    await bootstrap({ dars: values.dar, configPath: values.config, jsonApiUrl: values["json-api-url"], prefix: values.prefix });
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
   }
