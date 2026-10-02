@@ -6,6 +6,11 @@
 // Assessment trigger (M18): the seed creates CA-001 under the lender's authority; otherwise the lender's first
 // GET /cases/:id or saveAssessment creates it through workflow/sharing ensureLenderAssessment (actAs the lender,
 // snapshot copied from the lender's verifier-signed AttestationDisclosure) before the review starts.
+//
+// Notes (packages/db notes.ts): Assessment_Save has no note field, so the internal notes (lender org only) and the
+// feedback shared with the borrower are private off-ledger notes owned by the save command (the sequence's parent
+// record). They are readable only once that command commits; the command records carry digests, never the text.
+import { noteDigest, putPendingNote, settleNotes, settleNotesOfCommand, type NoteKind } from "@collara/db";
 import { STATUS_COPY, type ReviewDecisionRequest, type SaveAssessmentRequestSchema } from "@collara/domain";
 import type { z } from "zod";
 import type { AcsContract, AcsReader } from "../../ledger/acs";
@@ -14,9 +19,10 @@ import { PAYLOAD_SCHEMAS, type Payload } from "../../ledger/contracts";
 import type { ResolvedActor } from "../../plugins/actor";
 import { must, mustBeVisible, sameAnchor } from "../preconditions";
 import { workflowProblems } from "../problems";
-import type { CommittedStep, WorkflowOutcome } from "../run";
+import type { CommittedStep, WorkflowOutcome, WorkflowSequence } from "../run";
 import { findCase, guardUnlessReplay, nextRef, type CaseScope, type FinanceDeps } from "../financing/common";
 import { ensureLenderAssessment } from "../sharing";
+import { assertNoteText } from "./notes";
 
 type Assessment = AcsContract<Payload<"CollateralAssessment">>;
 export type SaveAssessmentInput = z.output<typeof SaveAssessmentRequestSchema>;
@@ -50,6 +56,34 @@ export function findReview(deps: FinanceDeps, member: ResolvedActor, reviewRef: 
 
 // --- POST /cases/:id/assessments ------------------------------------------------------------------------
 
+/** The request as recorded on the command: note texts replaced by their digests (the note store keeps the text). */
+function recordedInput(input: SaveAssessmentInput) {
+  return {
+    ...input,
+    ...(input.internalNotes !== undefined ? { internalNotes: noteDigest(input.internalNotes) } : {}),
+    ...(input.sharedFeedback !== undefined ? { sharedFeedback: noteDigest(input.sharedFeedback) } : {}),
+  };
+}
+
+/**
+ * PENDING notes of the save command for each note field that was sent and differs from the text the member
+ * currently reads ("" clears it). Idempotent per command and kind.
+ */
+async function recordAssessmentNotes(deps: FinanceDeps, member: ResolvedActor, scope: CaseScope, commandId: string, assessmentRef: string, input: SaveAssessmentInput): Promise<void> {
+  const fields: readonly [NoteKind, string | undefined, string | null][] = [
+    ["ASSESSMENT_INTERNAL", input.internalNotes, scope.facts.review.internalNotes],
+    ["ASSESSMENT_SHARED_FEEDBACK", input.sharedFeedback, scope.facts.review.sharedFeedback],
+  ];
+  for (const [kind, body, current] of fields) {
+    if (body === undefined || body === (current ?? "")) continue;
+    await putPendingNote(
+      deps.db,
+      { kind, ownerOrgId: member.orgId, caseRef: scope.facts.ref, subjectRef: assessmentRef, body, commandId, createdByUserId: member.userId },
+      deps.clock(),
+    );
+  }
+}
+
 export async function saveAssessment(
   deps: FinanceDeps,
   member: ResolvedActor,
@@ -58,59 +92,79 @@ export async function saveAssessment(
   idempotencyKey: string,
 ): Promise<WorkflowOutcome<AssessmentState>> {
   const operation = "review.saveAssessment";
+  assertNoteText([
+    ["ASSESSMENT_INTERNAL", input.internalNotes, "body.internalNotes"],
+    ["ASSESSMENT_SHARED_FEEDBACK", input.sharedFeedback, "body.sharedFeedback"],
+  ]);
   await guardUnlessReplay(deps, scope, member, "review.saveAssessment", operation, idempotencyKey);
   const caseRef = scope.facts.ref;
   // M18 when it has not happened yet (builder A's single creation path, keyed per case and disclosure).
   const opened = await ensureLenderAssessment({ db: deps.db, workflow: deps.workflow, member, caseRef, facts: scope.facts, now: scope.now });
   if (opened && !opened.committed) return { ...opened, result: null };
   const actor = await deps.workflow.actorFor(member);
-  return deps.workflow.sequence({
-    actor,
-    operation,
-    idempotencyKey,
-    payload: { caseId: caseRef, input },
-    resourceRef: caseRef,
-    steps: async (seq) => {
-      const namespace = deps.workflow.namespace ?? "";
-      const acs = deps.workflow.acs(actor);
-      const lender = acs.parties[0] ?? "";
-      const ofCase = (a: Payload<"CollateralAssessment">) => a.caseRef === caseRef && a.lender === lender;
-      const current = mustBeVisible(await latestAssessment(acs, namespace, ofCase));
-      if (OPEN_FOR_START.includes(current.payload.status)) {
-        await seq.step("start", {
-          prepare: async (ctx) => {
-            const a = must(await latestAssessment(ctx.acs, ctx.namespace, ofCase));
-            if (!OPEN_FOR_START.includes(a.payload.status)) throw workflowProblems.stateChanged();
-            return { commands: [L.assessmentStartReview(a.contractId, { actorRef: ctx.actorRef })] };
-          },
-          result: assessmentStateOf,
-        });
-      }
-      const fallback: AssessmentState = { assessmentRef: current.payload.assessmentRef, status: "IN_REVIEW", version: 0 };
-      return seq.step("save", {
-        payload: input,
+  const recorded = recordedInput(input);
+  const carrier: { id: string | null } = { id: null };
+  try {
+    const outcome = await deps.workflow.sequence({
+      actor,
+      operation,
+      idempotencyKey,
+      payload: { caseId: caseRef, input: recorded },
+      resourceRef: caseRef,
+      steps: (seq) => {
+        carrier.id = seq.parent.id;
+        return saveSteps(seq);
+      },
+    });
+    await settleNotes(deps.db, outcome.record.id, outcome.record.status, deps.clock());
+    return outcome;
+  } catch (error) {
+    // A precondition failed after a step committed: the parent is REJECTED and its notes are discarded.
+    if (carrier.id) await settleNotesOfCommand(deps.db, carrier.id, deps.clock());
+    throw error;
+  }
+
+  async function saveSteps(seq: WorkflowSequence): Promise<AssessmentState> {
+    const namespace = deps.workflow.namespace ?? "";
+    const acs = deps.workflow.acs(actor);
+    const lender = acs.parties[0] ?? "";
+    const ofCase = (a: Payload<"CollateralAssessment">) => a.caseRef === caseRef && a.lender === lender;
+    const current = mustBeVisible(await latestAssessment(acs, namespace, ofCase));
+    await recordAssessmentNotes(deps, member, scope, seq.parent.id, current.payload.assessmentRef, input);
+    if (OPEN_FOR_START.includes(current.payload.status)) {
+      await seq.step("start", {
         prepare: async (ctx) => {
           const a = must(await latestAssessment(ctx.acs, ctx.namespace, ofCase));
-          if (a.payload.status !== "IN_REVIEW") throw workflowProblems.stateChanged();
-          return {
-            commands: [
-              L.assessmentSave(a.contractId, {
-                newValuation: {
-                  value: { amount: input.valuation.amount, currency: input.valuation.currency },
-                  source: input.valuationSource,
-                  valuationDate: input.valuationDate,
-                  limitations: input.limitations,
-                },
-                newPolicyRef: input.policyRef,
-                actorRef: ctx.actorRef,
-              }),
-            ],
-          };
+          if (!OPEN_FOR_START.includes(a.payload.status)) throw workflowProblems.stateChanged();
+          return { commands: [L.assessmentStartReview(a.contractId, { actorRef: ctx.actorRef })] };
         },
-        result: (step) => assessmentStateOf(step) ?? fallback,
+        result: assessmentStateOf,
       });
-    },
-  });
+    }
+    const fallback: AssessmentState = { assessmentRef: current.payload.assessmentRef, status: "IN_REVIEW", version: 0 };
+    return seq.step("save", {
+      payload: recorded,
+      prepare: async (ctx) => {
+        const a = must(await latestAssessment(ctx.acs, ctx.namespace, ofCase));
+        if (a.payload.status !== "IN_REVIEW") throw workflowProblems.stateChanged();
+        return {
+          commands: [
+            L.assessmentSave(a.contractId, {
+              newValuation: {
+                value: { amount: input.valuation.amount, currency: input.valuation.currency },
+                source: input.valuationSource,
+                valuationDate: input.valuationDate,
+                limitations: input.limitations,
+              },
+              newPolicyRef: input.policyRef,
+              actorRef: ctx.actorRef,
+            }),
+          ],
+        };
+      },
+      result: (step) => assessmentStateOf(step) ?? fallback,
+    });
+  }
 }
 
 // --- POST /reviews/:id/submit-for-approval -----------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   ASSESSMENT_OUTCOMES,
   CREDIT_POLICY_REF,
   DECIMAL_AMOUNT_PATTERN,
+  NOTE_COPY,
   reviewStates,
   type Me,
   type Review,
@@ -83,8 +84,9 @@ export function AssessmentDialog({
       valuationSource: v.valuationSource,
       valuationDate: v.valuationDate,
       limitations: v.limitations,
+      // Both note fields are always sent: "" clears a note; unchanged text is not stored again.
       internalNotes: v.internalNotes,
-      sharedFeedback: v.sharedFeedback || undefined,
+      sharedFeedback: v.sharedFeedback,
       outcome: v.outcome,
       policyRef: v.policyRef,
     };
@@ -137,10 +139,10 @@ export function AssessmentDialog({
       <Field label="Valuation limitations" error={errors.limitations?.message}>
         {(wired) => <TextArea wired={wired} rows={2} {...form.register("limitations")} />}
       </Field>
-      <Field label="Internal assessment notes" tag={`Internal · ${lender} only`} error={errors.internalNotes?.message}>
+      <Field label="Internal assessment notes" tag={`Internal · ${lender} only`} hint={NOTE_COPY.STORED_OFF_LEDGER} error={errors.internalNotes?.message}>
         {(wired) => <TextArea wired={wired} rows={3} className="border-pending/30" {...form.register("internalNotes")} />}
       </Field>
-      <Field label="Feedback shared with the borrower" error={errors.sharedFeedback?.message}>
+      <Field label="Feedback shared with the borrower" hint={NOTE_COPY.STORED_OFF_LEDGER} error={errors.sharedFeedback?.message}>
         {(wired) => <TextArea wired={wired} rows={2} {...form.register("sharedFeedback")} />}
       </Field>
       <Field label="Collateral outcome" error={errors.outcome?.message}>

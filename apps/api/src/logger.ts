@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import type { LoggerOptions } from "pino";
+import { toLogSafeError } from "@collara/db";
+import { stdSerializers, type LoggerOptions } from "pino";
 import type { Config } from "./config";
 
 const CENSOR = "[redacted]";
@@ -29,6 +30,12 @@ const SENSITIVE_KEYS = [
   "requestedPrincipal",
   "terms",
   "financingTerms",
+  // private notes (off-ledger note store): never logged, even if a body or note row reaches a log call
+  "internalNotes",
+  "sharedFeedback",
+  "note",
+  "servicingRef",
+  "body",
 ];
 
 /** Header values and sensitive fields that must never reach logs. */
@@ -74,6 +81,8 @@ export function loggerOptions(config: Pick<Config, "LOG_LEVEL" | "NODE_ENV">): L
     level: config.LOG_LEVEL,
     redact: { paths: REDACTED_PATHS, censor: CENSOR },
     serializers: {
+      // Database errors carry bound parameters (user data); keep only SQL text and diagnostic codes.
+      err: (err: unknown) => stdSerializers.err(toLogSafeError(err) as Error),
       // Fastify's default request serializer logs the raw URL, which would include OIDC codes.
       req: (req: LoggedRequest) => ({
         method: req.method,

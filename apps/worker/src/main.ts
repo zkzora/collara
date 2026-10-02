@@ -4,7 +4,7 @@
 // Restart-safe: all progress is in PostgreSQL; SIGINT/SIGTERM stop the loops, then close the pool.
 import { createRequire } from "node:module";
 import { once } from "node:events";
-import { createPgDatabase, type DbHandle } from "@collara/db";
+import { createPgDatabase, toLogSafeError, type DbHandle } from "@collara/db";
 import pino, { type LoggerOptions } from "pino";
 import packageJson from "../package.json" with { type: "json" };
 import { loadConfig } from "./config";
@@ -17,7 +17,12 @@ const CONNECT_RETRY_MS = 10_000;
 
 const config = loadConfig();
 
-const logOptions: LoggerOptions = { level: config.LOG_LEVEL, base: { service: "worker" } };
+const logOptions: LoggerOptions = {
+  level: config.LOG_LEVEL,
+  base: { service: "worker" },
+  // Database errors carry bound parameters (user data); keep only SQL text and diagnostic codes.
+  serializers: { err: (err: unknown) => pino.stdSerializers.err(toLogSafeError(err) as Error) },
+};
 if (config.NODE_ENV === "development" && process.stdout.isTTY) {
   logOptions.transport = { target: createRequire(import.meta.url).resolve("pino-pretty") };
 }

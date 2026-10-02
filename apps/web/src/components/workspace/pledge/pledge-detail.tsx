@@ -1,6 +1,16 @@
 "use client";
 
-import { BOUNDARY_COPY, CONFIRMATION_COPY, ERROR_COPY, OPEN_RELEASE_REQUEST_STATES, STATUS_COPY, type Pledge, type ReleaseRequest } from "@collara/domain";
+import {
+  BOUNDARY_COPY,
+  CONFIRMATION_COPY,
+  ERROR_COPY,
+  NOTE_COPY,
+  OPEN_RELEASE_REQUEST_STATES,
+  RELEASE_THREAD_LABELS,
+  STATUS_COPY,
+  type Pledge,
+  type ReleaseRequest,
+} from "@collara/domain";
 import Link from "next/link";
 import { DefinitionList } from "@/components/collara/definition-list";
 import { ErrorState } from "@/components/collara/error-state";
@@ -59,6 +69,30 @@ function LockEvidence({ p }: { p: Pledge }) {
   );
 }
 
+/** The request's private note thread (request note, lender questions, borrower responses), oldest first. */
+function ReleaseThread({ rr }: { rr: ReleaseRequest }) {
+  if (rr.thread.length === 0) return null;
+  return (
+    <section aria-label={`${NOTE_COPY.THREAD_TITLE} · ${rr.ref}`} className="mt-4 border-t border-line-subtle pt-4">
+      <h4 className="text-[12.5px] font-medium text-fg-muted">{NOTE_COPY.THREAD_TITLE}</h4>
+      <ol className="mt-2 flex flex-col gap-2.5">
+        {rr.thread.map((entry, index) => (
+          <li
+            key={`${entry.kind}-${entry.at}-${index}`}
+            className={entry.kind === "QUESTION" ? "rounded-md border border-warning/30 bg-warning/5 px-3.5 py-3" : "rounded-md border border-line-subtle bg-surface-sunken px-3.5 py-3"}
+          >
+            <p className="mb-1 font-mono text-[10.5px] tracking-[.04em] text-fg-muted uppercase">
+              {`${RELEASE_THREAD_LABELS[entry.kind]} · ${entry.by ?? entry.author.name} · ${formatUtcDateTime(entry.at)}`}
+            </p>
+            <p className="text-[13px] leading-relaxed whitespace-pre-line text-fg">{entry.body}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-[12px] text-fg-subtle">{NOTE_COPY.THREAD_SCOPE}</p>
+    </section>
+  );
+}
+
 function ReleaseRequestCard({ rr }: { rr: ReleaseRequest }) {
   return (
     <Panel eyebrow={`Release request · ${rr.ref}`} action={<StatusBadge status={rr.state} />}>
@@ -70,7 +104,7 @@ function ReleaseRequestCard({ rr }: { rr: ReleaseRequest }) {
           { term: "Reason", description: rr.reason.label },
           ...(rr.note ? [{ term: "Borrower note", description: <span className="whitespace-pre-line text-fg-muted">{rr.note}</span> }] : []),
           ...(rr.servicingRef ? [{ term: "Servicing reference", description: <span className="font-mono">{rr.servicingRef}</span> }] : []),
-          ...(rr.informationRequest ? [{ term: "Information requested", description: rr.informationRequest }] : []),
+          ...(rr.informationRequest ? [{ term: "Information requested", description: <span className="whitespace-pre-line">{rr.informationRequest}</span> }] : []),
           ...(rr.decision
             ? [
                 { term: "Decision", description: `${rr.decision.outcome.label} · ${rr.decision.decidedBy}` },
@@ -80,6 +114,7 @@ function ReleaseRequestCard({ rr }: { rr: ReleaseRequest }) {
             : []),
         ]}
       />
+      <ReleaseThread rr={rr} />
       {isOpen(rr) ? (
         <p role="note" className="mt-4 rounded-md border border-pending/30 bg-pending/5 px-3.5 py-3 text-[13px] text-pending-strong">
           {STATUS_COPY.RELEASE_PENDING}

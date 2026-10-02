@@ -151,7 +151,10 @@ function ReviewActions({ review, detail, me }: { review: Review; detail: CaseDet
 export function ReviewTab() {
   const { detail } = useCaseWorkspace();
   const { me } = useSession();
-  const { ref, isPending: refPending } = useCaseReviewRef(detail);
+  const listed = useCaseReviewRef(detail);
+  // The server names the review the viewer may open (e.g. a borrower who has shared feedback but no decision yet).
+  const ref = detail.references.review?.ref ?? listed.ref;
+  const refPending = !detail.references.review && listed.isPending;
   const review = useReview(ref);
   const isLender = me.roles.includes("LENDER_ANALYST") || me.roles.includes("LENDER_APPROVER");
 
@@ -195,7 +198,7 @@ export function ReviewTab() {
                   : "Pending approver mandate",
               },
               ...(r.informationRequest ? [{ term: "Information requested", description: r.informationRequest }] : []),
-              ...(r.sharedFeedback ? [{ term: "Shared feedback", description: r.sharedFeedback }] : []),
+              ...(r.sharedFeedback ? [{ term: "Shared feedback", description: <span className="whitespace-pre-line">{r.sharedFeedback}</span> }] : []),
             ]}
           />
         ) : (
@@ -204,7 +207,7 @@ export function ReviewTab() {
         {r?.internalNotes ? (
           <div className="mt-4 rounded-md border border-pending/30 bg-pending/5 px-3.5 py-3">
             <p className="mb-1 font-mono text-[10.5px] tracking-[.04em] text-pending-strong uppercase">Internal · {lenderName} only</p>
-            <p className="text-[13px] leading-relaxed text-fg">{r.internalNotes}</p>
+            <p className="text-[13px] leading-relaxed whitespace-pre-line text-fg">{r.internalNotes}</p>
           </div>
         ) : null}
         {r ? (

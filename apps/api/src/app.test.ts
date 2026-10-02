@@ -1,5 +1,6 @@
 import { Writable } from "node:stream";
 import pino from "pino";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { ApiProblemSchema, ERROR_COPY } from "@collara/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type CollaraApp } from "./app";
@@ -140,6 +141,28 @@ describe("logger", () => {
     const output = lines.join("");
     expect(output).not.toMatch(/secret-token|collara_sid=|secret-code|secret-state|eyJhbGciOi|secret-access|100000\.00/);
     expect(output).toContain("[redacted]");
+  });
+
+  it("logs database errors without bound parameters or row values", () => {
+    const lines: string[] = [];
+    const sink = new Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        lines.push(chunk.toString());
+        callback();
+      },
+    });
+    const log = pino(loggerOptions({ LOG_LEVEL: "info", NODE_ENV: "test" }), sink);
+    const pgError = Object.assign(new Error("duplicate key value violates unique constraint"), {
+      code: "23505",
+      severity: "ERROR",
+      detail: "Key (email)=(person@example.test) already exists.",
+      constraint: "pilot_requests_email_key",
+    });
+    log.error({ err: new DrizzleQueryError('insert into "pilot_requests" ("email") values ($1)', ["person@example.test"], pgError) }, "request failed");
+    const output = lines.join("");
+    expect(output).not.toContain("person@example.test");
+    expect(output).toContain("23505");
+    expect(output).toContain("pilot_requests_email_key");
   });
 
   it("redacts sensitive query parameters only", () => {

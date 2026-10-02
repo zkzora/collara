@@ -130,6 +130,8 @@ function ActivePledge({ detail, pledgeRef }: { detail: CaseDetail; pledgeRef: st
                 { term: "Requested by", description: rr.requestedBy },
                 { term: "Requested", description: <span className="font-mono">{formatUtcDateTime(rr.requestedAt)}</span> },
                 { term: "Reason", description: rr.reason.label },
+                ...(rr.note ? [{ term: "Borrower note", description: <span className="whitespace-pre-line text-fg-muted">{rr.note}</span> }] : []),
+                ...(rr.informationRequest ? [{ term: "Information requested", description: <span className="whitespace-pre-line">{rr.informationRequest}</span> }] : []),
                 ...(rr.decision ? [{ term: "Decision", description: `${rr.decision.outcome.label} · ${rr.decision.decidedBy}` }] : []),
               ]}
             />

@@ -3,6 +3,7 @@
 import {
   CONFIRMATION_COPY,
   ERROR_COPY,
+  NOTE_COPY,
   releaseReasons,
   type CreateReleaseRequest,
   type Me,
@@ -54,7 +55,7 @@ export function RequestReleaseDialog({ pledge, me }: { pledge: Pledge; me: Me })
           </SelectInput>
         )}
       </Field>
-      <Field label="Note to the lender (optional)">
+      <Field label="Note to the lender (optional)" hint={NOTE_COPY.STORED_OFF_LEDGER}>
         {(wired) => <TextArea wired={wired} rows={2} value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} />}
       </Field>
       <Field label="Servicing reference (optional)" hint="External loan or servicing reference. Do not enter account numbers.">
@@ -79,6 +80,7 @@ export function BorrowerReleaseActions({ pledge, rr, me }: { pledge: Pledge; rr:
           facts={{ actingParty: party, record: `${pledge.ref} · ${rr.ref}`, effect: "INFORMATION_REQUESTED → REQUESTED · lock stays ACTIVE" }}
           confirmLabel="Send response"
           fieldLabel="Response"
+          hint={NOTE_COPY.STORED_OFF_LEDGER}
           requiredMessage="Enter your response."
           maxLength={2000}
           perform={(message, options) => client.releaseRequests.respond(rr.ref, { message }, options)}
@@ -152,6 +154,7 @@ export function ReleaseDecisionActions({ pledge, rr, me }: { pledge: Pledge; rr:
           facts={{ actingParty: party, record: `${pledge.ref} · ${rr.ref}`, effect: "REQUESTED → INFORMATION_REQUESTED · lock stays ACTIVE" }}
           confirmLabel="Send request"
           fieldLabel="Information needed"
+          hint={NOTE_COPY.STORED_OFF_LEDGER}
           requiredMessage="Describe the information you need."
           maxLength={2000}
           perform={(message, options) => client.releaseRequests.requestInformation(rr.ref, { message }, options)}
