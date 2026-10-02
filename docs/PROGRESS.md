@@ -7,72 +7,39 @@ Living status file so work can resume across sessions. Update it at the end of e
 | # | Stage | Status | Notes |
 |---|---|---|---|
 | 1 | Audit, sources of truth, permissions, compatibility, migration plan | Done (2026-10-02) | `docs/_research/*`, ADR-0001, migration map |
-| 2 | Frontend migration (Next.js, UI_MOCK walkthrough, typecheck, build) | Done for UI_MOCK (2026-10-02) | Public site (`/`, `/docs`, `/pilot`, `/demo`, `/privacy`, `/terms`), `/login`, the workspace (Part A: overview, cases, case tabs and actions; Part B: assets, verifications, reviews, pledges, access, audit and exports, governance, settings, notifications). The full walkthrough e2e passes in UI_MOCK. Open: copy approval for strings marked INFERRED, BPD-1. LOCALNET rendering needs stage 4 endpoints. |
-| 3 | Daml state model + invariant tests; typed Canton adapter; LocalNet submission + visibility | In progress | Done: Daml model (`daml/collara`, see `docs/architecture/daml-model.md`) with 60 invariant/attack/privacy tests + 4 script tests on the Daml Script IDE ledger; `@collara/canton` adapter; LocalNet scripts (sandbox up/down/status/bootstrap, HMAC JWT auth). Not done: Collara templates submitted through the adapter on LocalNet, witness-level privacy on the 3-participant sandbox, contention on the real `Control_Activate`. |
-| 4 | API services, private evidence, DB migrations, command records, projections | In progress | Done: `@collara/db` schema + migration `0000_init`, API foundation (sessions in PostgreSQL, OIDC PKCE, CSRF, demo sessions, pilot requests, private evidence pipeline on SeaweedFS, command lifecycle service, health). Not done: `LedgerGateway` on `@collara/canton`, worker projections, `ProjectionReader`; 54 of the 66 endpoints in the web client's route table (`API_ENDPOINTS`) do not exist in the API yet. |
-| 5 | Core journey wired to LocalNet; authz failures, concurrency, retry, scoped exports verified | Done (2026-10-02), except witness-level privacy | 49 LOCALNET IT + 8 adversarial IT (44 id routes: anonymous 401, Lender B byte-identical 404, spoofed org/party ignored, idempotency, ledger down → 503 FAILED); Playwright LOCALNET walkthrough + negatives pass. Open: 3-participant witness privacy; full IT re-run with S3 after disk space is freed. |
-| 6 | BitSafe governance (DM) | Tier A done (2026-10-02) | DM v1.12.0 GovernanceRules 2-of-3 via API: 10/10 live tests (one confirmation fails, duplicate seat not counted, stale proposal fails, suspension blocks attestation, non-seats 404). Tier B (real DM nodes, decentralized party) not attempted. |
-| 7 | Setup scripts, CI, health checks, deployment config, docs | Done except never executed remotely | CI workflows (actionlint ok, never run on GitHub); Dockerfiles + compose app/canton profiles (untested, no Docker); docs: setup, demo, permissions (generated), governance, limitations, architecture overview, API, verification. Demo sessions refused in production unless explicitly allowed. |
+| 2 | Frontend migration (Next.js, UI_MOCK walkthrough, typecheck, build) | Done (2026-10-02/03) | Public site, `/login`, full workspace in UI_MOCK and LOCALNET; Create Case (`/app/cases/new`); Overview per-currency figures; form-control borders ≥ 3:1. Open: copy approval (strings marked INFERRED), BPD-1 legal text, landing FAQ/`/demo` copy still says "planned" (approved copy — needs sign-off to change). |
+| 3 | Daml state model + invariant tests; typed Canton adapter; LocalNet submission + visibility | Done on one participant | 60 Daml Script tests; all workflows submitted on Canton 3.5.19 through the adapter; contention proven live. Open: witness-level privacy on 3 participants. |
+| 4 | API services, private evidence, DB migrations, command records, projections | Done (2026-10-03) | All `API_ENDPOINTS` routes + directory/overview; projection worker; migrations 0000–0002; private evidence on SeaweedFS; verifier evidence grants; off-ledger note store; database errors logged without parameters. |
+| 5 | Core journey wired to LocalNet; authz failures, concurrency, retry, scoped exports verified | Done on one participant (2026-10-03) | Full LOCALNET IT with S3: 12 files, 71/71 (journey, adversarial 44 routes, concurrency 5 rounds, verifier evidence, notes, create case from clean-start, governance). Open: 3-participant witness privacy; LOCALNET browser walkthrough from clean-start. |
+| 6 | BitSafe governance (DM) | Tier A done; Tier B not attempted | DM v1.12.0 GovernanceRules 2-of-3 on one participant (10/10 live tests). Governance party is an ordinary local party. |
+| 7 | Setup scripts, CI, health checks, deployment config, docs | CI fixed, green run not yet confirmed | First GitHub run failed in setup-node@v5 (pnpm cache); fixed in bf5e131 (not pushed yet). Dockerfiles/compose untested (no Docker). Docs refreshed to current evidence (f8bf519). |
 
-## Integration check (2026-10-02)
-
-Run by the integrator from the repo root on the authoring machine after the parallel build (Node 24.16.0, pnpm 11.28.2). Every command below was run in this session; results are as observed.
+## Verification (2026-10-03, combined tree before commits 16e9b43…b0428c5)
 
 | Command | Result |
 |---|---|
-| `pnpm install --frozen-lockfile` | Already up to date (lockfile matches) |
-| `pnpm typecheck` | Pass: 7 packages |
-| `pnpm lint` | Pass: 298 files, 0 errors, 0 warnings |
-| `pnpm test` | Pass: 210 tests. canton 50, domain 56, api-client 22, db 7, worker 2, web 25, api 48 |
-| `pnpm build` | Pass: `next build` (Turbopack, default `.next`) and typecheck of api and worker |
-| `dpm build --all --no-cache` (in `daml/collara`) | Pass: 4 DARs (governance, contracts, scripts, tests), no warnings |
-| `node daml/collara/check.mjs --skip-build`, then `pnpm daml:check` | Pass both times: vendored DAR checksums ok; tests 60 ok / 0 failed; scripts 4 ok / 0 failed |
-| `next start` (UI_MOCK, port 3000) + `PLAYWRIGHT_BASE_URL=http://localhost:3000 playwright test --workers=2` | Pass: 59 passed, 7 skipped, 0 failed. marketing 33/1 skipped, smoke 4, walkthrough 1/1 skipped, workspace-a 13/1 skipped, workspace-b 8/4 skipped. Each skip is a deliberate viewport guard in the spec (desktop-only flow on the mobile project, or the reverse). Run twice, before and after the integrator's edits, with the same result. |
-| `curl -I` on `/app` and `/login` under `next start` | `Cache-Control: private, no-store` on both |
-| `pnpm localnet:status`, `pnpm db:status`, `pnpm infra:seaweed status`, `pnpm infra:keycloak status` | Scripts resolve and report "not running" (exit 1), the expected result with nothing started |
+| `pnpm typecheck` / `pnpm lint` | Pass |
+| `pnpm test` (packages one at a time, `--maxWorkers=2`) | 363 pass: canton 50, domain 67, api-client 32, db 56, web 47, api 104, worker 7 (+ log-safety tests added after: db 4, api 12 in its file) |
+| `LOCALNET_IT=1 … vitest run --config vitest.localnet.config.ts` (Canton 3.5.19 sandbox, 1 participant, S3 storage) | 12 files, 71/71, 496 s |
+| Playwright UI_MOCK (reported by builders, separate output dirs) | 70 passed, 14 skipped (viewport guards); marketing 35/35 incl. new docs status test |
+| `actionlint` on both workflows | Pass |
 
-Reported by the builders, **not** re-run in the integration check: Canton adapter integration tests (`CANTON_IT=1`, 6 tests, cold start and reuse, against a `dpm sandbox`, Canton 3.5.19); the API against PostgreSQL 16.14 in WSL and SeaweedFS 4.48; the Keycloak PKCE code-flow check for every demo user (`keycloak.mjs check`).
+## Known gaps
 
-Integrator changes: root scripts (`env:init`, `db:*`, `infra:*`, `localnet:*`, `daml:check`, `test:e2e`), `.env.example` aligned with the API config (added `PUBLIC_ORIGIN`, `COOKIE_SECURE`, `COLLARA_OIDC_ALLOW_INSECURE_HTTP=true` for the local http issuer, and the optional settings; removed the unused `COLLARA_OIDC_POST_LOGOUT_REDIRECT_URI`; corrected the Canton and worker comments), README commands and configuration, breadcrumb labels for `/app/access` and `/app/notifications` (with a unit test), `data-scroll-behavior="smooth"` on `<html>`.
-
-## Known gaps and blockers
-
-- **LOCALNET is not usable end to end.** The API has no ledger gateway (the default reports the ledger unavailable). The worker only serves health and has no projection loop. Case, asset, verification, review, proposal, pledge, release, access-grant, audit, report and governance endpoints do not exist yet. In LOCALNET the workspace pages have no endpoints to read from.
-- **Ledger privacy at witness level is untested.** IDE-ledger tests check active-contract visibility only. They need per-party update streams on the 3-participant sandbox, with priority on `Control_Activate`, `VR_IssueAttestation` and `Release_Reject`.
-- **Attestation revocation is not checked on-ledger at activation** (by design, to keep the verifier unaware of pledges). The API must check that the lender still holds the `AttestationDisclosure` before `Control_Activate` (`daml-model.md` §8).
-- **Not exercised:**
-  - an OIDC code exchange through the API against Keycloak (only with a fake OIDC service)
-  - Secure-cookie mode behind HTTPS
-  - API calls through the Next `/api` proxy with real sessions
-- **Copy approval:** strings marked INFERRED in `packages/domain/src/copy.ts` and in the web screens (login, dialogs, error states, governance notices, pilot form errors, docs footnotes). BPD-1 (privacy notice, terms, consent text, retention) blocks any public URL that collects personal data.
-- **Product and model gaps:**
-  - dealer consent step (`PARTIALLY_CONSENTED`) is not modelled in the API or the mock
-  - no `/app/cases/new` route
-  - Overview per-currency totals have no endpoint (they show "Not available")
-  - the projection checkpoint is only reported per case
-- **Accessibility:** input, select and checkbox borders are 1.21:1 against the surface (prototype look), below WCAG 1.4.11's 3:1. This needs a design decision.
-- **Environment:**
-  - Node 24.16.0 is installed; `.node-version` recommends 24.21.0
-  - `next build` downloads Google fonts (needs network)
-  - `infra/compose/compose.yaml` was never run
-- **CLAUDE.md still names `scripts/dev/wsl-keepalive`**, which does not exist. The current command is `pnpm db:up` (`node scripts/dev/wsl-postgres.mjs up`). The lead should update CLAUDE.md.
+- **Privacy across participants is unproven.** Every LocalNet check ran on one participant, whose operator sees every transaction.
+- **Tier B governance** (DM nodes, decentralized governance party) not attempted; Tier A's governance party credential could act without the seat quorum.
+- **Trust boundaries (documented):** attestation revocation is an API precheck before `Control_Activate`, not atomic ledger enforcement; the registrar holds issuance, config and mirror authority; analyst/approver mandates are off-ledger.
+- **Not verified:** Docker/compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, ledger persistence across sandbox restarts (in-memory), a green CI run, LOCALNET browser run of the new Create Case / notes / verifier-grant screens.
+- **Product gaps:** no web UI for the dealer's verification consent (API route only); only one verifier org in the demo ("a different verifier is refused" is unit-tested only); no retention policy for notes; decision/information-request text on `LenderDecisionNotice.sharedFeedback` is still on-ledger text (changing it needs a Daml change).
+- **Copy/legal:** INFERRED strings need approval; BPD-1 (privacy, terms, consent, retention) blocks any public URL that collects personal data.
 
 ## Next steps
 
-1. Commit the parallel build (nothing from it is committed yet), including `apps/web/AGENTS.md`, which `next dev` regenerates.
-2. Implement `LedgerGateway` on `@collara/canton`:
-   - deterministic `commandId` per idempotency record and a new `submissionId` per attempt
-   - `UNKNOWN_OUTCOME` handled by resubmitting or reading completions
-3. Seed the main fixture on LocalNet through real choices.
-4. Worker projection loop with `projector-svc`:
-   - poll `/v2/updates` per participant and persist `nextBeginExclusive`
-   - key events by `(updateId, nodeId)` and store witness parties
-   - read terminal outcomes from exercised events
-   - refuse to mix histories after a participant reset
-5. API read endpoints for the workspace, then the case and verification commands. Use the domain policy, workflow checks and presenters (404 for unrelated records), in the order of the walkthrough.
-6. Run the 3-participant witness privacy tests and a live `Control_Activate` contention test. Then run the e2e walkthrough in LOCALNET.
-7. Set up CI: `pnpm install --frozen-lockfile`, `typecheck`, `lint`, `test`, `build`, Playwright in UI_MOCK, and `daml:check`.
-8. Get approval for the INFERRED copy and resolve BPD-1 before any public deployment.
+1. Push `bf5e131…` to GitHub (with the user's go-ahead) and confirm CI is green; fix what the first real run reveals.
+2. Three-participant witness privacy: map orgs to participants (Lender B on its own participant), run seed + walkthrough, assert per-party `LEDGER_EFFECTS` streams carry no terms to verifier/dealer/registrar/Lender B and only granted scope to the auditor; record topology and results.
+3. LOCALNET browser walkthrough from clean-start (register → evidence → selected-document verification → attestation → create case → share → review → … → export).
+4. Tier B DM spike (WSL: Canton OSS 3-participant + DM nodes, decentralized party), time-boxed; record exact blockers if it fails.
+5. JWKS/client-credentials ledger token provider for a real participant; copy approval; BPD-1.
 
 ## Environment facts (authoring machine)
 
@@ -95,3 +62,4 @@ Integrator changes: root scripts (`env:init`, `db:*`, `infra:*`, `localnet:*`, `
 - Resume tip: shared infra is started with `pnpm db:up`, `pnpm infra:seaweed start`, `pnpm localnet:up`, `pnpm localnet:bootstrap`. Builder prompts for Stage 4/5 are saved in `docs/_research/build-prompts/stage-4-5-localnet.js` (constants `COMMON`, `PROJECTION`, `LEDGER_CORE`, `EP_*`, `VERIFY`).
 - 2026-10-02 — Stage 4/5 finished with background subagents (ultracode off): commits 6d3536f (IT harness), 0a3e843 (worker + read model; export lease bug fixed), c9337d3 (all endpoints, governance, app-wide parse serializer). Full LOCALNET stack brought up for the user: sandbox + default seed (24 steps), worker 4100, API 4000, web 3000 (next start, LOCALNET, demo sessions). Running in parallel: LOCALNET polish + Playwright/adversarial tests (own prefix e2e, ports 3100/4200/4210); Stage 7 CI/deploy/docs.
 - 2026-10-02 — Stage 7 committed (25265d0), demo-session production guard (ea4ebf2), LOCALNET polish + e2e + adversarial (bbd1548). Running demo restarted with the fixes (API 4000, worker 4100, web 3000). Environment issue: C: has ~3.2 GB free; SeaweedFS refuses writes below 1% free (~4.8 GB), so evidence uploads and export generation fail until the user frees disk space (reads, ledger workflow and governance work). Next: user frees disk → re-run full LOCALNET IT with S3; 3-participant witness privacy; Tier B DM spike (needs several GB RAM, run with the demo stopped); JWKS ledger auth for a real participant; BPD-1 legal text; copy approval.
+- 2026-10-03 — Review of e41a83e addressed: CI setup-node fix + bounded test workers (bf5e131); status docs derived from evidence (f8bf519); DB note store + log-safe errors (16e9b43); shared contracts (9ba1bbd); verifier evidence grants (b8bea52); persisted notes (ba0a319); Create Case, overview figures, contrast (b0428c5). Full LOCALNET IT with S3 71/71. Shared infra (sandbox, WSL Postgres, SeaweedFS) was restarted by builders after the machine stopped them overnight.
