@@ -114,6 +114,12 @@ describe("config", () => {
     expect(() => loadConfig({ NODE_ENV: "production", DATABASE_URL: "postgres://u:p@127.0.0.1:5432/db" })).toThrow(/SESSION_SECRET/);
     expect(() => loadConfig({ COLLARA_S3_ENDPOINT: "http://127.0.0.1:8333" })).toThrow(/S3 credentials/);
   });
+
+  it("refuses demo sessions in production unless explicitly allowed for a synthetic demo", () => {
+    expect(() => loadConfig({ NODE_ENV: "production", DEMO_SESSIONS_ENABLED: "true" })).toThrow(/DEMO_SESSIONS_ENABLED is refused in production/);
+    expect(loadConfig({ NODE_ENV: "production", DEMO_SESSIONS_ENABLED: "true", DEMO_SESSIONS_ALLOW_IN_PRODUCTION: "true" }).DEMO_SESSIONS_ENABLED).toBe(true);
+    expect(loadConfig({ NODE_ENV: "development", DEMO_SESSIONS_ENABLED: "true" }).DEMO_SESSIONS_ENABLED).toBe(true);
+  });
 });
 
 describe("logger", () => {

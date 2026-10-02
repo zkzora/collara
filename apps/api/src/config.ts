@@ -45,6 +45,7 @@ const ConfigSchema = z
 
     // Isolated demo sessions (POST /api/demo/sessions). Demo environments only, never production auth.
     DEMO_SESSIONS_ENABLED: envBool(false),
+    DEMO_SESSIONS_ALLOW_IN_PRODUCTION: envBool(false),
 
     // OIDC (Keycloak in dev; same names as scripts/infra/keycloak.mjs). Login is unavailable unless the
     // issuer and the client secret are set.
@@ -91,6 +92,14 @@ const ConfigSchema = z
     }
     if (config.NODE_ENV === "production" && config.COLLARA_MODE === "LOCALNET" && !config.CANTON_JWT_HMAC_SECRET) {
       ctx.addIssue({ code: "custom", path: ["CANTON_JWT_HMAC_SECRET"], message: "CANTON_JWT_HMAC_SECRET is required in production (no dev placeholder)" });
+    }
+    if (config.NODE_ENV === "production" && config.DEMO_SESSIONS_ENABLED && !config.DEMO_SESSIONS_ALLOW_IN_PRODUCTION) {
+      // Demo sessions let anyone pick a seeded identity; a production build must opt in explicitly (hosted synthetic demo only).
+      ctx.addIssue({
+        code: "custom",
+        path: ["DEMO_SESSIONS_ENABLED"],
+        message: "DEMO_SESSIONS_ENABLED is refused in production unless DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true (synthetic demo deployments only)",
+      });
     }
     if (config.COLLARA_S3_ENDPOINT && !(config.COLLARA_S3_ACCESS_KEY && config.COLLARA_S3_SECRET_KEY)) {
       // SeaweedFS without credentials serves the bucket anonymously; never run storage that way.
