@@ -1,8 +1,7 @@
 # Collara CI: workspace checks, UI_MOCK end-to-end tests and the Daml build + tests.
 #
-# NOT YET RUN ON GITHUB. Authored on 2026-10-02 on a Windows machine where these steps were run by hand
-# (docs/PROGRESS.md, "Integration check"); this workflow file itself has only been linted with actionlint.
-# Expect to adjust it on the first real run.
+# First run on GitHub (2026-10-02) failed in setup-node@v5 (automatic package-manager cache before pnpm was
+# installed); fixed with package-manager-cache: false.
 name: CI
 
 on:
@@ -32,6 +31,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          # v5 auto-enables the package-manager cache from packageManager, which needs pnpm on PATH before
+          # it is installed below; the pnpm store is cached explicitly instead.
+          package-manager-cache: false
 
       - name: Install pnpm (version from packageManager)
         run: npm install --global "$(node -p "require('./package.json').packageManager")"
@@ -79,6 +81,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          # v5 auto-enables the package-manager cache from packageManager, which needs pnpm on PATH before
+          # it is installed below; the pnpm store is cached explicitly instead.
+          package-manager-cache: false
 
       - name: Install pnpm (version from packageManager)
         run: npm install --global "$(node -p "require('./package.json').packageManager")"
@@ -129,6 +134,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          # v5 auto-enables the package-manager cache from packageManager, which needs pnpm on PATH before
+          # it is installed below; the pnpm store is cached explicitly instead.
+          package-manager-cache: false
 
       - name: Use JDK 21 (preinstalled on the runner image)
         run: |

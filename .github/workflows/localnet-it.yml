@@ -79,6 +79,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          # v5 auto-enables the package-manager cache from packageManager, which needs pnpm on PATH before
+          # it is installed below; the pnpm store is cached explicitly instead.
+          package-manager-cache: false
 
       - name: Install pnpm (version from packageManager)
         run: npm install --global "$(node -p "require('./package.json').packageManager")"
