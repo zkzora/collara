@@ -1,0 +1,166 @@
+# Collara CI: workspace checks, UI_MOCK end-to-end tests and the Daml build + tests.
+#
+# NOT YET RUN ON GITHUB. Authored on 2026-10-02 on a Windows machine where these steps were run by hand
+# (docs/PROGRESS.md, "Integration check"); this workflow file itself has only been linted with actionlint.
+# Expect to adjust it on the first real run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - name: Install pnpm (version from packageManager)
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        # Vitest in every package; the API and worker use PGlite, no external services.
+        run: pnpm test
+
+      - name: Generated docs are current
+        run: pnpm --filter @collara/api exec tsx ../../scripts/docs/permissions.mjs --check
+
+      - name: Build
+        # next build (downloads Google fonts) + typecheck of api and worker.
+        run: pnpm build
+
+  e2e-ui-mock:
+    name: Playwright e2e (UI_MOCK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      COLLARA_MODE: UI_MOCK
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - name: Install pnpm (version from packageManager)
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @collara/web exec playwright install --with-deps chromium
+
+      - name: Build the web app
+        run: pnpm --filter @collara/web build
+
+      - name: Playwright (desktop + mobile projects)
+        # playwright.config.ts starts `next start` on port 3000 (COLLARA_MODE=UI_MOCK from the job env).
+        run: pnpm --filter @collara/web test:e2e
+
+      - name: Upload the Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+  daml:
+    name: Daml build and tests (SDK 3.5.12)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DPM_SDK_VERSION: "3.5.12"
+      JDK_JAVA_OPTIONS: -Xmx1g
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - name: Use JDK 21 (preinstalled on the runner image)
+        run: |
+          if [ -z "${JAVA_HOME_21_X64:-}" ]; then
+            echo "::error::JAVA_HOME_21_X64 is not set on this runner image; install a JDK 21"
+            exit 1
+          fi
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+
+      # ~/.dpm holds dpm and the installed SDK (about 2.7 GB on the authoring machine).
+      - name: Cache dpm and the Daml SDK
+        id: cache-dpm
+        uses: actions/cache@v6
+        with:
+          path: ~/.dpm
+          key: dpm-sdk-${{ env.DPM_SDK_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install dpm and Daml SDK (official installer)
+        if: steps.cache-dpm.outputs.cache-hit != 'true'
+        env:
+          TERM: dumb
+        run: curl -sSLf https://get.digitalasset.com/install/install.sh | sh -s "$DPM_SDK_VERSION"
+
+      - name: Put dpm on PATH
+        run: echo "$HOME/.dpm/bin" >> "$GITHUB_PATH"
+
+      - name: Show versions
+        run: |
+          java -version
+          dpm --version
+          dpm version --active
+
+      - name: Vendored DAR checksums, dpm build --all, dpm test (tests and scripts)
+        run: node daml/collara/check.mjs

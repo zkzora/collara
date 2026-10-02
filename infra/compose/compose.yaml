@@ -1,15 +1,32 @@
-# Collara local infrastructure for machines with Docker: PostgreSQL, SeaweedFS (S3) and Keycloak.
+# Collara on machines with Docker: infrastructure (PostgreSQL, SeaweedFS S3, Keycloak), plus two opt-in
+# profiles: `app` (web, api, worker, a one-shot database job) and `canton` (a Canton 3.5.19 dpm sandbox and a
+# one-shot bootstrap).
 #
-# UNTESTED on the authoring machine (no Docker). The verified path is the native Windows setup in
-# docs/setup.md; these services mirror it (same versions, ports, bucket and realm).
+# UNTESTED on the authoring machine (no Docker). Nothing in this file has been run. The verified path is the
+# native setup in docs/setup.md; these services mirror it (same versions, ports, bucket and realm). Not a
+# production deployment: synthetic data, plain HTTP, dev-only credentials, start-dev Keycloak, in-memory
+# ledger with unsafe HMAC auth. See infra/deploy/README.md for what a hosted deployment would need.
 #
 # From the repo root, after `node scripts/dev/init-env.mjs` (creates .env with dev-only secrets):
-#   docker compose --env-file .env -f infra/compose/compose.yaml up -d
-#   docker compose --env-file .env -f infra/compose/compose.yaml ps
-#   docker compose --env-file .env -f infra/compose/compose.yaml down      # add -v to delete the data volumes
+#   docker compose --env-file .env -f infra/compose/compose.yaml up -d                     # infrastructure only
+#   docker compose --env-file .env -f infra/compose/compose.yaml --profile app up -d --build   # + web/api/worker (UI_MOCK)
+#   COLLARA_MODE=LOCALNET docker compose --env-file .env -f infra/compose/compose.yaml \
+#     --profile canton --profile app up -d --build                                          # full LOCALNET stack
+#   docker compose --env-file .env -f infra/compose/compose.yaml --profile canton --profile app run --rm api \
+#     node --import tsx src/seed/cli.ts --profile main --state /state/state.json             # seed CL-001 (LOCALNET)
+#   docker compose --env-file .env -f infra/compose/compose.yaml --profile canton --profile app down   # -v deletes data
 #
-# Every port is published on 127.0.0.1 only. Development only: synthetic data, plain HTTP, start-dev.
+# LOCALNET also needs CANTON_JWT_HMAC_SECRET (16+ random characters) in .env; init-env.mjs does not create it.
+# The published host ports are the native ones (3000, 4000, 4100, 7575, 5432, 8333, 18080, 19000): stop the
+# native services first. Every port is published on 127.0.0.1 only. `depends_on.required: false` needs
+# Docker Compose 2.20 or later.
 name: collara-infra
+
+x-app-common: &app-common
+  restart: unless-stopped
+  # The API, worker and migration job read the ledger bootstrap state from the shared volume (LOCALNET).
+  volumes:
+    - localnet-state:/state:ro
 
 services:
   postgres:
@@ -77,6 +94,154 @@ services:
       retries: 30
       start_period: 60s
 
+  # --- Profile `canton`: local ledger (UNTESTED) ---------------------------------------------------------
+  # Option (a) of synthesis §4.3: the same dpm sandbox as scripts/localnet, in a JDK 21 container. In-memory:
+  # party ids change on every restart, so `canton-bootstrap` and `migrate` (bind-localnet) must run again.
+
+  canton:
+    profiles: ["canton"]
+    build:
+      context: ../..
+      dockerfile: infra/compose/canton/Dockerfile
+    image: collara-canton-sandbox:local
+    environment:
+      # The sandbox's unsafe-jwt-hmac-256 secret (sandbox-auth.conf reads it); api, worker and bootstrap must match.
+      CANTON_JWT_HMAC_SECRET: ${CANTON_JWT_HMAC_SECRET:?set CANTON_JWT_HMAC_SECRET in .env (16+ characters) for the canton profile}
+      JDK_JAVA_OPTIONS: ${LOCALNET_JDK_JAVA_OPTIONS:--Xmx1g}
+    ports:
+      - "127.0.0.1:7575:7575"
+    restart: unless-stopped
+    # healthcheck (readyz) is defined in the image.
+
+  canton-bootstrap:
+    profiles: ["canton"]
+    build:
+      context: ../..
+      dockerfile: infra/compose/canton/Dockerfile
+    image: collara-canton-sandbox:local
+    # Uploads the DARs, allocates parties, creates least-privilege ledger users and writes /state/state.json
+    # with the participant's in-network URL (http://canton:7575). Idempotent.
+    command: ["node", "scripts/localnet/bootstrap.mjs", "--json-api-url", "http://canton:7575"]
+    environment:
+      CANTON_JWT_HMAC_SECRET: ${CANTON_JWT_HMAC_SECRET:?set CANTON_JWT_HMAC_SECRET in .env}
+      LOCALNET_DIR: /state
+    volumes:
+      - localnet-state:/state
+    depends_on:
+      canton:
+        condition: service_healthy
+    restart: "no"
+
+  # --- Profile `app`: web, api, worker (UNTESTED) ----------------------------------------------------------
+  # COLLARA_MODE defaults to UI_MOCK (no ledger needed). For LOCALNET also enable the `canton` profile.
+
+  migrate:
+    <<: *app-common
+    profiles: ["app"]
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: collara-api:local
+    # Committed migrations, demo identities, then (LOCALNET) the party bindings from the bootstrap state.
+    command:
+      - sh
+      - -c
+      - >-
+        node --import tsx scripts/db.ts migrate &&
+        node --import tsx scripts/db.ts seed &&
+        if [ -f /state/state.json ]; then node --import tsx scripts/db.ts bind-localnet --state /state/state.json; fi
+    environment:
+      DATABASE_URL: postgres://collara:collara_dev@postgres:5432/collara
+    depends_on:
+      postgres:
+        condition: service_healthy
+      canton-bootstrap:
+        condition: service_completed_successfully
+        required: false
+    restart: "no"
+
+  api:
+    <<: *app-common
+    profiles: ["app"]
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: collara-api:local
+    environment:
+      NODE_ENV: production
+      COLLARA_MODE: ${COLLARA_MODE:-UI_MOCK}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://collara:collara_dev@postgres:5432/collara
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      PUBLIC_ORIGIN: http://localhost:3000
+      # Plain HTTP on localhost: Secure cookies would never be sent back.
+      COOKIE_SECURE: "false"
+      # Local demo only. Must be false on any reachable deployment (the API does not refuse it in production).
+      DEMO_SESSIONS_ENABLED: ${DEMO_SESSIONS_ENABLED:-true}
+      COLLARA_S3_ENDPOINT: http://seaweedfs:8333
+      # Presigned download URLs must use a host name the browser can reach.
+      COLLARA_S3_PUBLIC_ENDPOINT: http://localhost:8333
+      COLLARA_S3_REGION: ${COLLARA_S3_REGION:-us-east-1}
+      COLLARA_S3_BUCKET: ${COLLARA_S3_BUCKET:-collara-evidence}
+      COLLARA_S3_ACCESS_KEY: ${COLLARA_S3_ACCESS_KEY:-collara-dev}
+      COLLARA_S3_SECRET_KEY: ${COLLARA_S3_SECRET_KEY:?set COLLARA_S3_SECRET_KEY in .env}
+      COLLARA_LOCALNET_STATE: /state/state.json
+      # Required with NODE_ENV=production in LOCALNET (no dev placeholder); ignored in UI_MOCK.
+      CANTON_JWT_HMAC_SECRET: ${CANTON_JWT_HMAC_SECRET:-}
+      # OIDC is left unset: inside the network Keycloak is http://keycloak:8080 while the browser uses
+      # http://localhost:18080, and NODE_ENV=production refuses an http issuer. Demo sessions only.
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_healthy
+
+  worker:
+    <<: *app-common
+    profiles: ["app"]
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    image: collara-worker:local
+    environment:
+      NODE_ENV: production
+      COLLARA_MODE: ${COLLARA_MODE:-UI_MOCK}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://collara:collara_dev@postgres:5432/collara
+      COLLARA_LOCALNET_STATE: /state/state.json
+      CANTON_JWT_HMAC_SECRET: ${CANTON_JWT_HMAC_SECRET:-}
+      COLLARA_S3_ENDPOINT: http://seaweedfs:8333
+      COLLARA_S3_REGION: ${COLLARA_S3_REGION:-us-east-1}
+      COLLARA_S3_BUCKET: ${COLLARA_S3_BUCKET:-collara-evidence}
+      COLLARA_S3_ACCESS_KEY: ${COLLARA_S3_ACCESS_KEY:-collara-dev}
+      COLLARA_S3_SECRET_KEY: ${COLLARA_S3_SECRET_KEY:?set COLLARA_S3_SECRET_KEY in .env}
+    ports:
+      - "127.0.0.1:4100:4100"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    profiles: ["app"]
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: collara-web:local
+    restart: unless-stopped
+    environment:
+      COLLARA_MODE: ${COLLARA_MODE:-UI_MOCK}
+      PUBLIC_DEMO_STATUS: ${PUBLIC_DEMO_STATUS:-off}
+      API_INTERNAL_ORIGIN: http://api:4000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres-data: {}
   seaweedfs-data: {}
+  # Ledger bootstrap state (state.json): written by canton-bootstrap, read by migrate, api and worker.
+  localnet-state: {}

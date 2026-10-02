@@ -1,0 +1,16 @@
+# Context is the repo root; the ledger image needs only daml/, scripts/localnet/ and infra/. UNTESTED.
+**/node_modules
+**/.next*
+**/*.log
+.git
+.github
+.local
+.vendor
+.spike
+.env
+.env.*
+Collara Website
+docs
+apps
+packages
+daml/**/.daml

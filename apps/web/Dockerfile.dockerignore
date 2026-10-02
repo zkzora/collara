@@ -1,0 +1,25 @@
+# BuildKit uses <Dockerfile>.dockerignore next to the Dockerfile when the build context is the repo root.
+# UNTESTED (no Docker on the authoring machine). Keep secrets, local state and build output out of the context.
+**/node_modules
+**/.next*
+**/dist
+**/build
+**/out
+**/coverage
+**/playwright-report
+**/test-results
+**/blob-report
+**/*.tsbuildinfo
+**/*.log
+.git
+.github
+.local
+.vendor
+.spike
+.env
+.env.*
+!.env.example
+**/.env.local
+Collara Website
+docs
+daml/**/.daml

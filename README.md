@@ -1,8 +1,37 @@
 # Collara
 
-Collara is a private coordination workflow for equipment collateral (used CNC machinery) between borrowers, dealers, verifiers, lenders and auditors, built on Canton. The MVP is a reproducible local demo with synthetic data only. Cash settlement, real-money transfers, lien registration and ownership transfer are out of scope (ADR-0001).
+Collara is a private coordination workflow for equipment collateral (used CNC machinery) between borrowers, dealers, verifiers, lenders and auditors, built on Canton. A borrower registers an asset passport and evidence, a verifier attests it, the selected lender reviews it and issues a proposal, and an accepted proposal activates a pledge that locks the asset's single control token on the ledger until the designated lender releases it. The MVP is a reproducible local demo with **synthetic data only**. Cash settlement, real-money transfers, lien registration and ownership transfer are out of scope (ADR-0001). It is not production-ready.
 
-Architecture and pinned versions: [`docs/architecture/ADR-0001-architecture-and-versions.md`](docs/architecture/ADR-0001-architecture-and-versions.md). Build status: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+## Status (2026-10-02)
+
+| Area | Status |
+|---|---|
+| `UI_MOCK` (web only, in-browser synthetic fixtures) | Implemented. Playwright e2e on desktop and mobile viewports; the full CL-001 walkthrough runs on desktop. |
+| `LOCALNET` (web → API → Canton 3.5.19 sandbox, worker projections, PostgreSQL, SeaweedFS) | Implemented: every workflow endpoint runs on the sandbox. 274 unit tests and 49 LOCALNET integration tests passed at commit `e320c59`. Single participant; 3-participant witness-privacy tests not run. |
+| Daml model | Implemented: 60 invariant, attack and privacy tests + 4 script tests on the IDE ledger. |
+| Governance Tier A (DM `GovernanceRules` 2-of-3 on one local participant) | Implemented and tested on the sandbox. |
+| Governance Tier B (Decentralization Manager, decentralized party) | Planned, not attempted. |
+| CI (GitHub Actions) | Written and linted with actionlint; **not yet run on GitHub**. |
+| Container images, Compose `app`/`canton` profiles, hosting | Written; **untested** (no Docker on the authoring machine). Nothing is deployed. |
+| Legal pages (BPD-1), INFERRED copy | Pending; block any public deployment. |
+
+Details and evidence: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [`docs/setup.md`](docs/setup.md) | Local bring-up: PostgreSQL, SeaweedFS, Keycloak, environment |
+| [`scripts/localnet/README.md`](scripts/localnet/README.md) | Canton sandbox, bootstrap, ledger users |
+| [`docs/demo.md`](docs/demo.md) | Demo script for CL-001 per persona (LOCALNET and UI_MOCK) |
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Request flow, sources of truth, command lifecycle, projection worker, privacy model |
+| [`docs/architecture/ADR-0001-architecture-and-versions.md`](docs/architecture/ADR-0001-architecture-and-versions.md) | Architecture decisions and pinned versions |
+| [`docs/architecture/daml-model.md`](docs/architecture/daml-model.md) | Daml templates, choices, invariants and trust assumptions |
+| [`docs/permissions.md`](docs/permissions.md) | Permission matrix, authority chain, field-level disclosure (generated from `@collara/domain`) |
+| [`docs/api.md`](docs/api.md) | OpenAPI, authentication, CSRF, idempotency, error shape |
+| [`docs/governance.md`](docs/governance.md) | Tier A governance, thresholds, Tier B and what a real deployment needs |
+| [`docs/limitations.md`](docs/limitations.md) | What Collara does not do or prove |
+| [`infra/deploy/README.md`](infra/deploy/README.md) | Deployment proposal and requirements (untested) |
 
 ## Workspace layout
 
@@ -60,6 +89,13 @@ pnpm localnet:up                   # Canton sandbox (add --bootstrap); localnet:
 pnpm localnet:bootstrap            # upload DARs, allocate parties and ledger users
 pnpm localnet:status | localnet:down
 pnpm daml:check                    # verify vendored DARs, dpm build --all, run the Daml Script tests
+```
+
+Generated files (re-run after changing routes or the domain policy; CI checks the permissions doc):
+
+```sh
+pnpm --filter @collara/api openapi:export                                    # apps/api/openapi.json (no server needed)
+pnpm --filter @collara/api exec tsx ../../scripts/docs/permissions.mjs       # docs/permissions.md (add --check to verify)
 ```
 
 `next build` and `next dev` lock their output directory, so two builds of `apps/web` cannot share it. Set `NEXT_DIST_DIR` (for example `.next-landing`; any `.next*` name is gitignored) to give a build or dev server its own directory. `next start` and `test:e2e` must be given the same value as the build they serve.

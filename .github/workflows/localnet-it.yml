@@ -1,0 +1,154 @@
+# LOCALNET integration tests (manual): the API's test/localnet/*.it.test.ts against a real Canton 3.5.19
+# `dpm sandbox`, PostgreSQL 16 and SeaweedFS 4.48 on one runner.
+#
+# NOT YET RUN ON GITHUB. On the authoring machine (Windows, native services, no Docker) the same tests passed
+# 49/49 against the sandbox (commit e320c59). This workflow file itself has only been linted with actionlint;
+# the service-container setup in particular has never been exercised. Expect to adjust it on the first run.
+#
+# Trigger it from the Actions tab (workflow_dispatch). It needs about 2 GB of RAM for the sandbox.
+name: LOCALNET integration (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-file:
+        description: "Optional single test file, e.g. test/localnet/smoke.it.test.ts (empty = all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  DPM_SDK_VERSION: "3.5.12"
+  # Dev-only values for an ephemeral runner; never reuse them anywhere else.
+  CANTON_JWT_HMAC_SECRET: collara-ci-only-hmac-secret-0001
+  COLLARA_S3_ACCESS_KEY: collara-ci
+  COLLARA_S3_SECRET_KEY: collara-ci-only-s3-secret-0001
+
+jobs:
+  localnet-it:
+    name: API LOCALNET integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          # The harness creates one database per test file (collara_it_<prefix>), so the role must be able to
+          # create databases; the image's POSTGRES_USER is a superuser.
+          POSTGRES_USER: collara
+          POSTGRES_PASSWORD: collara_dev
+          POSTGRES_DB: collara
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U collara -d collara"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      seaweedfs:
+        # The image's default command is `weed mini -dir=/data` (service containers cannot override it).
+        image: chrislusf/seaweedfs:4.48
+        env:
+          AWS_ACCESS_KEY_ID: collara-ci
+          AWS_SECRET_ACCESS_KEY: collara-ci-only-s3-secret-0001
+          S3_BUCKET: collara-evidence
+        ports:
+          - 8333:8333
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+
+    env:
+      LOCALNET_IT: "1"
+      DATABASE_URL: postgres://collara:collara_dev@127.0.0.1:5432/collara
+      COLLARA_S3_ENDPOINT: http://127.0.0.1:8333
+      COLLARA_S3_REGION: us-east-1
+      COLLARA_S3_BUCKET: collara-evidence
+      JDK_JAVA_OPTIONS: -Xmx1g
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - name: Install pnpm (version from packageManager)
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Use JDK 21 (preinstalled on the runner image)
+        run: |
+          if [ -z "${JAVA_HOME_21_X64:-}" ]; then
+            echo "::error::JAVA_HOME_21_X64 is not set on this runner image; install a JDK 21"
+            exit 1
+          fi
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+
+      - name: Cache dpm and the Daml SDK
+        id: cache-dpm
+        uses: actions/cache@v6
+        with:
+          path: ~/.dpm
+          key: dpm-sdk-${{ env.DPM_SDK_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install dpm and Daml SDK (official installer)
+        if: steps.cache-dpm.outputs.cache-hit != 'true'
+        env:
+          TERM: dumb
+        run: curl -sSLf https://get.digitalasset.com/install/install.sh | sh -s "$DPM_SDK_VERSION"
+
+      - name: Put dpm on PATH
+        run: echo "$HOME/.dpm/bin" >> "$GITHUB_PATH"
+
+      - name: Build the DARs
+        working-directory: daml/collara
+        run: dpm build --all
+
+      - name: Start the Canton sandbox (1 participant, HMAC auth)
+        run: node scripts/localnet/up.mjs --timeout=300
+
+      - name: Bootstrap (DARs, parties, ledger users, state.json)
+        # The harness bootstraps its own isolated prefix per test file; this default bootstrap checks the
+        # DAR upload and party allocation once up front.
+        run: node scripts/localnet/bootstrap.mjs
+
+      - name: LOCALNET integration tests
+        env:
+          TEST_FILE: ${{ inputs.test-file }}
+        # LOCALNET_IT=1 comes from the job env; the file filter is relative to apps/api.
+        run: |
+          if [ -n "$TEST_FILE" ]; then
+            pnpm --filter @collara/api exec vitest run --config vitest.localnet.config.ts --reporter=default "$TEST_FILE"
+          else
+            pnpm --filter @collara/api exec vitest run --config vitest.localnet.config.ts --reporter=default
+          fi
+
+      - name: Sandbox status
+        if: ${{ always() }}
+        run: node scripts/localnet/status.mjs || true
+
+      - name: Upload ledger logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: localnet-logs
+          path: |
+            .local/localnet/*.log
+            .local/localnet/state*.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop the sandbox
+        if: ${{ always() }}
+        run: node scripts/localnet/down.mjs || true
