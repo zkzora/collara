@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import { isLedgerError } from "@collara/canton";
 import type { DbHandle } from "@collara/db";
-import { ERROR_COPY } from "@collara/domain";
+import { COMMAND_COPY, ERROR_COPY } from "@collara/domain";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import {
   hasZodFastifySchemaValidationErrors,
@@ -103,6 +104,11 @@ declare module "fastify" {
 
 function toProblem(error: unknown): { problem: ProblemError; log: boolean } {
   if (isProblemError(error)) return { problem: error, log: error.statusCode >= 500 };
+  // A fresh ledger read outside a command's prepare step (e.g. a registry lookup) could not reach the participant:
+  // 503 with the approved copy, nothing was submitted. Never a 500 and never a simulated success.
+  if (isLedgerError(error) && (error.info.commandState === "FAILED" || error.info.commandState === "UNKNOWN_OUTCOME")) {
+    return { problem: problemError("ledger_unavailable", COMMAND_COPY.LEDGER_UNAVAILABLE), log: true };
+  }
   if (hasZodFastifySchemaValidationErrors(error)) {
     const issues = error.validation.map((issue) => ({
       path: `${error.validationContext ?? "body"}${issue.instancePath.replaceAll("/", ".")}`,

@@ -14,7 +14,7 @@ import { Panel } from "@/components/collara/panel";
 import { PermissionNotice } from "@/components/collara/permission-notice";
 import { buttonVariants } from "@/components/ui/button";
 import { useCollara } from "@/lib/collara-client";
-import { formatRelative, formatUtcDate, formatUtcDateTime } from "@/lib/format";
+import { formatRelative, formatUtcDate, formatUtcDateTime, withSeparator } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { noPayload } from "../action-dialog";
 import { TrackedActionDialog as ActionDialog } from "../audit/page-command";
@@ -185,7 +185,7 @@ export function VerificationWorkspace({ verificationRef }: { verificationRef: st
           status={vr.state}
           description={
             <>
-              {`${vr.equipmentSummary} · `}
+              {withSeparator(vr.equipmentSummary)}
               <Link href={assetHref(vr.assetRef)} className="font-mono text-[12.5px] text-fg underline-offset-4 hover:underline">
                 {vr.assetRef}
               </Link>

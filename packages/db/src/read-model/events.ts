@@ -2,6 +2,7 @@
 // mapper (ledger-view.ts); the presenters then apply the per-audience rules (EVENT_TYPES[*].audience).
 import {
   actorLine,
+  releaseReasons,
   roleFromActorRef,
   userIdFromActorRef,
   type EventFacts,
@@ -121,7 +122,7 @@ function onCreate(e: VisibleEvent): Mapping | null {
             actorRef: str(payload.requestedByRef),
             actorParty: str(payload.requester),
             to: "REQUESTED",
-            detail: str(payload.reason) || null,
+            detail: releaseReasonDetail(str(payload.reason)),
           }
         : null;
     case T.ReleaseDecision: {
@@ -258,4 +259,10 @@ export function mapLedgerEvent(e: VisibleEvent, parties: PartyDirectory): Mapped
     commit: { updateId: e.updateId, offset: e.offset },
   };
   return { event, caseRef: e.contract.caseRef, assetRef: e.contract.assetRef, assetLevel: ASSET_LEVEL.has(m.type) };
+}
+
+/** "external loan completion" (the UI_MOCK wording), never the raw ledger code; unknown codes are left out. */
+function releaseReasonDetail(code: string): string | null {
+  const parsed = releaseReasons.schema.safeParse(code);
+  return parsed.success ? releaseReasons.label(parsed.data).toLowerCase() : null;
 }

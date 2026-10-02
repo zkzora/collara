@@ -19,6 +19,7 @@ import { useReportLedgerSync, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { CaseWorkspaceContext, type CaseWorkspaceValue } from "./case-context";
 import { assetHref, caseTabHref, isCaseTab, nextActionHref } from "./links";
+import { joinParts, withSeparator } from "@/lib/format";
 
 function MiniTile({ label, status, fallback = "—" }: { label: string; status: StatusLike | null; fallback?: string }) {
   return (
@@ -91,7 +92,7 @@ function CaseHeader({ detail }: { detail: CaseDetail }) {
       status={detail.stage ?? undefined}
       description={
         <>
-          {`${detail.asset.equipmentClass} · ${detail.asset.model} · `}
+          {withSeparator(joinParts([detail.asset.equipmentClass, detail.asset.model]))}
           <Link href={assetHref(detail.asset.ref)} className="font-mono text-[12.5px] text-fg underline-offset-4 hover:underline">
             {detail.asset.ref}
           </Link>

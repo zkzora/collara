@@ -83,6 +83,7 @@ import {
   ROLE_LABELS,
   actorLine,
   governanceSeatOf,
+  orderRoles,
   orgName,
   personaByUserId,
   type Actor,
@@ -136,6 +137,14 @@ export interface PresentContext extends ContextOptions {
 
 const org = (id: OrgId): OrgRef => ({ id, name: orgName(id) });
 
+/**
+ * "CNC machining center · DEMO-CNC-500". Missing parts are left out (never a stray separator); an empty string
+ * when the viewer has no equipment identity at all.
+ */
+export function equipmentSummary(asset: { readonly equipmentClass: string; readonly model: string }): string {
+  return [asset.equipmentClass, asset.model].map((part) => part.trim()).filter(Boolean).join(" · ");
+}
+
 function userLabel(pctx: PresentContext, userId: string | null): string | null {
   if (!userId) return null;
   const name = pctx.userName?.(userId) ?? personaByUserId(userId)?.displayName ?? null;
@@ -155,6 +164,12 @@ export interface CaseDisclosure {
   readonly audit: EffectiveAuditAccess | null;
   readonly equipment: boolean;
   readonly evidence: boolean;
+  /**
+   * The viewer sees the whole evidence package (owner, selected lender through its shares, auditor with the
+   * evidence-manifest scope). A dealer sees only its own contributions and a verifier only its assignment, so
+   * package completeness and the stages derived from it are not theirs to show.
+   */
+  readonly packageVisible: boolean;
   readonly attestation: boolean;
   readonly internalNotes: boolean;
   readonly terms: boolean;
@@ -195,6 +210,7 @@ export function caseDisclosure(facts: CaseFacts, viewer: Actor, pctx: PresentCon
     audit,
     equipment,
     evidence: can(viewer, "evidence.view", ctx),
+    packageVisible: isOwner || isLender || !!audit?.scopes.includes("EVIDENCE_MANIFEST"),
     attestation: can(viewer, "attestation.view", ctx),
     internalNotes: isLender && can(viewer, "lenderInternal.view", ctx) && viewer.orgId === facts.review.lenderOrgId,
     terms: can(viewer, "terms.view", ctx),
@@ -254,14 +270,30 @@ export function presentCaseActivity(facts: CaseFacts, viewer: Actor, pctx: Prese
 
 /** Stages that say nothing about the lender review, proposal, pledge or release. */
 const EARLY_STAGES: readonly CaseStage[] = ["DRAFT", "EVIDENCE_COLLECTION", "VERIFICATION", "CANCELLED"];
+/** Early stages derived from evidence completeness: only meaningful to a viewer who sees the whole package. */
+const PACKAGE_STAGES: readonly CaseStage[] = ["DRAFT", "EVIDENCE_COLLECTION"];
 
 /**
  * The projected stage (and anything derived from it) reveals review, proposal and pledge status, so
  * it is disclosed only to viewers who may see both the review and the pledge (S L775: no credit or
- * loan-term screens for the dealer).
+ * loan-term screens for the dealer). A viewer with a partial package (dealer, verifier) would derive
+ * "Evidence collection" from the documents it cannot see, so package stages need the whole package.
  */
 function stageVisible(stage: CaseStage, d: CaseDisclosure): boolean {
-  return (d.review && d.pledge) || EARLY_STAGES.includes(stage);
+  if (d.review && d.pledge) return true;
+  return EARLY_STAGES.includes(stage) && (!PACKAGE_STAGES.includes(stage) || d.packageVisible);
+}
+
+/**
+ * Verification status for the viewer: the latest request when the viewer may see it, else the attestation the
+ * viewer holds (the selected lender sees ATT-001 through its AttestationDisclosure, never the owner↔verifier
+ * request itself).
+ */
+function verificationStatus(asset: AssetFacts, canSeeRequest: boolean, canSeeAttestation: boolean) {
+  const verification = latestVerification(asset);
+  if (verification && canSeeRequest) return verificationStates.badge(verification.state);
+  if (!verification && canSeeAttestation && currentAttestation(asset)) return verificationStates.badge("ATTESTED");
+  return null;
 }
 
 function savedViews(facts: CaseFacts, isMine: boolean, stage: CaseStage, d: CaseDisclosure): SavedView[] {
@@ -307,14 +339,13 @@ export function presentCaseSummary(facts: CaseFacts, viewer: Actor, pctx: Presen
     ? { org: org(next.nextActor.orgId), role: next.nextActor.role, label: actorLine(next.nextActor.orgId, next.nextActor.role) }
     : null;
   const isMine = showStage && viewerIsNextActor(viewer, next.nextActor);
-  const verification = latestVerification(facts.asset);
   return {
     caseId: facts.ref,
     title: facts.title,
     asset: { ref: facts.asset.ref, equipmentClass: facts.asset.equipmentClass, model: facts.asset.model },
     stage: showStage ? caseStages.badge(next.stage) : null,
     borrower: d.equipment ? org(facts.borrowerOrgId) : null,
-    verification: verification && (d.attestation || d.isOwner) ? verificationStates.badge(verification.state) : null,
+    verification: verificationStatus(facts.asset, d.attestation || d.isOwner, d.attestation),
     review: d.review ? reviewStates.badge(facts.review.state) : null,
     pledge: d.pledge ? pledgeDisplayStates.badge(pledgeDisplayState(facts)) : null,
     nextActor,
@@ -376,9 +407,10 @@ export function presentCaseDetail(facts: CaseFacts, viewer: Actor, pctx: Present
     purpose: facts.purpose,
     selectedLender: d.selectedLender && facts.selectedLenderOrgId ? org(facts.selectedLenderOrgId) : null,
     statuses: {
-      evidence: d.evidence
-        ? { complete: completeness.complete, label: completeness.complete ? `Complete · ${facts.asset.package.entries.length} documents` : "Incomplete" }
-        : null,
+      evidence:
+        d.evidence && d.packageVisible
+          ? { complete: completeness.complete, label: completeness.complete ? `Complete · ${facts.asset.package.entries.length} documents` : "Incomplete" }
+          : null,
       verification: summary.verification,
       attestation: attestation && d.attestation ? attestationValidityStates.badge(attestationValidity(attestation, pctx.now)) : null,
       review: summary.review,
@@ -394,9 +426,10 @@ export function presentCaseDetail(facts: CaseFacts, viewer: Actor, pctx: Present
     references: {
       passport: facts.asset.ref,
       attestation: attestation && d.attestation ? { ref: attestation.ref, validUntil: attestation.validUntil } : null,
-      package: d.evidence
-        ? { ref: facts.asset.package.ref, version: facts.asset.package.version, documentCount: facts.asset.package.entries.length }
-        : null,
+      package:
+        d.evidence && d.packageVisible && facts.asset.package.ref
+          ? { ref: facts.asset.package.ref, version: facts.asset.package.version, documentCount: facts.asset.package.entries.length }
+          : null,
       proposal:
         d.terms && proposal
           ? { ref: proposal.ref, version: proposal.version, state: proposalStates.badge(effectiveProposalState(proposal, pctx.now)) }
@@ -605,7 +638,6 @@ export function presentCaseAttestation(facts: CaseFacts, viewer: Actor, pctx: Pr
 export function presentAssetSummary(asset: AssetFacts, cases: readonly CaseFacts[], viewer: Actor, pctx: PresentContext): AssetSummary | null {
   const ad = assetDisclosure(asset, cases, viewer, pctx);
   if (!ad.related) return null;
-  const verification = latestVerification(asset);
   const attestation = currentAttestation(asset);
   const seesAttestation = ad.isOwner || ad.isVerifier || ad.caseDisclosures.some((d) => d.attestation);
   const updated = [asset.updatedAt, ...asset.events.map((e) => e.occurredAt)].reduce((max, t) => (Date.parse(t) > Date.parse(max) ? t : max));
@@ -616,7 +648,7 @@ export function presentAssetSummary(asset: AssetFacts, cases: readonly CaseFacts
     model: asset.model,
     owner: org(asset.ownerOrgId),
     lifecycle: assetLifecycleStates.badge(asset.lifecycle),
-    verification: verification && seesAttestation ? verificationStates.badge(verification.state) : null,
+    verification: verificationStatus(asset, seesAttestation, seesAttestation),
     attestation: attestation && seesAttestation ? attestationValidityStates.badge(attestationValidity(attestation, pctx.now)) : null,
     updatedAt: updated,
   };
@@ -644,7 +676,11 @@ export function presentAssetDetail(asset: AssetFacts, cases: readonly CaseFacts[
     locationScope: asset.locationScope,
     passportVersion: asset.passportVersion,
     registeredAt: asset.registeredAt,
-    evidence: tabs.evidence ? { documentCount: asset.package.entries.length, packageRef: asset.package.ref, packageVersion: asset.package.version } : null,
+    // Package size and version only for viewers who see the whole package (not a dealer's or verifier's slice).
+    evidence:
+      tabs.evidence && asset.package.ref && (ad.isOwner || ad.caseDisclosures.some((d) => d.packageVisible))
+        ? { documentCount: asset.package.entries.length, packageRef: asset.package.ref, packageVersion: asset.package.version }
+        : null,
     control: seesControl
       ? {
           state: pledgeDisplayStates.badge(pledgeCase ? pledgeDisplayState(pledgeCase) : "AVAILABLE"),
@@ -690,7 +726,7 @@ export function presentVerification(
   return {
     ref: verification.ref,
     assetRef: asset.ref,
-    equipmentSummary: `${asset.equipmentClass} · ${asset.model}`,
+    equipmentSummary: equipmentSummary(asset),
     caseId: verification.caseRef,
     verifier: org(verification.verifierOrgId),
     verifierRegistryRef: verification.verifierRegistryRef,
@@ -721,7 +757,7 @@ export function presentReview(facts: CaseFacts, viewer: Actor, pctx: PresentCont
   return {
     ref: review.ref,
     caseId: facts.ref,
-    equipmentSummary: `${facts.asset.equipmentClass} · ${facts.asset.model}`,
+    equipmentSummary: equipmentSummary(facts.asset),
     state: reviewStates.badge(review.state),
     lender: org(review.lenderOrgId),
     analyst: lenderView ? userLabel(pctx, review.analystUserId) : null,
@@ -778,7 +814,7 @@ export function presentReviewSummary(facts: CaseFacts, viewer: Actor, pctx: Pres
   return {
     ref: facts.review.ref,
     caseId: facts.ref,
-    equipmentSummary: `${facts.asset.equipmentClass} · ${facts.asset.model}`,
+    equipmentSummary: equipmentSummary(facts.asset),
     evidenceComplete: evidenceCompleteness(facts.asset).complete,
     attestationValidity: attestation ? attestationValidityStates.badge(attestationValidity(attestation, pctx.now)) : null,
     requestedPrincipal: d.terms ? facts.requestedPrincipal : null,
@@ -946,7 +982,8 @@ export function presentAccessGrants(facts: CaseFacts, viewer: Actor, pctx: Prese
         caseId: facts.ref,
         recipient: org(v.verifierOrgId),
         purpose: "Verification scope",
-        scope: `Assigned evidence · ${v.documentRefs.length} documents · no loan terms`,
+        // The verifier's own ledger view names the package version, not its documents: no count rather than "0".
+        scope: v.documentRefs.length > 0 ? `Assigned evidence · ${v.documentRefs.length} documents · no loan terms` : "Assigned evidence · no loan terms",
         auditScopes: null,
         permission: "VIEW",
         includesTerms: false,
@@ -1164,7 +1201,7 @@ export function presentGovernanceProposal(
 // --- Session ------------------------------------------------------------------------------------------
 
 export function presentMe(persona: Persona, mode: RuntimeMode, options: { demo?: boolean } = {}): Me {
-  const roles = [...persona.roles];
+  const roles = orderRoles(persona.roles);
   return {
     user: { id: persona.userId, email: persona.email, displayName: persona.displayName, title: persona.title },
     org: { id: persona.orgId, name: orgName(persona.orgId), type: DEMO_ORGANIZATIONS[persona.orgId]?.type ?? "BORROWER" },
@@ -1184,7 +1221,7 @@ export function personaSummary(persona: Persona): DemoPersona {
     displayName: persona.displayName,
     title: persona.title,
     org: org(persona.orgId),
-    roleLabels: persona.roles.map((role) => ROLE_LABELS[role]),
+    roleLabels: orderRoles(persona.roles).map((role) => ROLE_LABELS[role]),
     mandateLabels: persona.mandates.map((m) => m.label ?? MANDATE_LABELS[m.code]),
   };
 }

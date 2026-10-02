@@ -15,7 +15,7 @@ import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, type MouseEvent, type ReactNode } from "react";
-import { formatRelative, formatUtcDateTime } from "@/lib/format";
+import { formatRelative, formatUtcDateTime, joinParts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { casesHref } from "./navigation";
 import { StatusBadge } from "./status-badge";
@@ -49,13 +49,13 @@ const allColumns = helper.columns([
       </Link>
     ),
   }),
-  helper.accessor((row) => `${row.asset.equipmentClass} · ${row.asset.model}`, {
+  helper.accessor((row) => joinParts([row.asset.equipmentClass, row.asset.model]), {
     id: "asset",
     header: "Asset",
     sortFn: "text",
     cell: ({ row }) => (
       <div className="flex flex-col">
-        <span>{`${row.original.asset.equipmentClass} · ${row.original.asset.model}`}</span>
+        <span>{joinParts([row.original.asset.equipmentClass, row.original.asset.model]) || "—"}</span>
         <span className="font-mono text-[11.5px] text-fg-subtle">{row.original.asset.ref}</span>
       </div>
     ),

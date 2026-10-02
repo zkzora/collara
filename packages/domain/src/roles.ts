@@ -288,18 +288,31 @@ export function actorLine(orgId: OrgId, role: Role | null): string {
   return role ? `${orgName(orgId)} · ${ROLE_SHORT_LABELS[role]}` : orgName(orgId);
 }
 
+/** Business roles first, the governance seat role last (approver wins over analyst). */
+const ROLE_PRIORITY: readonly Role[] = [
+  "LENDER_APPROVER",
+  "LENDER_ANALYST",
+  "BORROWER",
+  "DEALER",
+  "VERIFIER",
+  "AUDITOR",
+  "ORG_ADMIN",
+  "OPERATOR",
+  "GOVERNANCE_MEMBER",
+];
+
+/** Roles in display order: the business role before Governance Member, whatever order they were stored in. */
+export function orderRoles(roles: readonly Role[]): Role[] {
+  const rank = (role: Role) => ROLE_PRIORITY.indexOf(role);
+  return [...roles].sort((a, b) => rank(a) - rank(b));
+}
+
+/** The role that best describes a set of roles ("Lender Approver" for an approver who also holds a governance seat). */
+export function primaryRoleOf(roles: readonly Role[]): Role | null {
+  return orderRoles(roles)[0] ?? null;
+}
+
 /** The role that best describes an actor in a given lender/borrower context (approver wins). */
 export function primaryRole(actor: Actor): Role {
-  const order: readonly Role[] = [
-    "LENDER_APPROVER",
-    "LENDER_ANALYST",
-    "BORROWER",
-    "DEALER",
-    "VERIFIER",
-    "AUDITOR",
-    "ORG_ADMIN",
-    "OPERATOR",
-    "GOVERNANCE_MEMBER",
-  ];
-  return order.find((role) => actor.roles.includes(role)) ?? actor.roles[0] ?? "BORROWER";
+  return primaryRoleOf(actor.roles) ?? "BORROWER";
 }

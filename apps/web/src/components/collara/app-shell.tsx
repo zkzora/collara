@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { useSession } from "@/lib/session";
+import { primaryRoleLabel, useSession } from "@/lib/session";
 import { ModeBanner } from "./mode-banner";
 import { Sidebar } from "./sidebar";
 import { WorkspaceHeader } from "./workspace-header";
@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <ModeBanner mode={mode} viewingAs={`${me.org.name} · ${me.roleLabels[0] ?? me.user.displayName}`} />
+      <ModeBanner mode={mode} viewingAs={`${me.org.name} · ${primaryRoleLabel(me) ?? me.user.displayName}`} />
       <div className="flex min-h-0 flex-1">
         <aside aria-label="Sidebar" className="hidden w-[232px] flex-none border-r border-line-subtle app:block">
           <Sidebar />

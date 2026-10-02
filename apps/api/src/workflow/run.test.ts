@@ -122,6 +122,34 @@ describe("WorkflowRunner submission context", () => {
     expect(await row(outcome.record.id)).toMatchObject({ ledgerUserId: "borrower-svc", actAs: [PARTY], ledgerSource: "sandbox", ledgerEndAtSubmit: null });
   });
 
+  it("records FAILED (never PREPARED or simulated) when the fresh ACS read cannot reach the ledger; a retry prepares again", async () => {
+    const { gateway, submitted } = fakeGateway([], []);
+    const runner = new WorkflowRunner({ db: handle.db, gateway, access });
+    let prepared = 0;
+    const run = () =>
+      runner.run({
+        actor,
+        operation: "test.unreachable",
+        idempotencyKey: "ctx-key-0005",
+        payload: { n: 1 },
+        // STATE points at http://127.0.0.1:1: nothing listens there.
+        prepare: async (ctx) => {
+          prepared += 1;
+          await ctx.acs.list("AuditGrant");
+          return { commands: [COMMAND] };
+        },
+      });
+    const first = await run();
+    expect(first.committed).toBe(false);
+    expect(first.command).toMatchObject({ state: "FAILED", simulated: false });
+    expect((await row(first.record.id)).status).toBe("FAILED");
+    const second = await run();
+    expect(second.record.id).toBe(first.record.id);
+    expect(second.command.state).toBe("FAILED");
+    expect(prepared).toBe(2);
+    expect(submitted).toHaveLength(0);
+  });
+
   it("records nothing for a gateway without ledgerEnd beyond the submitting identity", async () => {
     const gateway: LedgerGateway = { submit: async () => ({ kind: "rejected", errorKind: "FAILED_PRECONDITION", message: "no" }) };
     const outcome = await runOnce(new WorkflowRunner({ db: handle.db, gateway, access }), "ctx-key-0004");

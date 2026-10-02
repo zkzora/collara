@@ -2,6 +2,7 @@
 
 import type { CaseDetail, CommandStatus, Me } from "@collara/domain";
 import { createContext, useContext } from "react";
+import { primaryRoleLabel } from "@/lib/session";
 
 export interface CaseWorkspaceValue {
   readonly detail: CaseDetail;
@@ -23,5 +24,5 @@ export function useOptionalCaseWorkspace(): CaseWorkspaceValue | null {
 
 /** "Demo Lender A · Lender Approver" for the confirmation facts box. */
 export function actingParty(me: Me): string {
-  return `${me.org.name} · ${me.roleLabels[0] ?? me.user.displayName}`;
+  return `${me.org.name} · ${primaryRoleLabel(me) ?? me.user.displayName}`;
 }

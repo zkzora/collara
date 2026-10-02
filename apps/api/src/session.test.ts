@@ -56,7 +56,9 @@ describe("demo sessions, /api/me and logout", () => {
     expect(me).toMatchObject({
       user: { id: "user-lender-a-approver", displayName: "Morgan Hale", title: "Head of Credit" },
       org: { id: "demo-lender-a", name: "Demo Lender A", type: "LENDER" },
-      roles: ["GOVERNANCE_MEMBER", "LENDER_APPROVER"],
+      // The business role comes first (the banner reads "Lender Approver", not "Governance Member").
+      roles: ["LENDER_APPROVER", "GOVERNANCE_MEMBER"],
+      roleLabels: ["Lender Approver", "Governance Member"],
       governanceSeat: 1,
       mode: "LOCALNET",
       personaId: "lender-a-approver",

@@ -7,6 +7,7 @@ import { TrackedActionDialog as ActionDialog } from "../audit/page-command";
 import { actingParty } from "../case/case-context";
 import { Field, SelectInput, TextInput } from "../form-fields";
 import { useVerifiers } from "./queries";
+import { joinParts } from "@/lib/format";
 
 /** Verification checklist items (S §9.9 L647). Ownership/lien stays a document review, never "verified". */
 export const VERIFICATION_SCOPE_ITEMS = [
@@ -109,7 +110,7 @@ export function RequestVerificationDialog({
       label="Request verification"
       size={size}
       title={`Request verification · ${detail.ref}`}
-      description={`Asks the selected registry verifier to inspect ${detail.equipmentClass} · ${detail.model}. The verifier sees only the documents you select, never loan terms.`}
+      description={`Asks the selected registry verifier to inspect ${joinParts([detail.equipmentClass, detail.model]) || detail.ref}. The verifier sees only the documents you select, never loan terms.`}
       facts={{ actingParty: actingParty(me), record: `${detail.ref} · new verification request`, effect: "— → REQUESTED" }}
       caveat="The verifier's registry status is re-checked when the request is committed and again when an attestation is submitted."
       confirmLabel="Request verification"

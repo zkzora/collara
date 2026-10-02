@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { LoadingState } from "@/components/collara/loading-state";
 import { ModeBanner } from "@/components/collara/mode-banner";
-import { mockPersonaOptions, type PersonaOption } from "@/components/collara/persona-switcher";
+import { demoPersonaOption, mockPersonaOptions, type PersonaOption } from "@/components/collara/persona-switcher";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CollaraClientProvider, readStoredPersona, useCollara } from "@/lib/collara-client";
 import { cn } from "@/lib/utils";
@@ -105,7 +105,7 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
     );
   }
 
-  const remote = (demo.data ?? []).map((p) => ({ id: p.id, orgName: p.org.name, label: `${p.displayName} — ${p.roleLabels.join(", ")}` }));
+  const remote = (demo.data ?? []).map((p) => demoPersonaOption(p));
   return (
     <>
       <p className="text-[13.5px] leading-relaxed text-fg-muted">Access is by invitation during the pilot.</p>

@@ -43,3 +43,19 @@ export function initials(name: string): string {
   const words = name.split(/\s+/).filter((word) => /^[A-Za-z]/.test(word));
   return (words.length >= 2 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : name.slice(0, 2)).toUpperCase();
 }
+
+/**
+ * "CNC machining center · DEMO-CNC-500": joins the parts that have a value, so a field the viewer may not see (or
+ * that is not recorded) never leaves a stray separator such as "· ·" or ", ".
+ */
+export function joinParts(parts: readonly (string | null | undefined | false)[], separator = " · "): string {
+  return parts
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter(Boolean)
+    .join(separator);
+}
+
+/** "CNC machining center · " before a following element, or nothing when the text is empty. */
+export function withSeparator(text: string, separator = " · "): string {
+  return text ? `${text}${separator}` : "";
+}

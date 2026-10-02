@@ -223,6 +223,14 @@ export class WorkflowRunner {
         parent = await this.#storeResult(parent, { steps: seq.summary() });
         return { command: this.commands.toStatus(parent), record: parent, committed: false, replayed: false, result: null, step: null };
       }
+      if (isLedgerOutage(error)) {
+        // A ledger read in the sequence (outside a step's prepare) could not reach the participant. Record FAILED
+        // (503 with the command); a retry with the same key replays the committed steps and continues.
+        parent = await seq.markSubmitted();
+        parent = await this.commands.transition(parent.id, "FAILED", { error: { kind: "UNAVAILABLE", message: COMMAND_COPY.LEDGER_UNAVAILABLE } });
+        if (seq.anyCommitted()) parent = await this.#storeResult(parent, { steps: seq.summary() });
+        return { command: this.commands.toStatus(parent), record: parent, committed: false, replayed: false, result: null, step: null };
+      }
       if (isProblemError(error) && seq.anyCommitted()) {
         // A precondition failed after earlier steps committed: record the partial outcome, then report it.
         parent = await seq.markSubmitted();
@@ -255,7 +263,18 @@ export class WorkflowRunner {
       submission = stored.submission;
     } else {
       const ctx = this.#context(access, input.actor, current);
-      const plan = await prepareOrUnavailable(() => input.prepare(ctx));
+      let plan: PlannedSubmission;
+      try {
+        plan = await prepareOrUnavailable(() => input.prepare(ctx));
+      } catch (error) {
+        // The fresh ACS read could not reach the ledger: nothing was submitted. Record it as FAILED (503 with the
+        // command, never a simulated success); a retry with the same key prepares and submits again.
+        if (!isProblemError(error) || error.problem.code !== "ledger_unavailable" || (state !== "PREPARED" && state !== "FAILED")) throw error;
+        if (state === "PREPARED") {
+          current = await this.commands.transition(current.id, "FAILED", { error: { kind: "UNAVAILABLE", message: COMMAND_COPY.LEDGER_UNAVAILABLE } });
+        }
+        return { command: this.commands.toStatus(current), record: current, committed: false, replayed: false, result: null, step: null };
+      }
       if (plan.commands.length === 0) throw new Error("prepare() returned no commands");
       const identity = requireIdentity(input.actor, plan.as ?? "business");
       submission = {
@@ -467,6 +486,12 @@ export class WorkflowSequence {
 }
 
 // --- helpers -----------------------------------------------------------------------------------------
+
+/** The participant could not be reached (connection, timeout, auth): nothing was submitted by this read. */
+function isLedgerOutage(error: unknown): boolean {
+  if (isProblemError(error)) return error.problem.code === "ledger_unavailable";
+  return isLedgerError(error) && (error.info.commandState === "FAILED" || error.info.commandState === "UNKNOWN_OUTCOME");
+}
 
 /** ACS reads that fail for infrastructure reasons are a 503 (nothing was submitted), not a 500. */
 async function prepareOrUnavailable<T>(prepare: () => Promise<T>): Promise<T> {

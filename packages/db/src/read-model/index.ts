@@ -15,6 +15,7 @@ import type { DbOrTx } from "../client";
 import { auditEvents, cases, evidenceDocuments, exportJobs, type AuditEventRow } from "../schema";
 import { T } from "../projection/templates";
 import { decode } from "./decode";
+import { discloseEquipmentIdentity } from "./disclosure";
 import type { MappedEvent } from "./events";
 import { buildGovernance } from "./governance";
 import { loadLedgerView, loadPartyDirectory, readLastSync, type LastSync, type LedgerView, type PartyDirectory, type VisibleContract } from "./ledger-view";
@@ -26,6 +27,7 @@ export { loadLedgerView, loadPartyDirectory, readLastSync } from "./ledger-view"
 export type { MappedEvent } from "./events";
 export { mapLedgerEvent } from "./events";
 export { buildGovernance } from "./governance";
+export { discloseEquipmentIdentity, equipmentEntitlements, type EquipmentIdentity } from "./disclosure";
 export { buildWorld, documentTypeOf, type PendingRegistration, type WorldInput } from "./world";
 export { readViewerOf, type ReadOptions, type ReadViewer } from "./viewer";
 export * as payloads from "./decode";
@@ -84,8 +86,10 @@ export async function loadReadWorld(db: DbOrTx, viewer: ReadViewer, options: Rea
   ]);
   const records = await appRecords(db, viewer, view);
   const built = buildWorld({ viewer, now, view, parties, ...records });
-  let worldCases = built.cases;
-  let worldAssets = built.assets;
+  // Equipment identity of shared, invited or assigned cases (application-level disclosure, disclosure.ts).
+  const disclosed = await discloseEquipmentIdentity(db, viewer, built, view, { now, ...(options.sources ? { sources: options.sources } : {}) });
+  let worldCases = disclosed.cases;
+  let worldAssets = disclosed.assets;
 
   // Audit delegation: active grants observed by the viewer → the grantor's view of that one case.
   const delegated = new Map<string, Set<string>>();

@@ -7,6 +7,7 @@ import {
   integrityStates,
   MeSchema,
   navigationFor,
+  orderRoles,
   orgName,
   ROLE_LABELS,
   type DocumentType,
@@ -19,11 +20,13 @@ import {
 import type { ResolvedActor } from "./plugins/actor";
 
 export function presentMe(actor: ResolvedActor, mode: RuntimeMode): Me {
+  // Business role first (memberships are stored in no particular order): "Lender Approver", not "Governance Member".
+  const roles = orderRoles(actor.roles);
   return MeSchema.parse({
     user: actor.user,
     org: actor.org,
-    roles: actor.roles,
-    roleLabels: actor.roles.map((role) => ROLE_LABELS[role]),
+    roles,
+    roleLabels: roles.map((role) => ROLE_LABELS[role]),
     mandates: actor.mandates,
     governanceSeat: actor.mandates.find((m) => m.code === "GOVERNANCE_SEAT")?.seat ?? null,
     mode,

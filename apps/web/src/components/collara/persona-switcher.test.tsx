@@ -5,7 +5,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CollaraClientProvider } from "@/lib/collara-client";
 import { SessionProvider, useSession } from "@/lib/session";
-import { PersonaSwitcher } from "./persona-switcher";
+import { personaSummary, DEMO_PERSONAS } from "@collara/domain";
+import { joinParts } from "@/lib/format";
+import { demoPersonaOption, mockPersonaOptions, PersonaSwitcher } from "./persona-switcher";
 
 function Viewer() {
   const { me, scope } = useSession();
@@ -53,5 +55,23 @@ describe("PersonaSwitcher", () => {
     expect(mock.getPersona()).toBe("lender-b-approver");
     expect(queryClient.getQueryData(["mock:lender-a-approver", "cases", "detail", "CL-001"])).toBeUndefined();
     await waitFor(() => expect(screen.getByTestId("viewer")).toHaveTextContent("Lender B approver · mock:lender-b-approver"));
+  });
+});
+
+describe("persona labels", () => {
+  it("names LOCALNET personas like UI_MOCK: business role, never the governance seat, short in the sidebar", () => {
+    // The API lists roles in storage order; the label must still read "Lender Approver".
+    const approver = { ...personaSummary(DEMO_PERSONAS["lender-a-approver"]), roleLabels: ["Governance Member", "Lender Approver"] };
+    expect(demoPersonaOption(approver).label).toBe("Morgan Hale — Lender Approver");
+    expect(demoPersonaOption(approver, { short: true }).label).toBe("Morgan Hale · Approver");
+    const mock = mockPersonaOptions({ short: true }).find((o) => o.id === "lender-a-approver");
+    expect(mock?.label).toBe(demoPersonaOption(approver, { short: true }).label);
+    expect(demoPersonaOption(personaSummary(DEMO_PERSONAS.auditor), { short: true }).label).toBe("Audit lead · Auditor");
+  });
+
+  it("joins only the parts that have a value", () => {
+    expect(joinParts(["CNC machining center", "DEMO-CNC-500", "ASSET-DEMO-001"])).toBe("CNC machining center · DEMO-CNC-500 · ASSET-DEMO-001");
+    expect(joinParts(["", " ", null, undefined, "ASSET-DEMO-001"])).toBe("ASSET-DEMO-001");
+    expect(joinParts([])).toBe("");
   });
 });

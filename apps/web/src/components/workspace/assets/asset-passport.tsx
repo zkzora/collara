@@ -29,7 +29,7 @@ function PassportHeader({ detail }: { detail: AssetDetail }) {
   return (
     <PageHeader
       recordId={detail.ref}
-      title={detail.equipmentClass}
+      title={detail.equipmentClass || "Asset passport"}
       status={detail.lifecycle}
       description={[
         detail.model,

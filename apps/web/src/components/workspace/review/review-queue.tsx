@@ -69,7 +69,7 @@ export function ReviewQueue({ view }: { view: ReviewView }) {
                       {r.ref}
                     </Link>
                   </td>
-                  <td className={TD}>{r.equipmentSummary}</td>
+                  <td className={TD}>{r.equipmentSummary || "—"}</td>
                   <td className={`${TD} whitespace-nowrap`}>
                     <StatusBadge status={{ label: r.evidenceComplete ? "Complete" : "Incomplete", tone: r.evidenceComplete ? "success" : "warning" }} />
                   </td>

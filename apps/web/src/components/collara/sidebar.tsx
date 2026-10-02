@@ -7,7 +7,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useId } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useCaseList, useGovernanceState } from "@/lib/queries";
-import { useSession } from "@/lib/session";
+import { primaryRoleLabel, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { LedgerSyncIndicator } from "./ledger-sync";
 import { casesHref, isNavActive, NAV_ITEMS, SIDEBAR_SAVED_VIEWS } from "./navigation";
@@ -76,7 +76,7 @@ export function Sidebar({ onNavigate, showSync = false, className }: { onNavigat
           </span>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-medium text-fg">{me.org.name}</p>
-            <p className="truncate text-[11.5px] text-fg-muted">{me.roleLabels[0] ?? ""}</p>
+            <p className="truncate text-[11.5px] text-fg-muted">{primaryRoleLabel(me) ?? ""}</p>
           </div>
         </div>
         <PersonaSwitcher />

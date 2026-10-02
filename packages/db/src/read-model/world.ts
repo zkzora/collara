@@ -236,11 +236,17 @@ export function buildWorld(input: WorldInput): BuiltWorld {
     const assetVrs = pick(T.VerificationRequest).sort(byOffset);
     const assetAttestations = pick(T.VerificationAttestation).sort(byOffset);
     const assetDisclosures = pick(T.AttestationDisclosure).sort(byOffset);
+    // Shares name a case, not an asset: the shares (and share requests) of this asset's cases. A consenting dealer
+    // sees the package anchor only through them.
+    const assetShares = [...shares, ...shareProposals]
+      .filter((c) => caseRowByRef.get(str(c.payload.caseRef))?.assetRef === ref)
+      .sort(byOffset);
     const visibleAnchor =
       (activeControl && decode.control(activeControl.payload).evidence) ??
       (activeLock && decode.lock(activeLock.payload).evidence) ??
       [...assetVrs].reverse().map((c) => decode.verificationRequest(c.payload).evidence).find(Boolean) ??
       [...assetDisclosures].reverse().map((c) => decode.attestation(decode.disclosure(c.payload).attestation).evidence).find(Boolean) ??
+      [...assetShares].reverse().map((c) => decode.share(c.payload).evidence).find(Boolean) ??
       null;
     let pkg: EvidencePackageFacts;
     if (currentManifest) {

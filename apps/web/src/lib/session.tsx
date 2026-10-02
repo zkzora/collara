@@ -4,7 +4,7 @@
 // Every workspace query key starts with this scope so cached data never crosses users,
 // organizations or demo personas (ADR-0001 §2.9).
 import { createQueryKeys, sessionScope, type QueryKeys } from "@collara/api-client";
-import type { Me, RuntimeMode } from "@collara/domain";
+import { primaryRoleOf, ROLE_LABELS, type Me, type RuntimeMode } from "@collara/domain";
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useCollara } from "./collara-client";
@@ -38,6 +38,12 @@ export function useMeQuery() {
     queryFn: ({ signal }) => client.me({ signal }),
     staleTime: 60_000,
   });
+}
+
+/** "Lender Approver" for an approver who also holds a governance seat (the business role names the viewer). */
+export function primaryRoleLabel(me: Pick<Me, "roles">): string | null {
+  const role = primaryRoleOf(me.roles);
+  return role ? ROLE_LABELS[role] : null;
 }
 
 export function scopeFor(me: Me): string {

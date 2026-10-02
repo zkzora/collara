@@ -131,6 +131,85 @@ The realm, client and demo users are described in [`infra/keycloak/README.md`](.
 Every demo user's password is `collara-demo-only`. These are synthetic local accounts; never import this realm
 into a shared or reachable Keycloak.
 
+## 5. Run the LOCALNET demo
+
+The full stack on one machine: WSL PostgreSQL, SeaweedFS, a Canton 3.5.19 `dpm sandbox` (one participant),
+the worker, the API and `next start`. These are the commands used for the demo on the authoring machine
+(2026-10-02), from the repo root. The worker, the API and the web server each stay in the foreground, so give
+each its own terminal.
+
+1. Infrastructure and ledger:
+
+   ```sh
+   pnpm db:up                       # WSL PostgreSQL with a keepalive
+   pnpm infra:seaweed start         # evidence storage (S3 on 8333)
+   pnpm localnet:up                 # Canton sandbox, JSON API on 7575
+   pnpm localnet:bootstrap          # DARs, parties, ledger users → .local/localnet/state.json
+   pnpm db:migrate
+   pnpm localnet:seed --profile main   # CL-001 main fixture through the API's workflow runner (ledger + database)
+   ```
+
+2. In `.env`, set:
+
+   ```
+   COLLARA_MODE=LOCALNET
+   DEMO_SESSIONS_ENABLED=true
+   ```
+
+3. Worker and API (each in its own terminal; both read `.env`):
+
+   ```sh
+   pnpm --filter @collara/worker start   # projection, reconciliation, export jobs; health on 4100
+   pnpm --filter @collara/api start      # API on 4000
+   ```
+
+4. Web. `next start` reads `COLLARA_MODE` per request; set it for the build as well, as below:
+
+   ```bash
+   # Git Bash
+   COLLARA_MODE=LOCALNET pnpm --filter @collara/web build
+   COLLARA_MODE=LOCALNET pnpm --filter @collara/web start
+   ```
+
+   ```powershell
+   # PowerShell
+   $env:COLLARA_MODE = "LOCALNET"; pnpm --filter @collara/web build
+   $env:COLLARA_MODE = "LOCALNET"; pnpm --filter @collara/web start
+   ```
+
+5. Open <http://localhost:3000/login> and choose a demo persona. The banner reads
+   `Synthetic demo data — Canton LocalNet.`
+
+Re-running `pnpm localnet:seed --profile main` replays the stored outcome of every step. It does not reset a
+case that was walked forward. For a fresh CL-001, seed a new prefix (below) or restart the sandbox and
+bootstrap again (party ids change on every sandbox start).
+
+### A second, isolated stack next to the demo
+
+Tests and rehearsals use their own namespace, database and ports. They never touch the demo's default
+namespace, the `collara` database or `.local/localnet/state.json`. This is how the browser and adversarial
+checks in [`verification.md`](verification.md) were run, next to a running demo (`<p>` is a prefix such as
+`e2e`; the database is `collara_<p>`):
+
+```bash
+# Git Bash
+node scripts/localnet/bootstrap.mjs --prefix <p>
+pnpm localnet:seed --prefix <p> --profile main --database-url postgres://collara:collara_dev@127.0.0.1:5432/collara_<p>
+# worker (port 4210), API (port 4200) and web (port 3100), each in its own terminal:
+COLLARA_MODE=LOCALNET WORKER_PORT=4210 DATABASE_URL=postgres://collara:collara_dev@127.0.0.1:5432/collara_<p> \
+  COLLARA_LOCALNET_STATE=C:/Collara/.local/localnet/state-<p>.json pnpm --filter @collara/worker start
+COLLARA_MODE=LOCALNET PORT=4200 DATABASE_URL=postgres://collara:collara_dev@127.0.0.1:5432/collara_<p> \
+  COLLARA_LOCALNET_STATE=C:/Collara/.local/localnet/state-<p>.json DEMO_SESSIONS_ENABLED=true \
+  PUBLIC_ORIGIN=http://localhost:3100 pnpm --filter @collara/api start
+COLLARA_MODE=LOCALNET NEXT_DIST_DIR=.next-e2e pnpm --filter @collara/web build
+COLLARA_MODE=LOCALNET NEXT_DIST_DIR=.next-e2e API_INTERNAL_ORIGIN=http://127.0.0.1:4200 pnpm --filter @collara/web exec next start --port 3100
+```
+
+`COLLARA_LOCALNET_STATE` must be a Windows path (`C:/…`): Git Bash does not rewrite variables. `PUBLIC_ORIGIN`
+must be the second web server's origin, or the API's CSRF origin check refuses its mutations. Use one
+`next build` at a time on a machine with little free memory. Afterwards, stop the three processes, drop
+`collara_<p>` and delete `.local/localnet/state-<p>.json`. The prefix's parties stay on the sandbox, isolated.
+
 ## Ports
 
 | Service | Ports (all bound to 127.0.0.1) |

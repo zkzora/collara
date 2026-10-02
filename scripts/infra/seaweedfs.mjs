@@ -116,6 +116,10 @@ async function start() {
     "-webdav=false",
     "-s3.port.iceberg=0",
     "-s3.port.lance=0",
+    // Small, explicit volumes for a dev store (evidence files are capped at 20 MB). The default auto-sizes the
+    // volume count from free disk space, which drops to zero on a nearly full disk ("no free volumes left").
+    `-master.volumeSizeLimitMB=${process.env.COLLARA_S3_VOLUME_SIZE_MB ?? "256"}`,
+    `-volume.max=${process.env.COLLARA_S3_VOLUME_MAX ?? "16"}`,
   ];
   const launch = () => {
     const child = spawnDetached(WEED, args, {

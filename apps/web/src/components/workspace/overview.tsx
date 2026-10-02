@@ -36,6 +36,7 @@ import {
 } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { nextActionHref } from "./case/links";
+import { joinParts } from "@/lib/format";
 
 type Persona = "lender" | "borrower" | "verifier" | "auditor" | "dealer" | "other";
 
@@ -214,7 +215,7 @@ function useActionRows(persona: Persona): {
       key: item.caseId,
       ref: item.caseId,
       title: item.nextAction?.label ?? item.title,
-      sub: `${item.title} · ${item.asset.equipmentClass} · ${item.asset.ref}`,
+      sub: joinParts([item.title, item.asset.equipmentClass, item.asset.ref]),
       state: item.stage,
       href: item.nextAction ? nextActionHref(item.caseId, item.nextAction.code) : `/app/cases/${encodeURIComponent(item.caseId)}/summary`,
     });
@@ -223,7 +224,7 @@ function useActionRows(persona: Persona): {
     if (v.allowedActions.length === 0) continue;
     const title =
       v.state.value === "REQUESTED" ? NEXT_ACTIONS.ACCEPT_ASSIGNMENT : v.state.value === "IN_REVIEW" ? NEXT_ACTIONS.SUBMIT_ATTESTATION : v.state.label;
-    rows.push({ key: v.ref, ref: v.ref, title, sub: `${v.equipmentSummary} · ${v.assetRef}`, state: v.state, href: `/app/verifications/${encodeURIComponent(v.ref)}` });
+    rows.push({ key: v.ref, ref: v.ref, title, sub: joinParts([v.equipmentSummary, v.assetRef]), state: v.state, href: `/app/verifications/${encodeURIComponent(v.ref)}` });
   }
 
   // Case and verification queues are the work list; governance rows are additive and must not hide it.

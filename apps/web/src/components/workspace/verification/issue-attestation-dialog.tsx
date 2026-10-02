@@ -69,7 +69,7 @@ export function IssueAttestationDialog({ vr, me }: { vr: VerificationRequest; me
       label="Submit attestation"
       variant="primary"
       title={`Submit attestation · ${vr.ref}`}
-      description={`Issues an attestation for ${vr.assetRef} (${vr.equipmentSummary}) against evidence package ${vr.evidencePackage.ref} v${vr.evidencePackage.version}, as ${vr.verifier.name} (${vr.verifierRegistryRef}).`}
+      description={`Issues an attestation for ${vr.assetRef}${vr.equipmentSummary ? ` (${vr.equipmentSummary})` : ""} against evidence package ${vr.evidencePackage.ref} v${vr.evidencePackage.version}, as ${vr.verifier.name} (${vr.verifierRegistryRef}).`}
       facts={{ actingParty: actingParty(me), record: `${vr.ref} · ${vr.evidencePackage.ref} v${vr.evidencePackage.version}`, effect: "IN_REVIEW → ATTESTED" }}
       caveat={
         <>

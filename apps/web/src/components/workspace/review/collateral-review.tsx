@@ -14,6 +14,7 @@ import { SectionNav } from "../audit/section-nav";
 import { assetHref, caseTabHref } from "../case/links";
 import { REVIEW_TAB_LABELS, REVIEW_TABS, reviewTabHref } from "./links";
 import { PageCommands, PageCommandStatus } from "../audit/page-command";
+import { withSeparator } from "@/lib/format";
 
 export interface CollateralReviewValue {
   readonly review: Review;
@@ -79,7 +80,7 @@ export function CollateralReview({ reviewRef, children }: { reviewRef: string; c
             status={r.state}
             description={
               <>
-                {`${r.equipmentSummary} · `}
+                {withSeparator(r.equipmentSummary)}
                 <Link href={assetHref(d.asset.ref)} className="font-mono text-[12.5px] text-fg underline-offset-4 hover:underline">
                   {d.asset.ref}
                 </Link>

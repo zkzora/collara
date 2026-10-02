@@ -58,7 +58,7 @@ app.post("/cases/:id/sharing", {
 ```
 
 - **Authority.** Use only `request.requireActor()` and the server-side bindings. Never read a party, organisation or role from the body or headers. Mandates are enforced by the API through domain policy (`assertPermitted` / `can` in `@collara/domain`).
-- **`prepare(ctx)`.** It runs before every new submission. `ctx.acs` reads as the business party. `ctx.seatAcs` reads as the seat and the governance party (seat holders only). `ctx.now` is wall-clock time; use it for relative dates. `ctx.actorRef` goes on the choice. Throw a `ProblemError` to stop: nothing is submitted, and the record stays `PREPARED`. Seat actions return `{ as: "seat", commands }`. Use `L.*` builders (`src/ledger/builders.ts`) for commands. Use `TEMPLATES` / `PAYLOAD_SCHEMAS` for ids and decoding. Never use package ids.
+- **`prepare(ctx)`.** It runs before every new submission. `ctx.acs` reads as the business party. `ctx.seatAcs` reads as the seat and the governance party (seat holders only). `ctx.now` is wall-clock time; use it for relative dates. `ctx.actorRef` goes on the choice. Throw a `ProblemError` to stop: nothing is submitted, and the record stays `PREPARED`. If a read cannot reach the participant, the record becomes `FAILED` (503 `ledger_unavailable` with the command); a retry with the same key prepares again. Seat actions return `{ as: "seat", commands }`. Use `L.*` builders (`src/ledger/builders.ts`) for commands. Use `TEMPLATES` / `PAYLOAD_SCHEMAS` for ids and decoding. Never use package ids.
 - **Sequences.** Use these for multi-step operations, such as share + disclose, or registration:
   ```ts
   workflow.sequence({ actor, operation, idempotencyKey, payload, steps: async (seq) => {
@@ -85,7 +85,8 @@ app.post("/cases/:id/sharing", {
 | Committed (has an update id) | `200 { command, result? }`. `command` is the domain `CommandStatus` |
 | `SUBMITTED` / `UNKNOWN_OUTCOME` | `202 { command }`. The client polls `GET /api/commands/:id` |
 | `REJECTED` | `409 state_conflict`, using the approved copy, with `command`. A ledger authorization rejection gives `404 unavailable` |
-| `FAILED` (ledger unreachable or no binding) | `503 ledger_unavailable` with `command`. Nothing is simulated |
+| `FAILED` (ledger unreachable or no binding) | `503 ledger_unavailable` with `command`. Nothing is simulated. This includes a participant that cannot be reached during `prepare` or between the steps of a sequence |
+| Ledger read outside the runner that cannot reach the participant (e.g. a route's fresh ACS lookup) | `503 ledger_unavailable` (app error handler), never 500 |
 | Problem thrown in `prepare` | That problem: 404 / 409 / 503 |
 | Same key, different payload | `409 idempotency_conflict` |
 | Missing or invalid `Idempotency-Key` | `400 validation_error` |

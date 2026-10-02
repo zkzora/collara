@@ -39,8 +39,12 @@ export function PageHeader({
             {recordId ? (
               <>
                 <span className="font-mono tracking-[-0.03em]">{recordId}</span>
-                <span aria-hidden="true"> · </span>
-                <span className="sr-only">, </span>
+                {title ? (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    <span className="sr-only">, </span>
+                  </>
+                ) : null}
               </>
             ) : null}
             {title}

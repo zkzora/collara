@@ -28,6 +28,7 @@ import {
   presentCaseEvidence,
   presentCaseList,
   presentCaseSummary,
+  equipmentSummary,
   presentGovernanceProposal,
   presentGovernanceState,
   presentMe,
@@ -38,7 +39,7 @@ import {
   presentVerifierEntries,
   type PresentContext,
 } from "./presenters";
-import { DEMO_PERSONAS, PERSONA_IDS, personaActor, type PersonaId } from "./roles";
+import { DEMO_PERSONAS, orderRoles, PERSONA_IDS, personaActor, primaryRoleOf, type PersonaId } from "./roles";
 
 const now = new Date("2026-11-15T12:00:00Z");
 const pctx: PresentContext = { now, mode: "UI_MOCK", sync: { offset: null, at: null } };
@@ -157,6 +158,53 @@ describe("field omission", () => {
     expect(dealer.views).toEqual(["all"]);
     expect(presentAssetDetail(cl001.asset, world.cases, viewer("dealer-contributor"), pctx)?.cases[0]?.stage).toBeNull();
     expect(presentCaseDetail(cl001, viewer("lender-a-analyst"), pctx)?.stage?.value).toBe("PLEDGE_ACTIVE");
+  });
+
+  it("shows package completeness and package stages only to viewers who see the whole package", () => {
+    const world = buildScenario({ now });
+    const cl001 = world.cases.find((c) => c.ref === "CL-001")!;
+    // A LOCALNET dealer or verifier sees only its slice of the package (no owner manifest on its ledger view).
+    const partial: CaseFacts = { ...cl001, review: { ...cl001.review, state: "NOT_SUBMITTED" }, asset: { ...cl001.asset, documents: [], package: { ...cl001.asset.package, entries: [] } } };
+    for (const id of ["dealer-contributor"] as const) {
+      const detail = presentCaseDetail(partial, viewer(id), pctx)!;
+      expect(detail.statuses.evidence).toBeNull();
+      expect(detail.references.package).toBeNull();
+      // "Evidence collection" would be derived from documents the viewer cannot see.
+      expect(detail.stage).toBeNull();
+      expect(detail.nextAction).toBeNull();
+    }
+    const owner = presentCaseDetail(partial, viewer("manufacturer-owner"), pctx)!;
+    expect(owner.stage?.value).toBe("EVIDENCE_COLLECTION");
+    expect(owner.statuses.evidence?.label).toBe("Incomplete");
+    expect(presentCaseDetail(cl001, viewer("lender-a-analyst"), pctx)?.statuses.evidence?.label).toBe("Complete · 5 documents");
+  });
+
+  it("shows the selected lender's attestation as the verification status when the request itself is not visible", () => {
+    const world = buildScenario({ now });
+    const cl001 = world.cases.find((c) => c.ref === "CL-001")!;
+    // LOCALNET: the lender holds ATT-001 through its AttestationDisclosure, never the owner↔verifier request.
+    const lenderView: CaseFacts = { ...cl001, asset: { ...cl001.asset, verifications: [] } };
+    const summary = presentCaseSummary(lenderView, viewer("lender-a-analyst"), pctx)!;
+    expect(summary.verification).toMatchObject({ value: "ATTESTED" });
+    expect(presentCaseDetail(lenderView, viewer("lender-a-analyst"), pctx)?.references.attestation?.ref).toBe("ATT-001");
+    expect(presentAssetDetail(lenderView.asset, [lenderView], viewer("lender-a-analyst"), pctx)?.verification).toMatchObject({ value: "ATTESTED" });
+    // Without an attestation there is nothing to show.
+    const none: CaseFacts = { ...lenderView, asset: { ...lenderView.asset, attestations: [] } };
+    expect(presentCaseSummary(none, viewer("lender-a-analyst"), pctx)?.verification).toBeNull();
+  });
+
+  it("never renders a stray separator for a missing equipment field", () => {
+    expect(equipmentSummary({ equipmentClass: "CNC machining center", model: "DEMO-CNC-500" })).toBe("CNC machining center · DEMO-CNC-500");
+    expect(equipmentSummary({ equipmentClass: "", model: "DEMO-CNC-500" })).toBe("DEMO-CNC-500");
+    expect(equipmentSummary({ equipmentClass: "", model: "" })).toBe("");
+  });
+
+  it("names a viewer by the business role, not the governance seat", () => {
+    expect(orderRoles(["GOVERNANCE_MEMBER", "LENDER_APPROVER"])).toEqual(["LENDER_APPROVER", "GOVERNANCE_MEMBER"]);
+    expect(primaryRoleOf(["GOVERNANCE_MEMBER", "AUDITOR"])).toBe("AUDITOR");
+    expect(primaryRoleOf(["GOVERNANCE_MEMBER"])).toBe("GOVERNANCE_MEMBER");
+    expect(primaryRoleOf([])).toBeNull();
+    expect(presentMe({ ...DEMO_PERSONAS["lender-a-approver"], roles: ["GOVERNANCE_MEMBER", "LENDER_APPROVER"] }, "LOCALNET").roleLabels).toEqual(["Lender Approver", "Governance Member"]);
   });
 
   it("keeps the verifier out of an asset-level case and terms", () => {

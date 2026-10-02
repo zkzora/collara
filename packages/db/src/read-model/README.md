@@ -32,6 +32,27 @@ contract it acts on. Consequences, all covered by `read-model.test.ts`:
 - The legacy helpers `visibleContracts` / `visibleEvents` in `queries.ts` filter by **witness** parties. Do not
   use them to decide what a user may read.
 
+## Application-level disclosure: equipment identity (`disclosure.ts`)
+
+The `AssetPassport` has no observers, so no case participant other than the owner has the equipment identity on
+its ledger view. The permission matrix (synthesis §1.4.1, row "Equipment identity") nevertheless gives it to the
+selected lender ("Shared case"), the invited dealer ("Scoped (invited case)") and the assigned verifier ("Scoped
+(assignment)"). `loadReadWorld` therefore copies **only** `equipmentClass`, `manufacturer`, `model`,
+`serialNumber` and `yearOfManufacture` from the owner's latest projected passport into the viewer's `AssetFacts`
+when the viewer holds one of these entitling contracts (`equipmentEntitlements`):
+
+| Viewer | Entitling contract (active, as stakeholder) |
+| --- | --- |
+| Selected lender | `PackageShare` of the case with the viewer as `recipient`, not expired; the asset's `AssetControl` with the viewer as `sharedLender`; a `CollateralLock` with the viewer as `lender` |
+| Invited dealer | `PackageShare` with the viewer among `consenters`; `PackageShareProposal` with the viewer as `dealer`; the viewer's `DealerContribution` to the case |
+| Assigned verifier | a `VerificationRequest` for the asset with the viewer as `verifier` whose latest version was not declined or cancelled |
+
+The entitling contract must name the passport's signatory as `owner`. Nothing else qualifies: Demo Lender B, a
+revoked or expired share, a declined or cancelled assignment, an auditor (auditors see the identity only through
+the owner's `AuditGrant`, i.e. the grantor's view built by the audit delegation) and operators. The raw `view`
+keeps the stakeholder rule (no passport for these viewers); the disclosure only changes the facts. Ledger privacy
+is unchanged. Covered by `read-model.test.ts` ("equipment identity disclosure").
+
 ## Viewer
 
 ```ts
@@ -93,7 +114,7 @@ never 0). Terminal outcomes without a successor contract (daml-model D14) come f
 | --- | --- |
 | `AssetRegistrationRequest` | `pendingRegistrations[]` (state: active → `REGISTRATION_REQUESTED`; archived by `Request_Accept` → `REGISTERED`, `Request_Decline` → `REGISTRATION_DECLINED`); identity fallback for `AssetFacts` |
 | `IssuanceTicket` | `requestRef` → `assetId` link; asset counts as `REGISTERED` |
-| `AssetPassport` | `AssetFacts` identity (class, manufacturer, model, serial, year, location), `passportVersion`, `registeredAt` (owner only: lenders/verifiers see no serial) |
+| `AssetPassport` | `AssetFacts` identity (class, manufacturer, model, serial, year, location), `passportVersion`, `registeredAt`. Owner-only on the ledger; the selected lender, the invited dealer and the assigned verifier get the identity fields through the application-level disclosure below |
 | `AssetControl` / `CollateralLock` | `asset.control`: newest active token; lock → `LOCKED` + `lockRef`, control → `AVAILABLE`; version = `controlVersion` |
 | `CollateralLockReleased` | `lock.state = RELEASED`, `releasedAt`, `releasedByUserId`, `controlVersionAfterRelease`; control `AVAILABLE` |
 | `RetiredControl` | `asset.lifecycle = ARCHIVED` |

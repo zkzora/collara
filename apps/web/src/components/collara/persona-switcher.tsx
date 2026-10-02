@@ -1,7 +1,18 @@
 "use client";
 
 import { errorMessage } from "@collara/api-client";
-import { DEMO_PERSONAS, orgName, PERSONA_IDS, PersonaIdSchema, ROLE_LABELS, ROLE_SHORT_LABELS, type DemoPersona, type PersonaId } from "@collara/domain";
+import {
+  DEMO_PERSONAS,
+  orderRoles,
+  orgName,
+  PERSONA_IDS,
+  PersonaIdSchema,
+  ROLE_LABELS,
+  ROLE_SHORT_LABELS,
+  type DemoPersona,
+  type PersonaId,
+  type Role,
+} from "@collara/domain";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -15,20 +26,33 @@ export interface PersonaOption {
   readonly orgName: string;
 }
 
+/**
+ * "Morgan Hale · Approver" (short, the sidebar select) or "Morgan Hale — Lender Approver" (the login list). The
+ * governance seat is a mandate shown elsewhere; the business role names the persona.
+ */
+export function personaLabel(displayName: string, roles: readonly Role[], { short = false }: { short?: boolean } = {}): string {
+  const business = orderRoles(roles).filter((role) => role !== "GOVERNANCE_MEMBER");
+  const shown = business.length > 0 ? business : orderRoles(roles);
+  return short
+    ? `${displayName} · ${shown.map((role) => ROLE_SHORT_LABELS[role]).join(", ")}`
+    : `${displayName} — ${shown.map((role) => ROLE_LABELS[role]).join(", ")}`;
+}
+
 /** UI_MOCK personas come from the domain fixtures; LOCALNET lists what the API offers. */
 export function mockPersonaOptions({ short = false }: { short?: boolean } = {}): PersonaOption[] {
   return PERSONA_IDS.map((id) => {
     const persona = DEMO_PERSONAS[id];
-    const roles = persona.roles.filter((role) => role !== "GOVERNANCE_MEMBER");
-    const label = short
-      ? `${persona.displayName} · ${roles.map((role) => ROLE_SHORT_LABELS[role]).join(", ")}`
-      : `${persona.displayName} — ${roles.map((role) => ROLE_LABELS[role]).join(", ")}`;
-    return { id, orgName: orgName(persona.orgId), label };
+    return { id, orgName: orgName(persona.orgId), label: personaLabel(persona.displayName, persona.roles, { short }) };
   });
 }
 
-function fromDemoPersona(persona: DemoPersona): PersonaOption {
-  return { id: persona.id, orgName: persona.org.name, label: `${persona.displayName} — ${persona.roleLabels.join(", ")}` };
+const ROLE_BY_LABEL = new Map(Object.entries(ROLE_LABELS).map(([role, label]) => [label, role as Role]));
+
+/** An API persona (seeded in LOCALNET) with the same labels as UI_MOCK. */
+export function demoPersonaOption(persona: DemoPersona, { short = false }: { short?: boolean } = {}): PersonaOption {
+  const roles = persona.roleLabels.map((label) => ROLE_BY_LABEL.get(label)).filter((role): role is Role => role !== undefined);
+  const label = roles.length > 0 ? personaLabel(persona.displayName, roles, { short }) : `${persona.displayName} — ${persona.roleLabels.join(", ")}`;
+  return { id: persona.id, orgName: persona.org.name, label };
 }
 
 function groupByOrg(options: readonly PersonaOption[]): [string, PersonaOption[]][] {
@@ -56,7 +80,8 @@ export function PersonaSwitcher({ className, onSwitched }: { className?: string;
     retry: false,
   });
 
-  const options = mode === "UI_MOCK" ? mockPersonaOptions({ short: true }) : (remote.data ?? []).map(fromDemoPersona);
+  const options = mode === "UI_MOCK" ? mockPersonaOptions({ short: true }) : (remote.data ?? []).map((p) => demoPersonaOption(p, { short: true }));
+  const selectedLabel = options.find((option) => option.id === me.personaId)?.label;
   if (mode === "LOCALNET" && (remote.isError || options.length === 0)) return null;
 
   async function change(value: string) {
@@ -81,6 +106,7 @@ export function PersonaSwitcher({ className, onSwitched }: { className?: string;
       <select
         id={id}
         value={me.personaId ?? ""}
+        title={selectedLabel}
         disabled={switching}
         aria-busy={switching}
         onChange={(event) => void change(event.target.value)}

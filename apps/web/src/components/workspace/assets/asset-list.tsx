@@ -54,10 +54,10 @@ export function AssetList() {
                   {asset.ref}
                 </Link>
               </td>
-              <td className={TD}>{asset.equipmentClass}</td>
+              <td className={TD}>{asset.equipmentClass || <Undisclosed />}</td>
               <td className={TD}>
-                {asset.manufacturer}
-                <span className="block font-mono text-[11.5px] text-fg-subtle">{asset.model}</span>
+                {asset.manufacturer || <Undisclosed />}
+                {asset.model ? <span className="block font-mono text-[11.5px] text-fg-subtle">{asset.model}</span> : null}
               </td>
               <td className={TD}>{asset.owner?.name ?? <Undisclosed />}</td>
               <td className={TD}>

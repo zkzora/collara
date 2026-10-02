@@ -20,6 +20,8 @@ import { visibleContracts, visibleEvents } from "../queries";
 import { cases } from "../schema";
 import { seedDemoIdentities } from "../seed";
 import { projectOnce, TEMPLATES as T } from "../projection";
+import { equipmentEntitlements } from "./disclosure";
+import type { LedgerView, VisibleContract } from "./ledger-view";
 import { buildScenario, scenarioBindingState, scenarioParties, type ScenarioParties, type ScenarioStage } from "./scenario-fixture";
 import {
   governanceState,
@@ -110,6 +112,8 @@ describe("read model: selected lender (Demo Lender A)", () => {
       ["RR-002", "AUTHORIZED"],
     ]);
     expect(facts.releaseRequests[0]?.decisionReason).toBe("Repayment confirmation has not been received.");
+    // Timeline detail uses the reason's wording, never the raw ledger code.
+    expect(facts.events.filter((e) => e.type === "RELEASE_REQUESTED").map((e) => e.detail)).toEqual(["external loan completion", "external loan completion"]);
     expect(facts.shares.map((s) => [s.ref, s.state, s.entries.length])).toEqual([
       ["SHR-001", "GRANTED", 1],
       ["SHR-002", "GRANTED", 3],
@@ -175,7 +179,9 @@ describe("read model: verifier (Demo Verifier)", () => {
     expect(facts.activation).toBeNull();
     expect(facts.releaseRequests).toEqual([]);
     expect(facts.review.state).toBe("NOT_SUBMITTED");
-    expect(facts.asset.serialNumber).toBe("");
+    // No passport on the verifier's ledger view; the identity comes from the assignment disclosure (disclosure.ts).
+    expect(world.view.contracts.some((c) => c.templateRef === T.AssetPassport)).toBe(false);
+    expect(facts.asset).toMatchObject({ equipmentClass: "CNC machining center", model: "DEMO-CNC-500", serialNumber: "SYNTH-CNC-001" });
     expect(facts.asset.verifications[0]).toMatchObject({ ref: "VR-001", state: "ATTESTED", caseRef: "CL-001", lastMessage: expect.stringContaining("spindle") });
     expect(facts.asset.events.map((e) => e.type)).toEqual(["VERIFICATION_REQUESTED", "ASSIGNMENT_ACCEPTED", "CHANGES_REQUESTED", "EVIDENCE_RESUBMITTED", "ATTESTATION_ISSUED"]);
     expect(presentProposal(facts, actor("verifier-inspector"), pctx)).toBeNull();
@@ -217,6 +223,70 @@ describe("read model: unrelated lender (Demo Lender B)", () => {
     const registrarView = await loadLedgerView(handle.db, viewers.registrar);
     expect(registrarView.contracts.some((c) => c.templateRef === T.VerificationRequest)).toBe(false);
     expect(registrarView.events.some((e) => e.choice === "VR_IssueAttestation")).toBe(false);
+  });
+});
+
+describe("read model: equipment identity disclosure (synthesis §1.4.1)", () => {
+  it("gives the selected lender, the invited dealer and the assigned verifier the owner's passport identity", async () => {
+    const identity = { equipmentClass: "CNC machining center", manufacturer: "Demo Machine Works (synthetic)", model: "DEMO-CNC-500", serialNumber: "SYNTH-CNC-001" };
+    for (const viewer of [viewers.lenderA, viewers.lenderAApprover, viewers.dealer, viewers.verifier]) {
+      const world = await loadReadWorld(handle.db, viewer, opts);
+      // The passport itself stays owner-only on the ledger and in the viewer's raw view.
+      expect(world.view.contracts.some((c) => c.templateRef === T.AssetPassport)).toBe(false);
+      expect(world.cases.find((c) => c.ref === "CL-001")?.asset).toMatchObject(identity);
+      expect(world.assets.find((a) => a.ref === "ASSET-DEMO-001")).toMatchObject(identity);
+      // Identity only: no location, documents or registration details.
+      expect(world.assets.find((a) => a.ref === "ASSET-DEMO-001")?.locationScope).toBe("");
+    }
+    const summary = presentCaseSummary((await loadCaseFacts(handle.db, viewers.lenderA, "CL-001", opts))!, actor("lender-a-analyst"), pctx);
+    expect(summary?.asset).toEqual({ ref: "ASSET-DEMO-001", equipmentClass: "CNC machining center", model: "DEMO-CNC-500" });
+  });
+
+  it("never discloses it to Demo Lender B or to an auditor through the lender's grant alone", async () => {
+    for (const viewer of [viewers.lenderB, viewers.lenderBWithSeat]) expect(await listAssets(handle.db, viewer, opts)).toEqual([]);
+    const lenderBWorld = await loadReadWorld(handle.db, viewers.lenderB, opts);
+    expect(equipmentEntitlements(lenderBWorld.view, viewers.lenderB, new Map([["CL-001", "ASSET-DEMO-001"]]), NOW).size).toBe(0);
+    const auditorWorld = await loadReadWorld(handle.db, { ...viewers.auditor, roles: ["AUDITOR"] }, opts);
+    expect(equipmentEntitlements(auditorWorld.view, viewers.auditor, new Map([["CL-001", "ASSET-DEMO-001"]]), NOW).size).toBe(0);
+  });
+
+  it("entitles only active, unexpired shares and assignments that were not declined or cancelled", () => {
+    const contract = (templateRef: string, payload: Record<string, unknown>, archived: string | null = null): VisibleContract => ({
+      source: "sandbox",
+      contractId: `${templateRef}-${Math.random()}`,
+      templateRef,
+      payload,
+      signatories: [],
+      observers: [],
+      businessRef: null,
+      caseRef: typeof payload.caseRef === "string" ? payload.caseRef : null,
+      assetRef: typeof payload.assetId === "string" ? payload.assetId : null,
+      createdAt: "2026-10-01T00:00:00Z",
+      createdOffset: 1,
+      createdNodeId: 0,
+      createdUpdateId: "u",
+      archived: archived ? { at: "2026-10-01T01:00:00Z", offset: 2, updateId: "u2", choice: archived, argument: {}, actingParties: [] } : null,
+    });
+    const view = (contracts: VisibleContract[]): LedgerView => ({ contracts, events: [], byId: new Map(contracts.map((c) => [c.contractId, c])) });
+    const caseAssets = new Map([["CL-001", "ASSET-DEMO-001"]]);
+    const share = (extra: Record<string, unknown>) => ({ owner: P.owner, consenters: [], recipient: P.lenderA, caseRef: "CL-001", shareRef: "SHR-9", documents: [], ...extra });
+    const lender = { orgId: "demo-lender-a", readableParties: [P.lenderA] };
+    const entitled = (contracts: VisibleContract[], viewer: ReadViewer = lender) => [...equipmentEntitlements(view(contracts), viewer, caseAssets, NOW).keys()];
+
+    expect(entitled([contract(T.PackageShare, share({ expiresAt: "2026-12-31T00:00:00Z" }))])).toEqual(["ASSET-DEMO-001"]);
+    expect(entitled([contract(T.PackageShare, share({ expiresAt: "2026-12-31T00:00:00Z" }), "Share_Revoke")])).toEqual([]);
+    expect(entitled([contract(T.PackageShare, share({ expiresAt: "2026-09-30T00:00:00Z" }))])).toEqual([]);
+    // Another lender's share entitles nobody else.
+    expect(entitled([contract(T.PackageShare, share({ recipient: P.lenderB, expiresAt: "2026-12-31T00:00:00Z" }))])).toEqual([]);
+    expect(entitled([contract(T.AssetControl, { owner: P.owner, assetId: "ASSET-DEMO-001", sharedLender: P.lenderA })])).toEqual(["ASSET-DEMO-001"]);
+    expect(entitled([contract(T.AssetControl, { owner: P.owner, assetId: "ASSET-DEMO-001", sharedLender: null })])).toEqual([]);
+
+    const verifier = { orgId: "demo-verifier", readableParties: [P.verifier] };
+    const vr = (version: number) => ({ owner: P.owner, verifier: P.verifier, requestRef: "VR-9", assetId: "ASSET-DEMO-001", version });
+    expect(entitled([contract(T.VerificationRequest, vr(1))], verifier)).toEqual(["ASSET-DEMO-001"]);
+    expect(entitled([contract(T.VerificationRequest, vr(1), "VR_DeclineAssignment")], verifier)).toEqual([]);
+    expect(entitled([contract(T.VerificationRequest, vr(1), "VR_AcceptAssignment"), contract(T.VerificationRequest, vr(2), "VR_Cancel")], verifier)).toEqual([]);
+    expect(entitled([contract(T.VerificationRequest, vr(1), "VR_AcceptAssignment"), contract(T.VerificationRequest, vr(2), "VR_IssueAttestation")], verifier)).toEqual(["ASSET-DEMO-001"]);
   });
 });
 

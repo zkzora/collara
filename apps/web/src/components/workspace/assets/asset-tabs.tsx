@@ -98,9 +98,9 @@ function OverviewTab() {
         <DefinitionList
           termWidth="lg"
           items={[
-            { term: "Equipment class", description: detail.equipmentClass },
-            { term: "Manufacturer", description: detail.manufacturer },
-            { term: "Model", description: <span className="font-mono">{detail.model}</span> },
+            { term: "Equipment class", description: detail.equipmentClass || <Undisclosed /> },
+            { term: "Manufacturer", description: detail.manufacturer || <Undisclosed /> },
+            { term: "Model", description: detail.model ? <span className="font-mono">{detail.model}</span> : <Undisclosed /> },
             { term: "Serial number", description: detail.serialNumber ? <span className="font-mono">{detail.serialNumber}</span> : <Undisclosed /> },
             { term: "Year of manufacture", description: detail.yearOfManufacture ?? "—" },
             { term: "Asset ID · namespace", description: <span className="font-mono">{`${detail.ref} · ${detail.namespace}`}</span> },
@@ -110,7 +110,7 @@ function OverviewTab() {
                 ? `${detail.owner.name}${detail.ownerClaimSource ? ` · claim source: ${detail.ownerClaimSource}` : ""}`
                 : <Undisclosed />,
             },
-            { term: "Location scope", description: detail.locationScope ?? <Undisclosed /> },
+            { term: "Location scope", description: detail.locationScope || <Undisclosed /> },
             { term: "Registered", description: <span className="font-mono">{detail.registeredAt ? formatUtcDateTime(detail.registeredAt) : "Not registered"}</span> },
             { term: "Last update", description: <span className="font-mono">{formatUtcDateTime(detail.updatedAt)}</span> },
           ]}
