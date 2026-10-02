@@ -18,7 +18,7 @@ const ConfigSchema = z
     COLLARA_MODE: z.enum(["UI_MOCK", "LOCALNET"]).default("UI_MOCK"),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     WORKER_HEALTH_HOST: z.string().min(1).default("127.0.0.1"),
-    /** WORKER_PORT is accepted as an alias. */
+    /** WORKER_PORT is accepted as an alias (and wins when both are set). */
     WORKER_HEALTH_PORT: z.coerce.number().int().min(0).max(65_535).default(4100),
     /** Identifies this worker in job leases (default host:pid). */
     WORKER_ID: z.string().min(1).max(200).default(`${hostname()}:${process.pid}`),
@@ -62,7 +62,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   const cleaned: Record<string, string> = Object.fromEntries(
     Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== ""),
   );
-  if (cleaned.WORKER_PORT && !cleaned.WORKER_HEALTH_PORT) cleaned.WORKER_HEALTH_PORT = cleaned.WORKER_PORT;
+  // WORKER_PORT (the name used in the docs and briefs) wins over WORKER_HEALTH_PORT (the .env template's name).
+  if (cleaned.WORKER_PORT) cleaned.WORKER_HEALTH_PORT = cleaned.WORKER_PORT;
   const result = ConfigSchema.safeParse(cleaned);
   if (!result.success) {
     throw new Error(`Invalid worker configuration:\n${z.prettifyError(result.error)}`);

@@ -30,3 +30,39 @@ describe("worker health server", () => {
     expect((await fetch(`${base}/healthz`, { method: "POST" })).status).toBe(404);
   });
 });
+
+describe("worker health server (LOCALNET details)", () => {
+  let details: () => Promise<{ degraded: boolean; [key: string]: unknown }> = async () => ({ degraded: false });
+  const server = createHealthServer({ mode: "LOCALNET", version: "0.0.0", details: () => details() });
+  let base = "";
+
+  beforeAll(async () => {
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+
+  afterAll(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+
+  it("merges per-source projection state and reports degraded sources", async () => {
+    details = async () => ({ degraded: false, sources: [{ source: "sandbox", status: "ACTIVE", checkpoint: 12, ledgerEnd: 12, lag: 0 }] });
+    expect(await (await fetch(`${base}/healthz`)).json()).toEqual({
+      status: "ok",
+      service: "worker",
+      mode: "LOCALNET",
+      version: "0.0.0",
+      sources: [{ source: "sandbox", status: "ACTIVE", checkpoint: 12, ledgerEnd: 12, lag: 0 }],
+    });
+    details = async () => ({ degraded: true, sources: [{ source: "sandbox", status: "RESET_DETECTED" }] });
+    expect(await (await fetch(`${base}/healthz`)).json()).toMatchObject({ status: "degraded", sources: [{ status: "RESET_DETECTED" }] });
+    details = async () => {
+      throw new Error("database unavailable");
+    };
+    const res = await fetch(`${base}/healthz`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: "degraded", error: "database unavailable" });
+  });
+});

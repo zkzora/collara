@@ -4,7 +4,7 @@
 // whose lease expired (crashed worker) is claimed again until JOB_MAX_ATTEMPTS, then FAILED.
 // Handlers live in ./handlers; the export handler is replaced by the reports builder (same file and export).
 import { exportJobs, type Db, type ExportJobRow } from "@collara/db";
-import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, lt, or, sql } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { WorkerConfig } from "../config";
 import { exportJobHandler } from "./handlers/export";
@@ -60,7 +60,9 @@ export async function claimExportJob(db: Db, options: ClaimOptions): Promise<Exp
     .orderBy(asc(exportJobs.requestedAt))
     .limit(1)
     .for("update", { skipLocked: true });
-  const [job] = await db
+  // A scalar subquery (`id = (select …)`) runs once as an InitPlan. `id in (select … limit 1 for update skip
+  // locked)` must not be used: PostgreSQL may re-scan it per outer row and then claims every queued job.
+  const rows = await db
     .update(exportJobs)
     .set({
       state: "GENERATING",
@@ -69,9 +71,9 @@ export async function claimExportJob(db: Db, options: ClaimOptions): Promise<Exp
       attempts: sql`${exportJobs.attempts} + 1`,
       updatedAt: now,
     })
-    .where(and(inArray(exportJobs.id, candidate), claimable))
+    .where(and(sql`${exportJobs.id} = (${candidate})`, claimable))
     .returning();
-  return job ?? null;
+  return rows[0] ?? null;
 }
 
 /** Records the outcome if this worker still holds the lease. Returns false when the lease was lost. */

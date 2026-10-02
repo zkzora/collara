@@ -1,12 +1,15 @@
 import {
   caseDisclosure,
   deriveCaseStage,
+  latestProposal,
   personaActor,
+  pledgeDisplayState,
   presentCaseDetail,
   presentCaseSummary,
   presentPledge,
   presentProposal,
   presentReview,
+  type CaseStage,
   type PersonaId,
   type PresentContext,
 } from "@collara/domain";
@@ -17,7 +20,7 @@ import { visibleContracts, visibleEvents } from "../queries";
 import { cases } from "../schema";
 import { seedDemoIdentities } from "../seed";
 import { projectOnce, TEMPLATES as T } from "../projection";
-import { buildScenario, scenarioBindingState, scenarioParties, type ScenarioParties } from "./scenario-fixture";
+import { buildScenario, scenarioBindingState, scenarioParties, type ScenarioParties, type ScenarioStage } from "./scenario-fixture";
 import {
   governanceState,
   listAssets,
@@ -267,21 +270,81 @@ describe("read model: governance and sync", () => {
   });
 });
 
-describe("read model: main fixture (review submitted, no proposal)", () => {
-  it("derives LENDER_REVIEW for lender and borrower", async () => {
+// Stage derivation (synthesis §1.5.1) over the projected fixture, one fresh database per stop of the walkthrough,
+// with the privacy filters re-checked at every stop.
+interface StageExpectation {
+  readonly stage: CaseStage;
+  readonly review: string;
+  readonly proposal: string | null;
+  readonly activation: string | null;
+  readonly lock: string | null;
+  readonly control: { version: number; state: string; lockRef: string | null };
+  readonly releases: readonly (readonly [string, string])[];
+  readonly pledgeDisplay: string;
+}
+const STAGES: readonly (readonly [ScenarioStage, StageExpectation])[] = [
+  ["main", { stage: "LENDER_REVIEW", review: "SUBMITTED", proposal: null, activation: null, lock: null, control: { version: 3, state: "AVAILABLE", lockRef: null }, releases: [], pledgeDisplay: "AVAILABLE" }],
+  ["eligible", { stage: "PROPOSAL", review: "ELIGIBLE", proposal: null, activation: null, lock: null, control: { version: 3, state: "AVAILABLE", lockRef: null }, releases: [], pledgeDisplay: "AVAILABLE" }],
+  ["proposal", { stage: "PROPOSAL", review: "ELIGIBLE", proposal: "ISSUED", activation: null, lock: null, control: { version: 3, state: "AVAILABLE", lockRef: null }, releases: [], pledgeDisplay: "AVAILABLE" }],
+  ["authorized", { stage: "PROPOSAL", review: "ELIGIBLE", proposal: "ACCEPTED", activation: "AUTHORIZED", lock: null, control: { version: 3, state: "AVAILABLE", lockRef: null }, releases: [], pledgeDisplay: "AVAILABLE" }],
+  ["pledged", { stage: "PLEDGE_ACTIVE", review: "ELIGIBLE", proposal: "ACCEPTED", activation: "CONSUMED", lock: "ACTIVE", control: { version: 4, state: "LOCKED", lockRef: "PL-001" }, releases: [], pledgeDisplay: "ACTIVE" }],
+  ["release-requested", { stage: "RELEASE_REVIEW", review: "ELIGIBLE", proposal: "ACCEPTED", activation: "CONSUMED", lock: "ACTIVE", control: { version: 4, state: "LOCKED", lockRef: "PL-001" }, releases: [["RR-001", "REQUESTED"]], pledgeDisplay: "RELEASE_REQUESTED" }],
+  ["release-rejected", { stage: "PLEDGE_ACTIVE", review: "ELIGIBLE", proposal: "ACCEPTED", activation: "CONSUMED", lock: "ACTIVE", control: { version: 4, state: "LOCKED", lockRef: "PL-001" }, releases: [["RR-001", "REJECTED"]], pledgeDisplay: "RELEASE_REJECTED" }],
+  ["full", { stage: "CLOSED", review: "ELIGIBLE", proposal: "ACCEPTED", activation: "CONSUMED", lock: "RELEASED", control: { version: 5, state: "AVAILABLE", lockRef: null }, releases: [["RR-001", "REJECTED"], ["RR-002", "AUTHORIZED"]], pledgeDisplay: "RELEASED" }],
+];
+
+const FINANCING_TEMPLATES = [T.FinancingProposal, T.FinancingAgreement, T.PledgeActivationAuthorization, T.CollateralAssessment, T.LenderDecisionNotice, T.CollateralLock, T.CollateralLockReleased, T.ReleaseRequest, T.ReleaseDecision];
+
+describe("read model: stage derivation across the walkthrough", () => {
+  it.each(STAGES)("after %s", async (stop, expected) => {
     const db = await createPgliteDatabase();
     try {
       await seedDemoIdentities(db.db);
       await importLocalnetState(db.db, scenarioBindingState());
-      const { ledger } = buildScenario("main");
+      const { ledger } = buildScenario(stop);
       await projectOnce(db.db, ledger, { source: "sandbox", jsonApiUrl: "http://127.0.0.1:7575", parties: Object.values(P) });
-      const lender = await loadCaseFacts(db.db, viewers.lenderA, "CL-001", opts);
-      const borrower = await loadCaseFacts(db.db, viewers.borrower, "CL-001", opts);
-      expect(lender?.review.state).toBe("SUBMITTED");
-      expect(borrower?.review.state).toBe("SUBMITTED");
-      expect(lender && deriveCaseStage(lender, NOW)).toBe("LENDER_REVIEW");
-      expect(borrower && deriveCaseStage(borrower, NOW)).toBe("LENDER_REVIEW");
-      expect(lender?.asset.control).toEqual({ version: 3, state: "AVAILABLE", lockRef: null });
+
+      // The selected lender and the borrower derive the same stage from their own stakeholder views.
+      for (const viewer of [viewers.lenderA, viewers.borrower]) {
+        const facts = await loadCaseFacts(db.db, viewer, "CL-001", opts);
+        expect(facts, `${stop}: ${viewer.orgId}`).not.toBeNull();
+        if (!facts) continue;
+        expect(deriveCaseStage(facts, NOW), `${stop}: ${viewer.orgId}`).toBe(expected.stage);
+        expect(facts.review.state).toBe(expected.review);
+        expect(latestProposal(facts)?.state ?? null).toBe(expected.proposal);
+        expect(facts.activation?.state ?? null).toBe(expected.activation);
+        expect(facts.lock?.state ?? null).toBe(expected.lock);
+        expect(facts.asset.control).toEqual(expected.control);
+        expect(facts.releaseRequests.map((r) => [r.ref, r.state])).toEqual(expected.releases);
+        expect(pledgeDisplayState(facts)).toBe(expected.pledgeDisplay);
+        if (expected.proposal === "ACCEPTED") {
+          // Acceptance comes from the FinancingAgreement both parties sign.
+          expect(latestProposal(facts)).toMatchObject({ respondedByUserId: "user-manufacturer-owner", principal: { amount: "100000.00", currency: "USD" } });
+          expect(latestProposal(facts)?.respondedAt).toBeTruthy();
+        }
+      }
+
+      // Lender B (with and without a governance seat): nothing about the case, at any stage.
+      for (const viewer of [viewers.lenderB, viewers.lenderBWithSeat]) {
+        expect(await listVisibleCaseRefs(db.db, viewer, opts)).toEqual([]);
+        expect(await loadCaseFacts(db.db, viewer, "CL-001", opts)).toBeNull();
+        expect(await listAssets(db.db, viewer, opts)).toEqual([]);
+      }
+      // Verifier and dealer: no financing contract in their view, no proposal/agreement/lock facts.
+      for (const viewer of [viewers.verifier, viewers.dealer]) {
+        const world = await loadReadWorld(db.db, viewer, opts);
+        expect(world.view.contracts.filter((c) => FINANCING_TEMPLATES.includes(c.templateRef as (typeof FINANCING_TEMPLATES)[number]))).toEqual([]);
+        const facts = world.cases.find((c) => c.ref === "CL-001");
+        expect(facts?.proposals ?? []).toEqual([]);
+        expect(facts?.activation ?? null).toBeNull();
+        expect(facts?.lock ?? null).toBeNull();
+        expect(facts?.releaseRequests ?? []).toEqual([]);
+        expect(facts?.review.assessment ?? null).toBeNull();
+      }
+      // Auditor: nothing before the audit grants exist (W13–W14 only run in "full").
+      const auditorFacts = await loadCaseFacts(db.db, viewers.auditor, "CL-001", opts);
+      if (stop === "full") expect(auditorFacts?.auditGrants.map((g) => g.ref)).toEqual(["AG-001", "AG-002"]);
+      else expect(auditorFacts).toBeNull();
     } finally {
       await db.close();
     }

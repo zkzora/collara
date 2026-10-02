@@ -156,30 +156,15 @@ export function buildWorld(input: WorldInput): BuiltWorld {
     return mapped ? [mapped] : [];
   });
 
-  // Contracts by template ------------------------------------------------------------------------------
-  const passports = of(T.AssetPassport);
+  // Cross-asset/cross-case lookups. Everything scoped to one asset or case is picked per asset (byAsset) or per
+  // case (byCase) below, from the business columns extracted at projection time (projection/templates.ts).
   const requests = of(T.AssetRegistrationRequest);
   const tickets = of(T.IssuanceTicket);
-  const controls = of(T.AssetControl);
-  const locks = of(T.CollateralLock);
-  const released = of(T.CollateralLockReleased);
-  const retired = of(T.RetiredControl);
-  const manifests = of(T.EvidenceManifest);
   const contributions = of(T.DealerContribution);
   const shareProposals = of(T.PackageShareProposal);
   const shares = of(T.PackageShare);
-  const vrs = of(T.VerificationRequest);
   const attestations = of(T.VerificationAttestation);
-  const disclosures = of(T.AttestationDisclosure);
   const revoked = of(T.RevokedAttestation);
-  const assessments = of(T.CollateralAssessment);
-  const notices = of(T.LenderDecisionNotice);
-  const proposals = of(T.FinancingProposal);
-  const agreements = of(T.FinancingAgreement);
-  const authorizations = of(T.PledgeActivationAuthorization);
-  const releaseRequests = of(T.ReleaseRequest);
-  const decisions = of(T.ReleaseDecision);
-  const grants = of(T.AuditGrant);
   const mirrors = of(T.VerifierStatusMirror);
   const accreditations = of(T.VerifierAccreditation);
 
@@ -691,15 +676,24 @@ export function buildWorld(input: WorldInput): BuiltWorld {
     }
 
     // Proposals -------------------------------------------------------------------------------------------
+    // Proposal_Accept archives the proposal version and creates the FinancingAgreement (agreementRef =
+    // proposalRef, proposalVersion = the accepted version). The agreement is authoritative for acceptance.
+    const agreementOf = new Map(
+      pick(T.FinancingAgreement).map((c) => {
+        const a = decode.agreement(c.payload);
+        return [`${a.agreementRef}#${a.proposalVersion}`, { contract: c, agreement: a }] as const;
+      }),
+    );
     const proposalFacts: ProposalVersionFacts[] = pick(T.FinancingProposal).flatMap((c): ProposalVersionFacts[] => {
       const p = decode.proposal(c.payload);
       // An undecodable principal is unavailable, never 0: such a version is left out.
       if (!p.principal) return [];
       const choice = c.archived?.choice ?? null;
       const arg = c.archived?.argument ?? {};
+      const accepted = agreementOf.get(`${p.proposalRef}#${p.version}`);
       const state: ProposalVersionFacts["state"] =
-        choice === null ? "ISSUED" : choice === "Proposal_Accept" ? "ACCEPTED" : choice === "Proposal_Decline" ? "DECLINED" : "WITHDRAWN";
-      const responded = choice === "Proposal_Accept" || choice === "Proposal_Decline";
+        accepted || choice === "Proposal_Accept" ? "ACCEPTED" : choice === null ? "ISSUED" : choice === "Proposal_Decline" ? "DECLINED" : "WITHDRAWN";
+      const responded = state === "ACCEPTED" || choice === "Proposal_Decline";
       return [{
         ref: p.proposalRef,
         version: p.version,
@@ -714,12 +708,36 @@ export function buildWorld(input: WorldInput): BuiltWorld {
         draftedByUserId: userIdFromActorRef(p.issuedByRef) ?? "",
         issuedAt: p.issuedAt || c.createdAt,
         issuedByUserId: userIdFromActorRef(p.issuedByRef),
-        respondedAt: responded ? (c.archived?.at ?? null) : null,
-        respondedByUserId: responded ? userIdFromActorRef(str(arg.actorRef)) : null,
+        respondedAt: responded ? (accepted?.agreement.acceptedAt || c.archived?.at || null) : null,
+        respondedByUserId: responded ? userIdFromActorRef(accepted?.agreement.acceptedByRef || str(arg.actorRef)) : null,
         withdrawnAt: choice === "Proposal_Withdraw" || choice === "Proposal_Revise" ? (c.archived?.at ?? null) : null,
         note: choice === "Proposal_Revise" ? `Revised as v${p.version + 1}` : str(arg.reason) || null,
       }];
     });
+    // An agreement whose proposal version is not in the view (e.g. a viewer that is a stakeholder of the
+    // agreement only) still yields the accepted version, with the terms the agreement holds.
+    for (const [key, { contract, agreement: a }] of agreementOf) {
+      if (!a.principal || proposalFacts.some((p) => `${p.ref}#${p.version}` === key)) continue;
+      proposalFacts.push({
+        ref: a.agreementRef,
+        version: a.proposalVersion,
+        state: "ACCEPTED",
+        lenderOrgId: org(a.lender),
+        principal: a.principal,
+        termMetadata: a.termMetadata,
+        financingRef: null,
+        externalLegalRef: a.externalLegalRef,
+        expiresAt: a.acceptedAt || contract.createdAt,
+        draftedAt: contract.createdAt,
+        draftedByUserId: "",
+        issuedAt: null,
+        issuedByUserId: null,
+        respondedAt: a.acceptedAt || contract.createdAt,
+        respondedByUserId: userIdFromActorRef(a.acceptedByRef),
+        withdrawnAt: null,
+        note: null,
+      });
+    }
 
     // Activation authorization --------------------------------------------------------------------------
     const auth = pick(T.PledgeActivationAuthorization).filter((c) => c.archived?.choice !== "Auth_Withdraw").at(-1);

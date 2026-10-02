@@ -61,10 +61,14 @@ export interface ScenarioResult {
 }
 
 /**
- * Builds the history. `stage`: "main" stops after M18 (review SUBMITTED, no proposal, no lock); "full" runs the
- * walkthrough through release and audit grants.
+ * Where buildScenario stops: "main" after M18 (review SUBMITTED, no proposal, no lock); "eligible" after W4;
+ * "proposal" after W5 (FP-001 v1 issued); "authorized" after W7 (accepted, activation authorized); "pledged"
+ * after W8 (PL-001 active); "release-requested" with RR-001 open; "release-rejected" after RR-001 was rejected;
+ * "full" runs the walkthrough through the release (RR-002) and both audit grants.
  */
-export function buildScenario(stage: "main" | "full" = "full", ledger = new FakeLedger(), parties = scenarioParties()): ScenarioResult {
+export type ScenarioStage = "main" | "eligible" | "proposal" | "authorized" | "pledged" | "release-requested" | "release-rejected" | "full";
+
+export function buildScenario(stage: ScenarioStage = "full", ledger = new FakeLedger(), parties = scenarioParties()): ScenarioResult {
   const P = parties;
   const ns = "collara-localnet";
   const asset = "ASSET-DEMO-001";
@@ -397,6 +401,7 @@ export function buildScenario(stage: "main" | "full" = "full", ledger = new Fake
       { signatories: [P.lenderA], observers: [P.owner] },
     );
   });
+  if (stage === "eligible") return { ledger, parties };
 
   // W5–W8 proposal, acceptance, authorization, activation (control v3 → lock v4).
   const terms = { principal: { amount: "100000.00", currency: "USD" }, termMetadata: "Synthetic 36-month terms", externalLegalRef: "LEGAL-DEMO-FP-001" };
@@ -409,6 +414,7 @@ export function buildScenario(stage: "main" | "full" = "full", ledger = new Fake
       { signatories: [P.lenderA], observers: [P.owner] },
     );
   });
+  if (stage === "proposal") return { ledger, parties };
   let agreement = "";
   ledger.tx((tx) => {
     tx.exercise(proposal, "Proposal_Accept", { expectedProposalRef: "FP-001", expectedVersion: "1", actorRef: "mbr:manufacturer-owner" }, { actingParties: [P.owner] });
@@ -427,6 +433,7 @@ export function buildScenario(stage: "main" | "full" = "full", ledger = new Fake
       { signatories: [P.lenderA, P.owner] },
     );
   });
+  if (stage === "authorized") return { ledger, parties };
   let lock = "";
   const lockPayload = { registrar: P.registrar, owner: P.owner, lender: P.lenderA, namespace: ns, assetId: asset, controlVersion: "4", evidence: anchor(2), lockRef: "PL-001", caseRef, authorizationRef: "AUTH-001", agreementRef: "FP-001", attestationRef: "ATT-001", activatedAt: "", activatedByRef: "mbr:lender-a-approver" };
   ledger.tx((tx) => {
@@ -434,6 +441,7 @@ export function buildScenario(stage: "main" | "full" = "full", ledger = new Fake
     tx.exercise(authorization, "Archive", {}, { actingParties: [P.lenderA, P.owner] });
     lock = tx.create(T.CollateralLock, { ...lockPayload, activatedAt: ledger.now().toISOString() }, { signatories: [P.registrar, P.owner, P.lenderA] });
   });
+  if (stage === "pledged") return { ledger, parties };
 
   // W9–W12 release request rejected (lock stays), second request authorized (control v5).
   const rr = (ref: string) => ({
@@ -468,10 +476,12 @@ export function buildScenario(stage: "main" | "full" = "full", ledger = new Fake
   ledger.tx((tx) => {
     rr1 = tx.create(T.ReleaseRequest, rr("RR-001"), { signatories: [P.owner], observers: [P.owner, P.lenderA] });
   });
+  if (stage === "release-requested") return { ledger, parties };
   ledger.tx((tx) => {
     tx.exercise(rr1, "Release_Reject", { decisionRef: "RD-001", sharedReason: "Repayment confirmation has not been received.", actorRef: "mbr:lender-a-approver" }, { actingParties: [P.lenderA] });
     tx.create(T.ReleaseDecision, decision("RD-001", "RR-001", "REJECTED", "Repayment confirmation has not been received."), { signatories: [P.lenderA], observers: [P.owner] });
   });
+  if (stage === "release-rejected") return { ledger, parties };
   let rr2 = "";
   ledger.tx((tx) => {
     rr2 = tx.create(T.ReleaseRequest, rr("RR-002"), { signatories: [P.owner], observers: [P.owner, P.lenderA] });

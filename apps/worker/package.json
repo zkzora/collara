@@ -7,6 +7,10 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
     "start": "tsx --env-file-if-exists=../../.env src/main.ts",
+    "projection:status": "tsx --env-file-if-exists=../../.env src/cli.ts status",
+    "projection:once": "tsx --env-file-if-exists=../../.env src/cli.ts once",
+    "projection:reset": "tsx --env-file-if-exists=../../.env src/cli.ts reset",
+    "test:it": "vitest run --config vitest.it.config.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run"
