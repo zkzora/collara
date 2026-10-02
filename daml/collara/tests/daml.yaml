@@ -1,0 +1,19 @@
+sdk-version: 3.5.12
+name: collara-tests
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../vendor-dars/governance-action-v1-0.1.0.dar
+  - ../vendor-dars/governance-core-v1-0.1.0.dar
+  - ../governance/.daml/dist/collara-governance-0.1.0.dar
+  - ../contracts/.daml/dist/collara-contracts-0.1.0.dar
+  - ../scripts/.daml/dist/collara-scripts-0.1.0.dar
+build-options:
+  - --target=2.2
+  # This package is never uploaded to a ledger. It defines one test-only attacker template
+  # (Collara.Tests.Rogue) next to daml-script, which is intended.
+  - -Wno-template-interface-depends-on-daml-script

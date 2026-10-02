@@ -1,0 +1,72 @@
+[
+  {
+    "completionResponse": {
+      "Completion": {
+        "value": {
+          "commandId": "fx-create",
+          "status": {
+            "code": 0,
+            "message": "",
+            "details": []
+          },
+          "updateId": "12204add451c17bfb011dd6e3717d9678d76ebc5bdadc8101ce20bdd42bcf1fe272a",
+          "userId": "fx-issuerfxvkwg",
+          "actAs": [
+            "FxIssuerfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+          ],
+          "submissionId": "fx-sub-1",
+          "deduplicationPeriod": {
+            "DeduplicationOffset": {
+              "value": 0
+            }
+          },
+          "traceContext": {
+            "traceparent": "00-35b914fb4a413c8fe04d3f4ef1683551-e6d8b336199835d7-03",
+            "tracestate": null
+          },
+          "offset": 64,
+          "synchronizerTime": {
+            "synchronizerId": "synchronizer-1::12201de5be4e77213b31dce53313aeac78b7f4f6caa18eea97a0ad7b73995e507f5a",
+            "recordTime": "2026-10-01T22:28:35.721108Z"
+          },
+          "paidTrafficCost": 0
+        }
+      }
+    }
+  },
+  {
+    "completionResponse": {
+      "Completion": {
+        "value": {
+          "commandId": "fx-withdraw",
+          "status": {
+            "code": 0,
+            "message": "",
+            "details": []
+          },
+          "updateId": "1220c4e8929d5f7d9032e6dec3bb643f0c0f24fa834ed6fe92aca51b4f1ade65825f",
+          "userId": "fx-issuerfxvkwg",
+          "actAs": [
+            "FxIssuerfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+          ],
+          "submissionId": "7ac59b71-d748-4171-bfab-6dbe3784c130",
+          "deduplicationPeriod": {
+            "DeduplicationOffset": {
+              "value": 0
+            }
+          },
+          "traceContext": {
+            "traceparent": "00-bbdee596147500ff74c70b6e9a192ea9-c00e34d15b72efd1-03",
+            "tracestate": null
+          },
+          "offset": 67,
+          "synchronizerTime": {
+            "synchronizerId": "synchronizer-1::12201de5be4e77213b31dce53313aeac78b7f4f6caa18eea97a0ad7b73995e507f5a",
+            "recordTime": "2026-10-01T22:28:37.074485Z"
+          },
+          "paidTrafficCost": 0
+        }
+      }
+    }
+  }
+]

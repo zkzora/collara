@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Runs in the browser (and in Next server components): fetch/Response come from the DOM lib.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": [
+    "src",
+    "vitest.config.ts"
+  ]
+}

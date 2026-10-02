@@ -1,0 +1,121 @@
+-- | Fixture helpers shared by the invariant, attack, governance and privacy tests.
+module Collara.Tests.Common where
+
+import DA.Time (RelTime, addRelTime, days)
+import Daml.Script
+
+import Collara.Control
+import Collara.Evidence
+import Collara.Financing hiding (AssessmentStatus(..))
+import Collara.Governance.Proposals
+import Collara.Governance.Registry
+import Collara.Scripts.Scenario
+import Collara.Verification hiding (VerificationStatus(..))
+
+-- | The main fixture, financed and activated: PL-001 is ACTIVE (control v3 consumed, lock at v4).
+-- (A function of the fixture builder so that `dpm test` does not run it as a test of its own.)
+activeLockFrom : Script MainFixture -> Script (MainFixture, Financed, ContractId CollateralLock)
+activeLockFrom build = do
+  f <- build
+  fin <- financeToAuthorization f
+  lockCid <- activate f.ledger f.ledger.parties.lenderA f.controlCid fin.authorizationCid "PL-001"
+  pure (f, fin, lockCid)
+
+-- | One lender's own path on the fixture asset: assessment from its verifier-signed disclosure -> eligible ->
+-- proposal v1 -> exact-version acceptance -> borrower authorization pinned to the control's current version.
+financeLender : Ledger -> Party -> ContractId AttestationDisclosure -> Text -> ContractId AssetControl
+  -> Script (ContractId FinancingAgreement, ContractId PledgeActivationAuthorization)
+financeLender l lender disclosureCid tag controlCid = do
+  assessmentCid <- openAssessment l lender disclosureCid ("CA-" <> tag)
+  (eligibleCid, _) <- reviewToEligible lender assessmentCid ("LDN-" <> tag)
+  proposalCid <- issueProposal lender eligibleCid ("FP-" <> tag)
+  agreementCid <- acceptProposal l proposalCid ("FP-" <> tag) 1
+  authCid <- authorizeActivation l agreementCid controlCid ("AUTH-" <> tag) (days 7)
+  pure (agreementCid, authCid)
+
+-- | The owner discloses ATT-001 to another recipient (owner-controlled, verifier-signed copy).
+discloseTo : MainFixture -> Party -> Script (ContractId AttestationDisclosure)
+discloseTo f recipient = submit f.ledger.parties.owner $ exerciseCmd f.attestationCid Att_DiscloseTo with
+  recipient
+  purpose = "LENDER_REVIEW"
+  disclosureCaseRef = fixtureCaseRef
+  actorRef = ownerActor
+
+-- * Governance
+
+-- | The live verifier registry (the operator/registrar is an observer).
+currentRegistry : Ledger -> Script (ContractId VerifierRegistry, VerifierRegistry)
+currentRegistry l = queryOne l.parties.registrar (\(r : VerifierRegistry) -> r.registryId == fixtureNamespace)
+
+-- | The verifier's live accreditation with the given status.
+accreditationOf : Party -> VerifierStatus -> Script (ContractId VerifierAccreditation, VerifierAccreditation)
+accreditationOf verifier status =
+  queryOne verifier (\(a : VerifierAccreditation) -> a.verifier == verifier && a.status == status)
+
+-- | An Add-verifier proposal pinned to the given registry contract and version (not yet submitted).
+addVerifierProposal : Ledger -> Party -> ContractId VerifierRegistry -> Int -> Party -> Text
+  -> Script AddVerifierProposal
+addVerifierProposal l proposer registryCid expectedVersion verifier verifierRef = do
+  now <- getTime
+  pure AddVerifierProposal with
+    governanceParty = l.parties.governance
+    proposer
+    registryCid
+    expectedVersion
+    verifier
+    verifierRef
+    orgName = "Synthetic test verifier " <> verifierRef
+    scope = [cncScope]
+    validUntil = Some (addRelTime now accreditationValidity)
+    proposalDeadline = addRelTime now (days 1)
+    reason = "Synthetic test: add verifier"
+
+suspendVerifierProposal : Ledger -> Party -> ContractId VerifierRegistry -> Int -> ContractId VerifierAccreditation
+  -> Party -> Script SuspendVerifierProposal
+suspendVerifierProposal l proposer registryCid expectedVersion accreditationCid verifier = do
+  now <- getTime
+  pure SuspendVerifierProposal with
+    governanceParty = l.parties.governance
+    proposer
+    registryCid
+    expectedVersion
+    accreditationCid
+    verifier
+    proposalDeadline = addRelTime now (days 1)
+    reason = "Synthetic test: suspend verifier"
+
+-- | Governed Add verifier (seat 1 proposes; seats 1 and 2 confirm). Returns the new ACTIVE accreditation.
+addVerifierGoverned : Ledger -> Party -> Text -> RelTime -> [Text]
+  -> Script (ContractId VerifierAccreditation)
+addVerifierGoverned l verifier verifierRef validity scope = do
+  let p = l.parties
+  (registryCid, registry) <- currentRegistry l
+  now <- getTime
+  proposal <- addVerifierProposal l p.seat1 registryCid registry.version verifier verifierRef
+  proposalCid <- submit p.seat1 $ createCmd proposal with
+    validUntil = Some (addRelTime now validity); scope
+  _ <- governTwoOfThree p l.rulesCid (toInterfaceContractId proposalCid)
+  fst <$> accreditationOf verifier ACTIVE
+
+-- | Governed Suspend verifier of the verifier's current ACTIVE accreditation. Returns the SUSPENDED accreditation.
+suspendVerifierGoverned : Ledger -> Party -> Script (ContractId VerifierAccreditation)
+suspendVerifierGoverned l verifier = do
+  let p = l.parties
+  (registryCid, registry) <- currentRegistry l
+  (accCid, _) <- accreditationOf verifier ACTIVE
+  proposal <- suspendVerifierProposal l p.seat1 registryCid registry.version accCid verifier
+  proposalCid <- submit p.seat1 $ createCmd proposal
+  _ <- governTwoOfThree p l.rulesCid (toInterfaceContractId proposalCid)
+  fst <$> accreditationOf verifier SUSPENDED
+
+-- * Verification
+
+-- | A fresh ledger with ASSET-DEMO-001 registered, manifest v1 anchored and VR-001 assigned to Demo Verifier
+-- and accepted (IN_REVIEW).
+requestInReview : Ledger -> Script (Ledger, ContractId EvidenceManifest, ContractId VerificationRequest)
+requestInReview l0 = do
+  (l, control1, _) <- registerAsset l0 demoAsset
+  (manifestCid, _) <- createManifestV1 l control1
+  request1 <- requestVerification l manifestCid
+  request2 <- acceptAssignment l request1
+  pure (l, manifestCid, request2)

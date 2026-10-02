@@ -1,0 +1,41 @@
+-- | Explicit, scoped auditor access. One grant per record owner (borrower for owner records, lender for lender
+-- records). There is no global audit contract; exports are produced off-ledger from the grantor's projection.
+module Collara.Audit where
+
+import DA.List (unique)
+
+data AuditScope
+  = EVIDENCE_MANIFEST
+  | ATTESTATION
+  | DECISION_OUTCOME
+  | PROPOSAL_TERMS
+  | PLEDGE_RELEASE_EVENTS
+  deriving (Eq, Ord, Show)
+
+data AuditPermission
+  = VIEW
+  | EXPORT
+  deriving (Eq, Show)
+
+template AuditGrant
+  with
+    grantor : Party
+    auditor : Party
+    grantRef : Text
+    caseRef : Text
+    scopes : [AuditScope]
+    permission : AuditPermission
+    purpose : Text
+    expiresAt : Time
+  where
+    signatory grantor
+    observer auditor
+    ensure grantor /= auditor && grantRef /= "" && caseRef /= "" && purpose /= ""
+      && not (null scopes) && unique scopes
+
+    -- | Limits future access only.
+    choice Grant_Revoke : ()
+      with
+        actorRef : Text
+      controller grantor
+      do pure ()

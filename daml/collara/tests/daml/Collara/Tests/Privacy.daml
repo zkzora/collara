@@ -1,0 +1,218 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+-- | Visibility (active-contract) checks per party at every step of the walkthrough (S 11.7 #9, synthesis 1.4.2).
+--
+-- Scope: these run on the in-process IDE ledger and check what each party can read (its active contracts). They
+-- do not observe transaction-tree witnesses or participant-level disclosure; those need the 3-participant
+-- Canton sandbox (TRANSACTION_SHAPE_LEDGER_EFFECTS update streams per party).
+module Collara.Tests.Privacy where
+
+import DA.Action (unless, when)
+import DA.Foldable (forA_)
+import qualified DA.Text as T
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Governance.Confirmation (GovernanceConfirmation)
+import Governance.ExecutionResult (GovernanceExecutionResult)
+import Governance.Rules (GovernanceRules)
+
+import Collara.Audit hiding (AuditPermission(..))
+import qualified Collara.Audit as Audit
+import Collara.Config
+import Collara.Control
+import Collara.Evidence
+import Collara.Financing hiding (AssessmentStatus(..))
+import Collara.Governance.Proposals
+import Collara.Governance.Registry
+import Collara.Registration
+import Collara.Release hiding (ReleaseOutcome(..), ReleaseStatus(..))
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Util
+import Collara.Verification hiding (VerificationStatus(..))
+
+rows : forall t. (Template t, HasEnsure t, Show t) => Text -> Party -> Script [(Text, Text)]
+rows name party = map (\(_, c) -> (name, show c)) <$> query @t party
+
+-- | Every Collara and governance contract `party` can read, as (template name, payload).
+visibleContracts : Party -> Script [(Text, Text)]
+visibleContracts party = concat <$> mapA (\q -> q party)
+  [ rows @CollaraConfig "CollaraConfig"
+  , rows @VerifierStatusMirror "VerifierStatusMirror"
+  , rows @AssetRegistrationRequest "AssetRegistrationRequest"
+  , rows @AssetRegistry "AssetRegistry"
+  , rows @IssuanceTicket "IssuanceTicket"
+  , rows @AssetPassport "AssetPassport"
+  , rows @AssetControl "AssetControl"
+  , rows @RetiredControl "RetiredControl"
+  , rows @CollateralLock "CollateralLock"
+  , rows @CollateralLockReleased "CollateralLockReleased"
+  , rows @EvidenceManifest "EvidenceManifest"
+  , rows @DealerContribution "DealerContribution"
+  , rows @PackageShareProposal "PackageShareProposal"
+  , rows @PackageShare "PackageShare"
+  , rows @VerificationRequest "VerificationRequest"
+  , rows @VerificationAttestation "VerificationAttestation"
+  , rows @AttestationDisclosure "AttestationDisclosure"
+  , rows @RevokedAttestation "RevokedAttestation"
+  , rows @CollateralAssessment "CollateralAssessment"
+  , rows @LenderDecisionNotice "LenderDecisionNotice"
+  , rows @FinancingProposal "FinancingProposal"
+  , rows @FinancingAgreement "FinancingAgreement"
+  , rows @PledgeActivationAuthorization "PledgeActivationAuthorization"
+  , rows @ReleaseRequest "ReleaseRequest"
+  , rows @ReleaseDecision "ReleaseDecision"
+  , rows @AuditGrant "AuditGrant"
+  , rows @VerifierRegistry "VerifierRegistry"
+  , rows @VerifierAccreditation "VerifierAccreditation"
+  , rows @BootstrapVerifierRegistryProposal "BootstrapVerifierRegistryProposal"
+  , rows @AddVerifierProposal "AddVerifierProposal"
+  , rows @SuspendVerifierProposal "SuspendVerifierProposal"
+  , rows @GovernanceRules "GovernanceRules"
+  , rows @GovernanceConfirmation "GovernanceConfirmation"
+  , rows @GovernanceExecutionResult "GovernanceExecutionResult"
+  ]
+
+-- | Templates that carry terms, valuation or lender decisions (stakeholders: borrower and selected lender).
+financingTemplates : [Text]
+financingTemplates =
+  ["CollateralAssessment", "LenderDecisionNotice", "FinancingProposal", "FinancingAgreement", "PledgeActivationAuthorization"]
+
+pledgeTemplates : [Text]
+pledgeTemplates = ["CollateralLock", "CollateralLockReleased", "ReleaseRequest", "ReleaseDecision"]
+
+-- | Fixture values that may appear only in borrower/Lender A records (terms) or Lender A records (valuation).
+termValues, valuationValues, caseValues : [Text]
+termValues = ["100000.", "Synthetic 36-month equipment financing terms", "LEGAL-DEMO-"]
+valuationValues = ["150000.", "Synthetic desktop valuation"]
+caseValues = ["CL-001", "ASSET-DEMO-001", "PKG-001", "ATT-001", "SYNTH-CNC-001"]
+
+-- | `party` can read none of `templates` and no payload containing any of `fragments`.
+assertCannotRead : Text -> Text -> Party -> [Text] -> [Text] -> Script ()
+assertCannotRead stage who party templates fragments = do
+  visible <- visibleContracts party
+  forA_ visible $ \(name, payload) -> do
+    when (name `elem` templates) $ fail (stage <> ": " <> who <> " can read " <> name)
+    forA_ fragments $ \fragment -> when (fragment `T.isInfixOf` payload) $
+      fail (stage <> ": " <> who <> " can read '" <> fragment <> "' in " <> name)
+
+-- | `party` can read only the listed templates.
+assertReadsOnly : Text -> Text -> Party -> [Text] -> Script ()
+assertReadsOnly stage who party allowed = do
+  visible <- visibleContracts party
+  forA_ visible $ \(name, _) -> unless (name `elem` allowed) $
+    fail (stage <> ": " <> who <> " can unexpectedly read " <> name)
+
+-- | `party` can read at least one `template` whose payload contains `fragment` (positive control).
+assertCanRead : Text -> Text -> Party -> Text -> Text -> Script ()
+assertCanRead stage who party templateName fragment = do
+  visible <- visibleContracts party
+  unless (any (\(name, payload) -> name == templateName && fragment `T.isInfixOf` payload) visible) $
+    fail (stage <> ": " <> who <> " should read '" <> fragment <> "' in " <> templateName)
+
+outsiders : Parties -> [(Text, Party)]
+outsiders p =
+  [ ("verifier", p.verifier), ("dealer", p.dealer), ("Lender B", p.lenderB), ("auditor", p.auditor)
+  , ("governance party", p.governance), ("seat 1", p.seat1), ("seat 2", p.seat2), ("seat 3", p.seat3) ]
+
+-- | The privacy rules that must hold after every step.
+checkpoint : Text -> Parties -> Bool -> Script ()
+checkpoint stage p auditorGranted = do
+  -- terms, valuation and lender decisions: never the verifier, dealer, registrar, Lender B, auditor or governance
+  forA_ (("registrar", p.registrar) :: outsiders p) $ \(who, x) ->
+    assertCannotRead stage who x financingTemplates (termValues ++ valuationValues)
+  -- the borrower never reads the lender's internal assessment or valuation
+  assertCannotRead stage "borrower" p.owner ["CollateralAssessment"] valuationValues
+  -- pledge records: borrower and Lender A; the registrar only as a lock signatory / released-record observer
+  forA_ (outsiders p) $ \(who, x) -> assertCannotRead stage who x pledgeTemplates []
+  assertCannotRead stage "registrar" p.registrar ["ReleaseRequest", "ReleaseDecision"] []
+  -- Lender B: only the non-sensitive directory (config, verifier status), nothing of CL-001
+  assertReadsOnly stage "Lender B" p.lenderB ["CollaraConfig", "VerifierStatusMirror"]
+  assertCannotRead stage "Lender B" p.lenderB [] caseValues
+  -- the dealer: its own contribution and the share it consented to (its own document only)
+  assertReadsOnly stage "dealer" p.dealer ["DealerContribution", "PackageShare"]
+  assertCannotRead stage "dealer" p.dealer [] ["DOC-002", "DOC-003", "DOC-004", "ATT-001"]
+  -- the verifier: directory, its accreditation, its request/attestation and disclosures of it
+  assertReadsOnly stage "verifier" p.verifier
+    ["CollaraConfig", "VerifierStatusMirror", "VerifierAccreditation", "VerificationRequest",
+     "VerificationAttestation", "AttestationDisclosure", "RevokedAttestation"]
+  -- the auditor: nothing before a grant, then only its grants
+  if auditorGranted
+    then assertReadsOnly stage "auditor" p.auditor ["AuditGrant"]
+    else assertReadsOnly stage "auditor" p.auditor []
+
+test_privacy_through_the_walkthrough : Script ()
+test_privacy_through_the_walkthrough = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  checkpoint "main fixture" p False
+  assertCanRead "main fixture" "Lender A" p.lenderA "AttestationDisclosure" "ATT-001"
+  (eligibleCid, _) <- reviewToEligible p.lenderA f.assessmentCid "LDN-001"
+  checkpoint "eligible" p False
+  assertCanRead "eligible" "Lender A" p.lenderA "CollateralAssessment" "150000."
+  proposalCid <- issueProposal p.lenderA eligibleCid "FP-001"
+  checkpoint "proposal issued" p False
+  agreementCid <- acceptProposal l proposalCid "FP-001" 1
+  checkpoint "proposal accepted" p False
+  assertCanRead "proposal accepted" "borrower" p.owner "FinancingAgreement" "100000."
+  assertCanRead "proposal accepted" "Lender A" p.lenderA "FinancingAgreement" "100000."
+  authorizationCid <- authorizeActivation l agreementCid f.controlCid "AUTH-001" (days 7)
+  checkpoint "activation authorized" p False
+  lockCid <- activate l p.lenderA f.controlCid authorizationCid "PL-001"
+  checkpoint "pledge active" p False
+  assertCanRead "pledge active" "registrar" p.registrar "CollateralLock" "PL-001"
+  assertCannotRead "pledge active" "registrar" p.registrar [] termValues
+  rejected <- requestRelease l lockCid "RR-001"
+  checkpoint "release requested" p False
+  _ <- submit p.lenderA $ exerciseCmd rejected Release_Reject with
+    decisionRef = "RD-001"; sharedReason = "Repayment confirmation has not been received."; actorRef = approverActor
+  checkpoint "release rejected" p False
+  authorized <- requestRelease l lockCid "RR-002"
+  _ <- submit p.lenderA $ exerciseCmd authorized Release_Authorize with decisionRef = "RD-002"; actorRef = approverActor
+  checkpoint "released" p False
+  assertCanRead "released" "registrar" p.registrar "CollateralLockReleased" "PL-001"
+  now <- getTime
+  let grant grantor ref scopes = submit grantor $ createCmd AuditGrant with
+        grantor; auditor = p.auditor; grantRef = ref; caseRef = fixtureCaseRef; scopes
+        permission = Audit.EXPORT; purpose = "Synthetic audit of case CL-001"; expiresAt = addRelTime now (days 30)
+  ownerGrant <- grant p.owner "AG-001" [EVIDENCE_MANIFEST, ATTESTATION]
+  _ <- grant p.lenderA "AG-002" [DECISION_OUTCOME, PLEDGE_RELEASE_EVENTS]
+  checkpoint "audit grants" p True
+  grants <- query @AuditGrant p.auditor
+  assertEq "auditor grants" 2 (length grants)
+  submit p.owner $ exerciseCmd ownerGrant Grant_Revoke with actorRef = ownerActor
+  remaining <- query @AuditGrant p.auditor
+  assertEq "auditor grants after revocation" ["AG-002"] (map ((.grantRef) . snd) remaining)
+
+-- | Revocation limits future visibility: the lender loses the shares, the attestation copy and the control view.
+test_revocation_limits_future_visibility : Script ()
+test_revocation_limits_future_visibility = do
+  f <- seedMain
+  let p = f.ledger.parties
+  submit p.owner $ exerciseCmd f.ownerShareCid Share_Revoke with actorRef = ownerActor
+  submit p.owner $ exerciseCmd f.dealerShareCid Share_Revoke with actorRef = ownerActor
+  submit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
+  _ <- submit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with lender = p.lenderA; actorRef = ownerActor
+  assertCannotRead "after revocation" "Lender A" p.lenderA
+    ["PackageShare", "AttestationDisclosure", "AssetControl"] ["DOC-00"]
+  -- the lender keeps its own assessment record (which references ATT-001 by its display ref)
+  assertCanRead "after revocation" "Lender A" p.lenderA "CollateralAssessment" "CA-001"
+
+-- | The owner cannot share the dealer's document without the dealer's consent; a dealer can withdraw its consent
+-- and the owner's own share is unaffected.
+test_dealer_consent_required_and_withdrawable : Script ()
+test_dealer_consent_required_and_withdrawable = do
+  f <- seedMain
+  let p = f.ledger.parties
+  now <- getTime
+  manifest <- fetchAs p.owner f.manifestCid
+  rNoConsent <- trySubmit p.owner $ createCmd PackageShare with
+    owner = p.owner; consenters = []; recipient = p.lenderB; shareRef = "SHR-X"; purpose = "LENDER_REVIEW"
+    caseRef = fixtureCaseRef; evidence = anchorOf manifest
+    documents = sharedDocumentsFrom p.dealer manifest.entries; permission = VIEW
+    expiresAt = addRelTime now (days 1)
+  expectPreconditionFailure rNoConsent
+  submit p.dealer $ exerciseCmd f.dealerShareCid Share_WithdrawConsent with consenter = p.dealer; actorRef = dealerActor
+  assertArchived "dealer share" p.lenderA f.dealerShareCid
+  assertActive "owner share" p.lenderA f.ownerShareCid

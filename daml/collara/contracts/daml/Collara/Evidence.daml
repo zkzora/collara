@@ -1,0 +1,236 @@
+-- | Evidence manifests (hashes and opaque references only; bytes stay in private storage), dealer contributions
+-- and scoped package sharing with dealer consent.
+module Collara.Evidence where
+
+import DA.List (unique)
+
+import Collara.Control
+import Collara.Types
+import Collara.Verification
+
+data SharePermission
+  = VIEW
+  | VIEW_DOWNLOAD
+  deriving (Eq, Show)
+
+data ManifestEntry = ManifestEntry
+  with
+    docRef : Text
+    docType : Text
+    docVersion : Int
+    sha256 : Text
+    source : Party
+      -- ^ Record owner of the document: the asset owner or a contributing dealer.
+    contributorRef : Text
+  deriving (Eq, Show)
+
+data SharedDocument = SharedDocument
+  with
+    docRef : Text
+    docVersion : Int
+    sha256 : Text
+    source : Party
+  deriving (Eq, Show)
+
+validEntries : [ManifestEntry] -> Bool
+validEntries es = not (null es) && unique (map (.docRef) es)
+  && all (\e -> e.docRef /= "" && e.sha256 /= "" && e.docVersion >= 1) es
+
+-- | Owner-only evidence package version. A new version consumes this one and, in the same transaction, moves the
+-- asset control's evidence anchor, which invalidates authorizations bound to the previous version.
+template EvidenceManifest
+  with
+    owner : Party
+    registrar : Party
+      -- ^ Reference only; not a stakeholder.
+    namespace : Text
+    assetId : Text
+    packageRef : Text
+    version : Int
+    manifestHash : Text
+    entries : [ManifestEntry]
+  where
+    signatory owner
+    ensure nonEmptyTexts [namespace, assetId, packageRef, manifestHash] && version >= 1 && validEntries entries
+
+    -- | Anchors this manifest version on the asset control (used for the first version of a package).
+    nonconsuming choice Manifest_Anchor : ContractId AssetControl
+      with
+        controlCid : ContractId AssetControl
+        actorRef : Text
+      controller owner
+      do
+        assertControlMatches this controlCid
+        exercise controlCid Control_AnchorEvidence with anchor = anchorOf this; actorRef
+
+    choice Manifest_NewVersion : (ContractId EvidenceManifest, ContractId AssetControl)
+      with
+        newEntries : [ManifestEntry]
+        newManifestHash : Text
+        controlCid : ContractId AssetControl
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "Manifest hash must change" (newManifestHash /= manifestHash)
+        assertControlMatches this controlCid
+        let next = this with version = version + 1; entries = newEntries; manifestHash = newManifestHash
+        manifestCid <- create next
+        newControlCid <- exercise controlCid Control_AnchorEvidence with anchor = anchorOf next; actorRef
+        pure (manifestCid, newControlCid)
+
+    nonconsuming choice Manifest_RequestVerification : ContractId VerificationRequest
+      with
+        verifier : Party
+        requestRef : Text
+        passportVersion : Int
+        caseRef : Optional Text
+        equipmentScope : Text
+        checklist : [Text]
+        dueBy : Optional Time
+        actorRef : Text
+      controller owner
+      do
+        create VerificationRequest with
+          owner
+          verifier
+          registrar
+          namespace
+          requestRef
+          assetId
+          passportVersion
+          caseRef
+          evidence = anchorOf this
+          equipmentScope
+          checklist
+          dueBy
+          status = REQUESTED
+          version = 1
+          changeNote = ""
+
+    nonconsuming choice Manifest_SubmitToVerification : ContractId VerificationRequest
+      with
+        requestCid : ContractId VerificationRequest
+        actorRef : Text
+      controller owner
+      do
+        request <- fetch requestCid
+        assertMsg "Verification request is for another asset" (request.assetId == assetId && request.owner == owner)
+        exercise requestCid VR_SubmitNewEvidence with newEvidence = anchorOf this; actorRef
+
+anchorOf : EvidenceManifest -> EvidenceAnchor
+anchorOf m = EvidenceAnchor with packageRef = m.packageRef; manifestVersion = m.version; manifestHash = m.manifestHash
+
+assertControlMatches : EvidenceManifest -> ContractId AssetControl -> Update ()
+assertControlMatches m controlCid = do
+  control <- fetch controlCid
+  assertMsg "Asset control is for another asset or owner"
+    (control.owner == m.owner && control.namespace == m.namespace && control.assetId == m.assetId)
+
+-- | One contributed document. `verificationUseConsented` covers use by the assigned verifier; onward sharing
+-- with a lender needs a per-recipient `Consent_Grant`.
+template DealerContribution
+  with
+    dealer : Party
+    owner : Party
+    caseRef : Text
+    docRef : Text
+    docType : Text
+    docVersion : Int
+    sha256 : Text
+    contributorRef : Text
+    verificationUseConsented : Bool
+  where
+    signatory dealer
+    observer owner
+    ensure nonEmptyTexts [caseRef, docRef, sha256] && docVersion >= 1 && dealer /= owner
+
+    choice Contribution_Withdraw : ()
+      with
+        actorRef : Text
+      controller dealer
+      do pure ()
+
+-- | Owner's request for the dealer's consent to share the dealer's own documents with one recipient. It lists
+-- only that dealer's documents, so the dealer never sees the owner's document metadata; the owner shares its own
+-- documents in a separate owner-signed `PackageShare` for the same evidence anchor.
+template PackageShareProposal
+  with
+    owner : Party
+    dealer : Party
+    recipient : Party
+    shareRef : Text
+    purpose : Text
+    caseRef : Text
+    evidence : EvidenceAnchor
+    documents : [SharedDocument]
+    permission : SharePermission
+    expiresAt : Time
+  where
+    signatory owner
+    observer dealer
+    ensure validShare owner [dealer] recipient documents && all (\d -> d.source == dealer) documents
+      && shareRef /= "" && validAnchor evidence
+
+    choice Consent_Grant : ContractId PackageShare
+      with
+        actorRef : Text
+      controller dealer
+      do
+        now <- getTime
+        assertMsg "Share request has expired" (now <= expiresAt)
+        create PackageShare with
+          owner; consenters = [dealer]; recipient; shareRef; purpose; caseRef; evidence; documents; permission; expiresAt
+
+    choice Consent_Decline : ()
+      with
+        reason : Text
+        actorRef : Text
+      controller dealer
+      do pure ()
+
+    choice ShareProposal_Withdraw : ()
+      with
+        actorRef : Text
+      controller owner
+      do pure ()
+
+validShare : Party -> [Party] -> Party -> [SharedDocument] -> Bool
+validShare owner consenters recipient documents =
+  not (null documents) && unique (map (.docRef) documents)
+    && recipient /= owner && recipient `notElem` consenters
+    && all (\d -> d.source == owner || d.source `elem` consenters) documents
+
+-- | Scoped access grant for one recipient. Every document must belong to the owner or to a consenting party.
+-- Owner documents: created directly by the owner (`consenters = []`). Dealer documents: created by
+-- `Consent_Grant`. The API checks an active, unexpired share covering the document at every download.
+template PackageShare
+  with
+    owner : Party
+    consenters : [Party]
+    recipient : Party
+    shareRef : Text
+    purpose : Text
+    caseRef : Text
+    evidence : EvidenceAnchor
+    documents : [SharedDocument]
+    permission : SharePermission
+    expiresAt : Time
+  where
+    signatory owner, consenters
+    observer recipient
+    ensure validShare owner consenters recipient documents && shareRef /= "" && validAnchor evidence
+
+    -- | Revokes future document access. Previously shared copies may still exist.
+    choice Share_Revoke : ()
+      with
+        actorRef : Text
+      controller owner
+      do pure ()
+
+    choice Share_WithdrawConsent : ()
+      with
+        consenter : Party
+        actorRef : Text
+      controller consenter
+      do
+        assertMsg "Not a consenting party" (consenter `elem` consenters)

@@ -1,0 +1,25 @@
+{
+  "name": "@collara/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed Collara API client (HTTP) and the UI_MOCK client implementing the same interface",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mock": "./src/mock/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@collara/domain": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

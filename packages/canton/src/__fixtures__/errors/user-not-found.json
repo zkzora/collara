@@ -1,0 +1,25 @@
+{
+  "status": 404,
+  "body": {
+    "code": "USER_NOT_FOUND",
+    "cause": "getting user failed for unknown user \"nope-muq3hmv3\"",
+    "correlationId": null,
+    "traceId": "35ffb28a0f4e2f567d04bda87339bd52",
+    "context": {
+      "participant": "'sandbox'",
+      "definite_answer": "false",
+      "tid": "35ffb28a0f4e2f567d04bda87339bd52",
+      "category": "11"
+    },
+    "resources": [
+      [
+        "ErrorResource(USER)",
+        "nope-muq3hmv3"
+      ]
+    ],
+    "errorCategory": 11,
+    "grpcCodeValue": 5,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

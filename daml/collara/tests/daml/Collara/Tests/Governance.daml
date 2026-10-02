@@ -1,0 +1,225 @@
+-- | Governed verifier registry (DM `GovernanceRules`, threshold 2 of 3 seats), Tier A: the governance party is a
+-- local party and members act with `readAs` it, exactly as DM's own Daml tests do.
+module Collara.Tests.Governance where
+
+import DA.Foldable (forA_)
+import DA.List (sort)
+import qualified DA.Set as Set
+import DA.Time (addRelTime, minutes)
+import Daml.Script
+
+import Governance.Action
+import Governance.Confirmation (GovernanceConfirmation)
+import Governance.ExecutionResult
+import Governance.Rules
+
+import Collara.Governance.Proposals
+import Collara.Governance.Registry
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Common
+import Collara.Tests.Rogue
+import Collara.Tests.Util
+
+-- | A new synthetic verifier party, a live registry and an Add proposal for it created by seat 1.
+newAddProposal : Ledger -> Text -> Script (Party, ContractId GovernableAction)
+newAddProposal l hint = do
+  let p = l.parties
+  verifier <- allocatePartyByHint (PartyIdHint hint)
+  (registryCid, registry) <- currentRegistry l
+  proposal <- addVerifierProposal l p.seat1 registryCid registry.version verifier ("VER-" <> hint)
+  cid <- submit p.seat1 $ createCmd proposal
+  pure (verifier, toInterfaceContractId cid)
+
+tryExecute : Ledger -> Party -> ContractId GovernableAction -> [ContractId GovernanceConfirmation]
+  -> Script (Either SubmitError ExecuteConfirmedActionResult)
+tryExecute l executor proposalCid confirmations =
+  trySubmit (memberCtx l.parties executor) $ exerciseCmd l.rulesCid GovernanceRules_ExecuteConfirmedAction with
+    executor; actionProposalCid = proposalCid; confirmations
+
+test_one_confirmation_cannot_execute : Script ()
+test_one_confirmation_cannot_execute = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, proposalCid) <- newAddProposal l "T02"
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  r <- tryExecute l p.seat1 proposalCid [c1]
+  expectFailure "Enough confirmations to execute action" r
+  assertActive "proposal" p.governance (fromInterfaceContractId @AddVerifierProposal proposalCid)
+
+test_duplicate_confirmations_do_not_count_twice : Script ()
+test_duplicate_confirmations_do_not_count_twice = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, proposalCid) <- newAddProposal l "T02"
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  c1again <- confirmAs p l.rulesCid p.seat1 proposalCid
+  r <- tryExecute l p.seat1 proposalCid [c1, c1again]
+  expectFailure "No duplicate confirmers" r
+  (_, registry) <- currentRegistry l
+  assertEq "registry unchanged" 0 registry.version
+
+test_two_distinct_confirmations_execute_add_verifier : Script ()
+test_two_distinct_confirmations_execute_add_verifier = do
+  l <- seedCleanStart
+  let p = l.parties
+  (verifier2, proposalCid) <- newAddProposal l "T02"
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  c2 <- confirmAs p l.rulesCid p.seat2 proposalCid
+  result <- submit (memberCtx p p.seat2) $ exerciseCmd l.rulesCid GovernanceRules_ExecuteConfirmedAction with
+    executor = p.seat2; actionProposalCid = proposalCid; confirmations = [c1, c2]
+  evidence <- fetchAs p.governance result.executionResultCid
+  assertEq "audit label" addVerifierLabel evidence.actionLabel
+  assertEq "executor" p.seat2 evidence.executor
+  assertEq "confirmers" (sort [p.seat1, p.seat2]) (sort evidence.confirmers)
+  (_, registry) <- currentRegistry l
+  assertEq "registry version" 1 registry.version
+  assertEq "active verifiers" (Set.fromList [p.verifier, verifier2]) registry.activeVerifiers
+  (_, acc) <- accreditationOf verifier2 ACTIVE
+  assertEq "accreditation" ("VER-T02", 1, p.governance) (acc.verifierRef, acc.registryVersion, acc.governanceParty)
+  -- an executed proposal is archived and cannot execute again
+  assertArchived "executed proposal" p.governance (fromInterfaceContractId @AddVerifierProposal proposalCid)
+  c3 <- trySubmit (memberCtx p p.seat3) $ exerciseCmd l.rulesCid GovernanceRules_ConfirmAction with
+    confirmer = p.seat3; actionProposalCid = proposalCid
+  expectConsumed c3
+  rReplay <- tryExecute l p.seat2 proposalCid [c1, c2]
+  expectConsumed rReplay
+
+-- | Two proposals pinned to registry v0: after the first executes (registry archived, now v1) the second cannot.
+-- A proposal pinned to the live registry contract with a wrong version fails too.
+test_stale_proposal_cannot_execute : Script ()
+test_stale_proposal_cannot_execute = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, first) <- newAddProposal l "T02"
+  (_, second) <- newAddProposal l "T03"
+  _ <- governTwoOfThree p l.rulesCid first
+  d1 <- confirmAs p l.rulesCid p.seat1 second
+  d3 <- confirmAs p l.rulesCid p.seat3 second
+  rStale <- tryExecute l p.seat3 second [d1, d3]
+  expectConsumed rStale
+  (registryCid, registry) <- currentRegistry l
+  verifier4 <- allocatePartyByHint (PartyIdHint "T04")
+  wrong <- addVerifierProposal l p.seat1 registryCid (registry.version - 1) verifier4 "VER-T04"
+  wrongCid <- toInterfaceContractId @GovernableAction <$> submit p.seat1 (createCmd wrong)
+  e1 <- confirmAs p l.rulesCid p.seat1 wrongCid
+  e2 <- confirmAs p l.rulesCid p.seat2 wrongCid
+  rWrong <- tryExecute l p.seat2 wrongCid [e1, e2]
+  expectFailure "Stale registry version" rWrong
+
+test_deadline_passed_cannot_execute : Script ()
+test_deadline_passed_cannot_execute = do
+  l <- seedCleanStart
+  let p = l.parties
+  (registryCid, registry) <- currentRegistry l
+  verifier2 <- allocatePartyByHint (PartyIdHint "T02")
+  now <- getTime
+  proposal <- addVerifierProposal l p.seat1 registryCid registry.version verifier2 "VER-T02"
+  proposalCid <- toInterfaceContractId @GovernableAction <$>
+    submit p.seat1 (createCmd proposal with proposalDeadline = addRelTime now (minutes 10))
+  passTime (minutes 20)
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  c2 <- confirmAs p l.rulesCid p.seat2 proposalCid
+  r <- tryExecute l p.seat2 proposalCid [c1, c2]
+  expectFailure "Proposal deadline passed" r
+
+test_expired_confirmations_cannot_execute : Script ()
+test_expired_confirmations_cannot_execute = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, proposalCid) <- newAddProposal l "T02"
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  c2 <- confirmAs p l.rulesCid p.seat2 proposalCid
+  passTime (minutes 31)
+  r <- tryExecute l p.seat2 proposalCid [c1, c2]
+  expectFailure "Confirmation has expired" r
+
+test_only_members_confirm_and_execute : Script ()
+test_only_members_confirm_and_execute = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, proposalCid) <- newAddProposal l "T02"
+  -- business parties hold no seat (Demo Lender B's seat is the separate gov-seat-2 party)
+  rConfirm <- trySubmit (actAs p.lenderB <> readAs p.governance) $ exerciseCmd l.rulesCid GovernanceRules_ConfirmAction with
+    confirmer = p.lenderB; actionProposalCid = proposalCid
+  expectFailure "Confirmer is a governance member" rConfirm
+  c1 <- confirmAs p l.rulesCid p.seat1 proposalCid
+  c2 <- confirmAs p l.rulesCid p.seat2 proposalCid
+  rExecute <- tryExecute l p.registrar proposalCid [c1, c2]
+  expectFailure "Executor is a governance member" rExecute
+  -- a proposal by a non-member can be created but never confirmed
+  (registryCid, registry) <- currentRegistry l
+  verifier3 <- allocatePartyByHint (PartyIdHint "T03")
+  rogue <- addVerifierProposal l p.lenderA registryCid registry.version verifier3 "VER-T03"
+  rogueCid <- toInterfaceContractId @GovernableAction <$> submit p.lenderA (createCmd rogue)
+  rRogue <- trySubmit (memberCtx p p.seat1) $ exerciseCmd l.rulesCid GovernanceRules_ConfirmAction with
+    confirmer = p.seat1; actionProposalCid = rogueCid
+  expectFailure "Proposer is authorized" rRogue
+
+test_registry_contracts_need_governance_authority : Script ()
+test_registry_contracts_need_governance_authority = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, acc) <- accreditationOf p.verifier ACTIVE
+  forA_ [p.seat1, p.registrar, p.verifier] $ \x -> do
+    r <- trySubmit x $ createCmd acc with verifierRef = "VER-FORGED"
+    expectAuthorizationFailure r
+  (registryCid, _) <- currentRegistry l
+  rDirect <- trySubmit (actAs p.seat1 <> readAs p.governance) $ exerciseCmd registryCid Registry_Add with
+    verifier = p.lenderA
+  expectAuthorizationFailure rDirect
+
+test_duplicate_active_verifier_rejected : Script ()
+test_duplicate_active_verifier_rejected = do
+  l <- seedCleanStart
+  let p = l.parties
+  (registryCid, registry) <- currentRegistry l
+  proposal <- addVerifierProposal l p.seat1 registryCid registry.version p.verifier "VER-001"
+  cid <- toInterfaceContractId @GovernableAction <$> submit p.seat1 (createCmd proposal)
+  c1 <- confirmAs p l.rulesCid p.seat1 cid
+  c2 <- confirmAs p l.rulesCid p.seat2 cid
+  r <- tryExecute l p.seat2 cid [c1, c2]
+  expectFailure "Verifier already active" r
+
+test_proposer_can_cancel : Script ()
+test_proposer_can_cancel = do
+  l <- seedCleanStart
+  let p = l.parties
+  (_, proposalCid) <- newAddProposal l "T02"
+  submit p.seat1 $ exerciseCmd proposalCid GovernableAction_ProposerCancel
+  assertArchived "cancelled proposal" p.governance (fromInterfaceContractId @AddVerifierProposal proposalCid)
+
+-- | Governed suspension: registry v1 without the verifier, accreditation SUSPENDED, label recorded.
+test_suspend_verifier_governed : Script ()
+test_suspend_verifier_governed = do
+  l <- seedCleanStart
+  let p = l.parties
+  (oldAccCid, _) <- accreditationOf p.verifier ACTIVE
+  suspendedCid <- suspendVerifierGoverned l p.verifier
+  suspended <- fetchAs p.verifier suspendedCid
+  assertEq "status" SUSPENDED suspended.status
+  assertEq "registry version on accreditation" 1 suspended.registryVersion
+  assertArchived "active accreditation" p.verifier oldAccCid
+  (_, registry) <- currentRegistry l
+  assertEq "registry" (1, Set.empty) (registry.version, registry.activeVerifiers)
+  results <- query @GovernanceExecutionResult p.governance
+  assertEq "audit labels" (sort [bootstrapLabel, suspendVerifierLabel]) (sort (map ((.actionLabel) . snd) results))
+
+-- | A governed action cannot release a collateral lock: `executeImpl` only carries {proposer, governanceParty}
+-- authority, and neither is a lock stakeholder.
+test_governance_cannot_release_lock : Script ()
+test_governance_cannot_release_lock = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  rogueCid <- toInterfaceContractId @GovernableAction <$> submit p.seat1 (createCmd RogueReleaseProposal with
+    governanceParty = p.governance; proposer = p.seat1; lockCid)
+  c1 <- confirmAs p l.rulesCid p.seat1 rogueCid
+  c2 <- confirmAs p l.rulesCid p.seat2 rogueCid
+  rHidden <- tryExecute l p.seat2 rogueCid [c1, c2]
+  expectNotVisible rHidden
+  -- even when the executing node could read the lock, the designated lender's authority is missing
+  rWithRead <- trySubmit (memberCtx p p.seat2 <> readAs p.lenderA) $ exerciseCmd l.rulesCid
+    GovernanceRules_ExecuteConfirmedAction with executor = p.seat2; actionProposalCid = rogueCid; confirmations = [c1, c2]
+  expectAuthorizationFailure rWithRead
+  assertActive "lock" p.owner lockCid

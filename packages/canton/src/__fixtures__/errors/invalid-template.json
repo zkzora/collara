@@ -1,0 +1,25 @@
+{
+  "status": 404,
+  "body": {
+    "code": "TEMPLATES_OR_INTERFACES_NOT_FOUND",
+    "cause": "Templates do not exist: [3281ed459fe197194d2a769c284b0f8713eb126c64575cdce04254ab5cfda38c:It:Nope].",
+    "correlationId": null,
+    "traceId": "391a4929eaf3a6c0192be18107e5e40e",
+    "context": {
+      "participant": "sandbox",
+      "definite_answer": "false",
+      "tid": "391a4929eaf3a6c0192be18107e5e40e",
+      "category": "11"
+    },
+    "resources": [
+      [
+        "ErrorResource(TEMPLATE_ID)",
+        "3281ed459fe197194d2a769c284b0f8713eb126c64575cdce04254ab5cfda38c:It:Nope"
+      ]
+    ],
+    "errorCategory": 11,
+    "grpcCodeValue": 5,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

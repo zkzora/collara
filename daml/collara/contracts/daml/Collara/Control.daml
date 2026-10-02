@@ -1,0 +1,240 @@
+-- | The canonical control token of a registered asset and the collateral lock that holds it.
+--
+-- Single-lock invariant: for each registered asset exactly one control token exists at any time, either an
+-- `AssetControl` (AVAILABLE) or a `CollateralLock` (LOCKED). Every transition consumes the current token and
+-- creates the next one, so two activations of the same asset cannot both commit (the second finds the control
+-- archived). No contract keys and no flags are involved.
+module Collara.Control where
+
+import DA.Action (when)
+import DA.Optional (isNone)
+
+import Collara.Config
+import Collara.Financing
+import Collara.Governance.Registry (VerifierStatus(..))
+import Collara.Types
+
+-- | AVAILABLE control of one registered asset. Signed by the registrar and the owner: neither can create a
+-- replacement alone. Carries no valuation, terms or lender notes.
+template AssetControl
+  with
+    registrar : Party
+    owner : Party
+    namespace : Text
+    assetId : Text
+    controlVersion : Int
+      -- ^ Incremented by every transition that changes what an activation authorization pins (evidence anchor,
+      -- lender view revocation, correction, lock, release). Sharing with the first lender keeps it.
+    evidence : Optional EvidenceAnchor
+      -- ^ The owner's current evidence package version for this asset.
+    sharedLender : Optional Party
+      -- ^ At most one lender may see (and later activate against) the control at a time.
+  where
+    signatory registrar, owner
+    observer optional [] (\l -> [l]) sharedLender
+    ensure namespace /= "" && assetId /= "" && controlVersion >= 1 && registrar /= owner
+      && optional True validAnchor evidence
+      && optional True (\l -> l /= owner && l /= registrar) sharedLender
+
+    -- | The "share with selected lender" ledger step. Requires that no lender is currently shared: a previous
+    -- lender, as observer of the consumed control, would otherwise witness the next lender.
+    -- Adding the first observer does not change what an activation authorization pins, so the version is kept.
+    choice Control_ShareWithLender : ContractId AssetControl
+      with
+        lender : Party
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "Control is already shared with a lender; revoke that view first" (isNone sharedLender)
+        assertMsg "Lender must be another party" (lender /= owner && lender /= registrar)
+        create this with sharedLender = Some lender
+
+    -- | Removes the lender's view. Bumps the version, so any activation authorization pinned to the shared state
+    -- becomes unusable.
+    choice Control_RevokeLenderView : ContractId AssetControl
+      with
+        lender : Party
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "Control is not shared with this lender" (sharedLender == Some lender)
+        create this with sharedLender = None; controlVersion = controlVersion + 1
+
+    -- | Records the owner's current evidence package version. Exercised from `EvidenceManifest` choices so that a
+    -- new manifest version and the anchor change commit atomically. Versions of one package only move forward.
+    choice Control_AnchorEvidence : ContractId AssetControl
+      with
+        anchor : EvidenceAnchor
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "Invalid evidence anchor" (validAnchor anchor)
+        case evidence of
+          Some prev | prev.packageRef == anchor.packageRef ->
+            assertMsg "Evidence package version must increase" (anchor.manifestVersion > prev.manifestVersion)
+          _ -> pure ()
+        create this with evidence = Some anchor; controlVersion = controlVersion + 1
+
+    -- | Correction of the control record. Only possible while AVAILABLE: a locked asset has no `AssetControl`.
+    choice Control_Correct : ContractId AssetControl
+      with
+        reason : Text
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "A correction reason is required" (reason /= "")
+        create this with controlVersion = controlVersion + 1
+
+    -- | Ends the asset's Collara lifecycle. The asset id stays in the registry, so it is never reissued.
+    choice Control_Retire : ContractId RetiredControl
+      with
+        reason : Text
+        actorRef : Text
+      controller owner
+      do
+        now <- getTime
+        create RetiredControl with
+          registrar; owner; namespace; assetId
+          finalControlVersion = controlVersion
+          reason
+          retiredAt = now
+          retiredByRef = actorRef
+
+    -- | Pledge activation by the designated lender (flexible controller taken from the argument). Safe because it
+    -- requires `lender` to be the currently shared lender and consumes a lender+borrower-signed authorization
+    -- that pins this exact control version and evidence package.
+    -- Deliberately does not fetch the verifier-signed attestation or the governance-signed accreditation
+    -- (that would inform the verifier or the governance member nodes about the pledge).
+    choice Control_Activate : ContractId CollateralLock
+      with
+        lender : Party
+        authorizationCid : ContractId PledgeActivationAuthorization
+        configCid : ContractId CollaraConfig
+        verifierStatusCid : ContractId VerifierStatusMirror
+        lockRef : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Control is not shared with this lender" (sharedLender == Some lender)
+        auth <- fetch authorizationCid
+        assertMsg "Authorization is for another lender or borrower" (auth.lender == lender && auth.borrower == owner)
+        assertMsg "Authorization is for another asset" (auth.namespace == namespace && auth.assetId == assetId)
+        assertMsg "Control version changed since authorization" (auth.expectedControlVersion == controlVersion)
+        assertMsg "Evidence package changed since authorization" (evidence == Some auth.snapshot.evidence)
+        now <- getTime
+        assertMsg "Activation authorization expired" (now <= auth.expiresAt)
+        assertMsg "Attestation is outside its validity period" (now <= auth.snapshot.attestationValidUntil)
+        config <- fetch configCid
+        assertMsg "Config of another registrar or namespace"
+          (config.registrar == registrar && config.namespace == namespace)
+        mirror <- fetch verifierStatusCid
+        assertMsg "Verifier status is from another registrar or namespace"
+          (mirror.registrar == registrar && mirror.namespace == namespace)
+        assertMsg "Verifier status is for another verifier" (mirror.verifier == auth.snapshot.attestationVerifier)
+        assertMsg "Verifier status is from another governance" (mirror.governanceParty == config.governanceParty)
+        when (config.suspensionPolicy == REQUIRE_ACTIVE_VERIFIER) $
+          assertMsg "Verifier suspended" (mirror.status == ACTIVE)
+        archive authorizationCid
+        create CollateralLock with
+          registrar
+          owner
+          lender
+          namespace
+          assetId
+          controlVersion = controlVersion + 1
+          evidence = auth.snapshot.evidence
+          lockRef
+          caseRef = auth.caseRef
+          authorizationRef = auth.authorizationRef
+          agreementRef = auth.agreementRef
+          attestationRef = auth.snapshot.attestationRef
+          activatedAt = now
+          activatedByRef = actorRef
+
+-- | Historical record of a retired control.
+template RetiredControl
+  with
+    registrar : Party
+    owner : Party
+    namespace : Text
+    assetId : Text
+    finalControlVersion : Int
+    reason : Text
+    retiredAt : Time
+    retiredByRef : Text
+  where
+    signatory registrar, owner
+
+-- | LOCKED control: an ACTIVE pledge of one asset to one lender for one case. Signed by registrar, owner and
+-- lender, so the built-in `Archive` needs all three. `Lock_Release` is the only choice and only the designated
+-- lender controls it. Carries references only, never financing terms.
+template CollateralLock
+  with
+    registrar : Party
+    owner : Party
+    lender : Party
+    namespace : Text
+    assetId : Text
+    controlVersion : Int
+    evidence : EvidenceAnchor
+    lockRef : Text
+    caseRef : Text
+    authorizationRef : Text
+    agreementRef : Text
+    attestationRef : Text
+    activatedAt : Time
+    activatedByRef : Text
+  where
+    signatory registrar, owner, lender
+    ensure lockRef /= "" && caseRef /= "" && controlVersion >= 2 && lender /= owner
+
+    choice Lock_Release : (ContractId AssetControl, ContractId CollateralLockReleased)
+      with
+        releaseRequestRef : Text
+        actorRef : Text
+      controller lender
+      do
+        now <- getTime
+        controlCid <- create AssetControl with
+          registrar
+          owner
+          namespace
+          assetId
+          controlVersion = controlVersion + 1
+          evidence = Some evidence
+          sharedLender = None
+        releasedCid <- create CollateralLockReleased with
+          registrar
+          owner
+          lender
+          namespace
+          assetId
+          lockRef
+          caseRef
+          releaseRequestRef
+          lockControlVersion = controlVersion
+          releasedControlVersion = controlVersion + 1
+          activatedAt
+          releasedAt = now
+          releasedByRef = actorRef
+        pure (controlCid, releasedCid)
+
+-- | Historical record of a released lock (pledge state `RELEASED`). Never overwritten.
+template CollateralLockReleased
+  with
+    registrar : Party
+    owner : Party
+    lender : Party
+    namespace : Text
+    assetId : Text
+    lockRef : Text
+    caseRef : Text
+    releaseRequestRef : Text
+    lockControlVersion : Int
+    releasedControlVersion : Int
+    activatedAt : Time
+    releasedAt : Time
+    releasedByRef : Text
+  where
+    signatory lender, owner
+    observer registrar

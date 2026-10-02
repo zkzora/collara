@@ -1,0 +1,12 @@
+sdk-version: 3.5.12
+name: collara-governance
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+  - ../vendor-dars/governance-action-v1-0.1.0.dar
+build-options:
+  - --target=2.2
+  - -Werror=template-interface-depends-on-daml-script

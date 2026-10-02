@@ -1,0 +1,29 @@
+{
+  "status": 409,
+  "body": {
+    "code": "LOCAL_VERDICT_LOCKED_CONTRACTS",
+    "cause": "Rejected transaction is referring to locked contracts ",
+    "correlationId": null,
+    "traceId": "eb643450b86d4f97c6a23926c6500a04",
+    "context": {
+      "participant": "sandbox",
+      "CONTRACT_ID": "List(001c01458a57aadf6835c637bc1d151bc236c16ed2a55a90d450c936894ea87c98ca121220ed05a59d478a9e29529f8ba7086862ec83736a3ba9c129fc16dcafec777c60b6)",
+      "reported_by_participant_id": "PAR::sandbox::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854",
+      "psid": "synchronizer-1::1220aa9bad5b...::35-0",
+      "confirming_parties": "CapHolder-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854, CapIssuer-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854, sandbox::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854",
+      "category": "2",
+      "tid": "eb643450b86d4f97c6a23926c6500a04",
+      "definite_answer": "false"
+    },
+    "resources": [
+      [
+        "ErrorResource(CONTRACT_ID)",
+        "001c01458a57aadf6835c637bc1d151bc236c16ed2a55a90d450c936894ea87c98ca121220ed05a59d478a9e29529f8ba7086862ec83736a3ba9c129fc16dcafec777c60b6"
+      ]
+    ],
+    "errorCategory": 2,
+    "grpcCodeValue": 10,
+    "retryInfo": "1 second",
+    "definiteAnswer": null
+  }
+}

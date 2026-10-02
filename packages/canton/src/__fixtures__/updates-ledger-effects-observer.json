@@ -1,0 +1,103 @@
+[
+  {
+    "update": {
+      "Transaction": {
+        "value": {
+          "updateId": "12204add451c17bfb011dd6e3717d9678d76ebc5bdadc8101ce20bdd42bcf1fe272a",
+          "commandId": "",
+          "workflowId": "",
+          "effectiveAt": "2026-10-01T22:28:34.301763Z",
+          "events": [
+            {
+              "CreatedEvent": {
+                "offset": 64,
+                "nodeId": 0,
+                "contractId": "00210aa88e5f3b57f897756fe817c764a060f2a5a3bf6d1ea84ffe101e3911c94fca1212209aed684a24fc0a4ae7ebd9bc9ff61c02205ed39e13722ebb9a28ef4e6d56f9db",
+                "templateId": "395aa0a6adef3498aad51779e9e90ba89e0e6bf20ffc2d69c3bbfaa9e6102313:It:Notice",
+                "contractKey": null,
+                "contractKeyHash": "",
+                "createArgument": {
+                  "issuer": "FxIssuerfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda",
+                  "audience": [
+                    "FxObserverfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                  ],
+                  "body": "synthetic notice"
+                },
+                "createdEventBlob": "",
+                "interfaceViews": [],
+                "witnessParties": [
+                  "FxObserverfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                ],
+                "signatories": [
+                  "FxIssuerfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                ],
+                "observers": [
+                  "FxObserverfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                ],
+                "createdAt": "2026-10-01T22:28:34.301763Z",
+                "packageName": "collara-canton-it",
+                "representativePackageId": "395aa0a6adef3498aad51779e9e90ba89e0e6bf20ffc2d69c3bbfaa9e6102313",
+                "acsDelta": true
+              }
+            }
+          ],
+          "offset": 64,
+          "synchronizerId": "synchronizer-1::12201de5be4e77213b31dce53313aeac78b7f4f6caa18eea97a0ad7b73995e507f5a",
+          "traceContext": {
+            "traceparent": "00-35b914fb4a413c8fe04d3f4ef1683551-e6d8b336199835d7-03",
+            "tracestate": null
+          },
+          "recordTime": "2026-10-01T22:28:35.721108Z",
+          "externalTransactionHash": null,
+          "paidTrafficCost": null
+        }
+      }
+    }
+  },
+  {
+    "update": {
+      "Transaction": {
+        "value": {
+          "updateId": "1220c4e8929d5f7d9032e6dec3bb643f0c0f24fa834ed6fe92aca51b4f1ade65825f",
+          "commandId": "",
+          "workflowId": "",
+          "effectiveAt": "2026-10-01T22:28:36.980826Z",
+          "events": [
+            {
+              "ExercisedEvent": {
+                "offset": 67,
+                "nodeId": 0,
+                "contractId": "00210aa88e5f3b57f897756fe817c764a060f2a5a3bf6d1ea84ffe101e3911c94fca1212209aed684a24fc0a4ae7ebd9bc9ff61c02205ed39e13722ebb9a28ef4e6d56f9db",
+                "templateId": "395aa0a6adef3498aad51779e9e90ba89e0e6bf20ffc2d69c3bbfaa9e6102313:It:Notice",
+                "interfaceId": null,
+                "choice": "Withdraw",
+                "choiceArgument": {},
+                "actingParties": [
+                  "FxIssuerfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                ],
+                "consuming": true,
+                "witnessParties": [
+                  "FxObserverfxvkwg::12202a0352d255a3da1d6c590fe12ed440c7a66931afdad579c996573e7069ae5bda"
+                ],
+                "lastDescendantNodeId": 0,
+                "exerciseResult": {},
+                "packageName": "collara-canton-it",
+                "implementedInterfaces": [],
+                "acsDelta": true
+              }
+            }
+          ],
+          "offset": 67,
+          "synchronizerId": "synchronizer-1::12201de5be4e77213b31dce53313aeac78b7f4f6caa18eea97a0ad7b73995e507f5a",
+          "traceContext": {
+            "traceparent": "00-bbdee596147500ff74c70b6e9a192ea9-c00e34d15b72efd1-03",
+            "tracestate": null
+          },
+          "recordTime": "2026-10-01T22:28:37.074485Z",
+          "externalTransactionHash": null,
+          "paidTrafficCost": null
+        }
+      }
+    }
+  }
+]

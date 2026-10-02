@@ -1,0 +1,59 @@
+-- | Assertion helpers. Every negative test checks *why* a submission failed, so a test cannot pass because of an
+-- unrelated error (for example a visibility error where an authorization error was intended).
+module Collara.Tests.Util where
+
+import DA.Action (unless)
+import DA.Optional (isNone, isSome)
+import qualified DA.Text as T
+import Daml.Script
+
+expectFailure : Text -> Either SubmitError a -> Script ()
+expectFailure expected result = case result of
+  Right _ -> fail ("Expected a failure containing '" <> expected <> "', but the submission committed")
+  Left err -> unless (expected `T.isInfixOf` show err) $
+    fail ("Expected a failure containing '" <> expected <> "', got: " <> show err)
+
+expectAuthorizationFailure : Either SubmitError a -> Script ()
+expectAuthorizationFailure result = case result of
+  Left (AuthorizationError {}) -> pure ()
+  Left err -> fail ("Expected an authorization failure, got: " <> show err)
+  Right _ -> fail "Expected an authorization failure, but the submission committed"
+
+-- | The referenced contract existed but has been archived (IDE ledger debugging info).
+expectConsumed : Either SubmitError a -> Script ()
+expectConsumed result = case result of
+  Left err@(ContractNotFound {}) | "NotActive" `T.isInfixOf` show err -> pure ()
+  Left err -> fail ("Expected an archived-contract failure, got: " <> show err)
+  Right _ -> fail "Expected an archived-contract failure, but the submission committed"
+
+-- | The referenced contract is active but the submitting parties cannot see it.
+expectNotVisible : Either SubmitError a -> Script ()
+expectNotVisible result = case result of
+  Left err@(ContractNotFound {}) | "NotVisible" `T.isInfixOf` show err -> pure ()
+  Left err -> fail ("Expected a not-visible failure, got: " <> show err)
+  Right _ -> fail "Expected a not-visible failure, but the submission committed"
+
+expectPreconditionFailure : Either SubmitError a -> Script ()
+expectPreconditionFailure = expectFailure "Template precondition violated"
+
+assertActive : (Template t, HasEnsure t) => Text -> Party -> ContractId t -> Script ()
+assertActive what party cid = do
+  r <- queryContractId party cid
+  unless (isSome r) $ fail (what <> " should still be active")
+
+assertArchived : (Template t, HasEnsure t) => Text -> Party -> ContractId t -> Script ()
+assertArchived what party cid = do
+  r <- queryContractId party cid
+  unless (isNone r) $ fail (what <> " should have been archived")
+
+assertEq : (Eq a, Show a) => Text -> a -> a -> Script ()
+assertEq what expected actual =
+  unless (expected == actual) $
+    fail (what <> ": expected " <> show expected <> ", got " <> show actual)
+
+fetchAs : (Template t, HasEnsure t) => Party -> ContractId t -> Script t
+fetchAs party cid = do
+  r <- queryContractId party cid
+  case r of
+    Some c -> pure c
+    None -> fail "Contract not visible or not active"

@@ -1,0 +1,15 @@
+sdk-version: 3.5.12
+name: collara-scripts
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../vendor-dars/governance-action-v1-0.1.0.dar
+  - ../vendor-dars/governance-core-v1-0.1.0.dar
+  - ../governance/.daml/dist/collara-governance-0.1.0.dar
+  - ../contracts/.daml/dist/collara-contracts-0.1.0.dar
+build-options:
+  - --target=2.2

@@ -1,0 +1,128 @@
+-- | Release requests and decisions. A request never exercises the lock; only `Release_Authorize`, controlled
+-- by the lock's designated lender, runs `Lock_Release`. Rejection leaves the lock ACTIVE and the registrar
+-- uninformed.
+module Collara.Release where
+
+import Collara.Control
+
+data ReleaseReason
+  = EXTERNAL_LOAN_COMPLETION
+  | REFINANCING
+  | ADMINISTRATIVE_CORRECTION
+  deriving (Eq, Show)
+
+data ReleaseStatus
+  = REQUESTED
+  | INFORMATION_REQUESTED
+  deriving (Eq, Show)
+
+data ReleaseOutcome
+  = AUTHORIZED
+  | REJECTED
+  deriving (Eq, Show)
+
+template ReleaseRequest
+  with
+    requester : Party
+      -- ^ The borrower, or the lender acting in an authorized case role.
+    owner : Party
+    lender : Party
+      -- ^ Must be the lock's designated lender; `Release_Authorize` checks it against the lock.
+    lockCid : ContractId CollateralLock
+    lockRef : Text
+    caseRef : Text
+    namespace : Text
+    assetId : Text
+    releaseRequestRef : Text
+    reason : ReleaseReason
+    noteRef : Text
+    status : ReleaseStatus
+    version : Int
+    requestedByRef : Text
+  where
+    signatory requester
+    observer owner, lender
+    ensure (requester == owner || requester == lender) && owner /= lender
+      && lockRef /= "" && releaseRequestRef /= "" && version >= 1
+
+    choice Release_Authorize : (ContractId AssetControl, ContractId CollateralLockReleased, ContractId ReleaseDecision)
+      with
+        decisionRef : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Release request is waiting for information" (status == REQUESTED)
+        lock <- fetch lockCid
+        assertMsg "Release requires the designated lender's authorization." (lock.lender == lender)
+        assertMsg "Release request does not match the lock"
+          (lock.owner == owner && lock.lockRef == lockRef && lock.caseRef == caseRef
+            && lock.namespace == namespace && lock.assetId == assetId)
+        (controlCid, releasedCid) <- exercise lockCid Lock_Release with releaseRequestRef; actorRef
+        decisionCid <- recordDecision this AUTHORIZED decisionRef "" actorRef
+        pure (controlCid, releasedCid, decisionCid)
+
+    -- | Rejects the request. The lock is not touched and stays ACTIVE.
+    choice Release_Reject : ContractId ReleaseDecision
+      with
+        decisionRef : Text
+        sharedReason : Text
+        actorRef : Text
+      controller lender
+      do
+        recordDecision this REJECTED decisionRef sharedReason actorRef
+
+    choice Release_RequestInformation : ContractId ReleaseRequest
+      with
+        questionRef : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Release request is not awaiting a decision" (status == REQUESTED)
+        create this with status = INFORMATION_REQUESTED; noteRef = questionRef; version = version + 1
+
+    choice Release_Respond : ContractId ReleaseRequest
+      with
+        responseNoteRef : Text
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "No information was requested" (status == INFORMATION_REQUESTED)
+        create this with status = REQUESTED; noteRef = responseNoteRef; version = version + 1
+
+    choice Release_Withdraw : ()
+      with
+        actorRef : Text
+      controller requester
+      do pure ()
+
+recordDecision : ReleaseRequest -> ReleaseOutcome -> Text -> Text -> Text -> Update (ContractId ReleaseDecision)
+recordDecision r outcome decisionRef sharedReason actorRef = do
+  now <- getTime
+  create ReleaseDecision with
+    lender = r.lender
+    owner = r.owner
+    decisionRef
+    releaseRequestRef = r.releaseRequestRef
+    lockRef = r.lockRef
+    caseRef = r.caseRef
+    outcome
+    sharedReason
+    decidedAt = now
+    decidedByRef = actorRef
+
+template ReleaseDecision
+  with
+    lender : Party
+    owner : Party
+    decisionRef : Text
+    releaseRequestRef : Text
+    lockRef : Text
+    caseRef : Text
+    outcome : ReleaseOutcome
+    sharedReason : Text
+    decidedAt : Time
+    decidedByRef : Text
+  where
+    signatory lender
+    observer owner
+    ensure decisionRef /= ""

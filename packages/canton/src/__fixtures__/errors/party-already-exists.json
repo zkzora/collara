@@ -1,0 +1,22 @@
+{
+  "status": 400,
+  "body": {
+    "code": "INVALID_ARGUMENT",
+    "cause": "The submitted request has invalid arguments: Party already exists: party CapIssuer-muq3hmv3::1220769af13f... is already allocated on this node",
+    "correlationId": "122050023012759770c2561d732adfdc5092833e7771ecff971d22d649ee6a2c7bf7",
+    "traceId": "81026d2b707200f3730bd03b1a5b16c5",
+    "context": {
+      "participant": "'sandbox'",
+      "parties": "['CapIssuer-muq3hmv3']",
+      "submissionId": "'122050023012759770c2561d732adfdc5092833e7771ecff971d22d649ee6a2c7bf7'",
+      "category": "8",
+      "tid": "81026d2b707200f3730bd03b1a5b16c5",
+      "definite_answer": "false"
+    },
+    "resources": [],
+    "errorCategory": 8,
+    "grpcCodeValue": 3,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

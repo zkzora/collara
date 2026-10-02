@@ -1,0 +1,21 @@
+{
+  "status": 400,
+  "body": {
+    "code": "COMMAND_PREPROCESSING_FAILED",
+    "cause": "Cannot represent 1.234 as (Numeric 2) without loss of precision",
+    "correlationId": "23ac8ee0-0454-4b69-99c0-07e58cf8a043",
+    "traceId": "3dd071f0190faea00a9abcde280711d9",
+    "context": {
+      "participant": "'sandbox'",
+      "category": "8",
+      "tid": "3dd071f0190faea00a9abcde280711d9",
+      "definite_answer": "false",
+      "commands": "{readAs: [], deduplicationPeriod: {duration: 'PT168H'}, submittedAt: '2026-10-01T22:44:54.627220Z', submissionId: '23ac8ee0-0454-4b69-99c0-07e58cf8a043', actAs: ['Cap-xmuq4gkbp::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715'], commandId: 'cap-scale-xmuq4gkbp', userId: 'cap-xmuq4gkbp', workflowId: }"
+    },
+    "resources": [],
+    "errorCategory": 8,
+    "grpcCodeValue": 3,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

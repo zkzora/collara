@@ -1,0 +1,25 @@
+{
+  "status": 409,
+  "body": {
+    "code": "DUPLICATE_COMMAND",
+    "cause": "Command submission already exists.",
+    "correlationId": null,
+    "traceId": "a56eadcef583cd67f345cfdc1a35e0ae",
+    "context": {
+      "participant": "sandbox",
+      "changeId": "ChangeId(cap-issuer-muq3hmv3,cap-create-muq3hmv3,Set(CapIssuer-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854))",
+      "completion_offset": "55",
+      "accepted": "true",
+      "psid": "synchronizer-1::1220aa9bad5b...::35-0",
+      "category": "10",
+      "tid": "a56eadcef583cd67f345cfdc1a35e0ae",
+      "definite_answer": "true",
+      "existingSubmissionId": "Some(62e09986-4735-4b3a-b8cd-e70db246b5e6)"
+    },
+    "resources": [],
+    "errorCategory": 10,
+    "grpcCodeValue": 6,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

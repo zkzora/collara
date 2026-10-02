@@ -1,0 +1,122 @@
+-- | The main seed fixture and the full walkthrough, through real choices.
+module Collara.Tests.HappyPath where
+
+import DA.List (sort)
+import Daml.Script
+
+import Collara.Audit hiding (AuditPermission(..))
+import Collara.Control
+import Collara.Financing hiding (AssessmentStatus(..))
+import qualified Collara.Financing as Fin
+import Collara.Release hiding (ReleaseOutcome(..), ReleaseStatus(..))
+import qualified Collara.Release as Rel
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Types
+import Collara.Tests.Util
+
+-- | Seed profile "main": registered, attested ATT-001, PKG-001 v2 shared with Lender A, review SUBMITTED,
+-- no proposal and no lock.
+test_main_fixture : Script ()
+test_main_fixture = do
+  f <- seedMain
+  let p = f.ledger.parties
+  control <- fetchAs p.owner f.controlCid
+  -- v1 registered, v2 manifest v1 anchored, v3 manifest v2 anchored; sharing with Lender A keeps v3
+  assertEq "control version" 3 control.controlVersion
+  assertEq "shared lender" (Some p.lenderA) control.sharedLender
+  assertEq "anchored evidence" (Some (EvidenceAnchor fixturePackageRef 2 hashManifestV2)) control.evidence
+  attestation <- fetchAs p.owner f.attestationCid
+  assertEq "attestation ref" "ATT-001" attestation.attestationRef
+  assertEq "attested evidence" (EvidenceAnchor fixturePackageRef 2 hashManifestV2) attestation.evidence
+  assertEq "attestation governance" p.governance attestation.governanceParty
+  assessment <- fetchAs p.lenderA f.assessmentCid
+  assertEq "review status" Fin.SUBMITTED assessment.status
+  assertEq "review snapshot" (Some assessment.snapshot.evidence) control.evidence
+  dealerShare <- fetchAs p.lenderA f.dealerShareCid
+  assertEq "dealer share consenters" [p.dealer] dealerShare.consenters
+  assertEq "dealer share documents" ["DOC-001"] (map (.docRef) dealerShare.documents)
+  ownerShare <- fetchAs p.lenderA f.ownerShareCid
+  assertEq "owner share consenters" [] ownerShare.consenters
+  assertEq "owner share documents" ["DOC-002", "DOC-003", "DOC-004"] (map (.docRef) ownerShare.documents)
+  disclosure <- fetchAs p.lenderA f.disclosureCid
+  assertEq "disclosed attestation" attestation disclosure.attestation
+  proposals <- query @FinancingProposal p.owner
+  locks <- query @CollateralLock p.owner
+  assertEq "no proposal in main seed" 0 (length proposals)
+  assertEq "no lock in main seed" 0 (length locks)
+
+test_clean_start : Script ()
+test_clean_start = do
+  l <- seedCleanStart
+  let p = l.parties
+  mirror <- fetchAs p.lenderA l.mirrorCid
+  assertEq "VER-001 status mirror" "VER-001" mirror.verifierRef
+  controls <- query @AssetControl p.owner
+  assertEq "no assets in clean start" 0 (length controls)
+
+-- | review -> eligible -> proposal -> exact-version acceptance -> activation authorization -> activation ->
+-- release request (lock active) -> rejection (lock active) -> new request -> authorized release (control
+-- recreated) -> audit grants.
+test_happy_path : Script ()
+test_happy_path = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  assessment <- fetchAs p.lenderA fin.eligibleAssessmentCid
+  assertEq "assessment eligible" Fin.ELIGIBLE assessment.status
+  notice <- fetchAs p.owner fin.noticeCid
+  assertEq "borrower notice" Fin.ELIGIBLE notice.outcome
+  assertArchived "proposal after acceptance" p.owner fin.proposalCid
+  financing <- fetchAs p.owner fin.agreementCid
+  assertEq "agreement principal" fixturePrincipal financing.principal
+  assertEq "agreement version" 1 financing.proposalVersion
+  auth <- fetchAs p.lenderA fin.authorizationCid
+  assertEq "authorization pins control version" 3 auth.expectedControlVersion
+
+  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  lock <- fetchAs p.registrar lockCid
+  assertEq "lock version" 4 lock.controlVersion
+  assertEq "lock lender" p.lenderA lock.lender
+  assertEq "lock refs" ("PL-001", "CL-001", "AUTH-001", "FP-001", "ATT-001")
+    (lock.lockRef, lock.caseRef, lock.authorizationRef, lock.agreementRef, lock.attestationRef)
+  assertArchived "control after activation" p.owner f.controlCid
+  assertArchived "authorization after activation" p.owner fin.authorizationCid
+  controls <- query @AssetControl p.owner
+  assertEq "no available control while locked" 0 (length controls)
+
+  rr1 <- requestRelease l lockCid "RR-001"
+  assertActive "lock after release request" p.owner lockCid
+  rejection <- submit p.lenderA $ exerciseCmd rr1 Release_Reject with
+    decisionRef = "RD-001"; sharedReason = "Repayment confirmation has not been received."; actorRef = approverActor
+  assertActive "lock after rejection" p.owner lockCid
+  decision1 <- fetchAs p.owner rejection
+  assertEq "rejection outcome" Rel.REJECTED decision1.outcome
+
+  rr2 <- requestRelease l lockCid "RR-002"
+  (controlCid, releasedCid, decisionCid) <- submit p.lenderA $ exerciseCmd rr2 Release_Authorize with
+    decisionRef = "RD-002"; actorRef = approverActor
+  assertArchived "lock after authorized release" p.owner lockCid
+  control <- fetchAs p.owner controlCid
+  assertEq "released control version" 5 control.controlVersion
+  assertEq "released control has no shared lender" None control.sharedLender
+  assertEq "released control keeps evidence anchor" (Some lock.evidence) control.evidence
+  released <- fetchAs p.registrar releasedCid
+  assertEq "released record" ("PL-001", "RR-002", 4, 5)
+    (released.lockRef, released.releaseRequestRef, released.lockControlVersion, released.releasedControlVersion)
+  decision2 <- fetchAs p.owner decisionCid
+  assertEq "authorization outcome" Rel.AUTHORIZED decision2.outcome
+
+-- | The packaged walkthrough used by seeds and documentation runs end to end and leaves exactly the expected
+-- auditor view.
+test_run_happy_path : Script ()
+test_run_happy_path = do
+  f <- seedMain
+  h <- runHappyPath f
+  let p = f.ledger.parties
+  assertArchived "lock" p.owner h.lockCid
+  assertArchived "rejected request" p.owner h.rejectedRequestCid
+  assertActive "released control" p.owner h.releasedControlCid
+  grants <- query @AuditGrant p.auditor
+  assertEq "auditor grants" ["AG-001", "AG-002"] (sort (map ((.grantRef) . snd) grants))

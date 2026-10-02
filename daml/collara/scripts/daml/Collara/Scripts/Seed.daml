@@ -1,0 +1,22 @@
+-- | Seed profiles for a running ledger (`dpm script`). They use only ledger time (no setTime/passTime), so they
+-- also run against a Canton sandbox. The `...With` variants take already allocated parties (e.g. through
+-- `--input-file parties.json`); the others allocate parties with the standard hints.
+module Collara.Scripts.Seed where
+
+import Daml.Script
+
+import Collara.Scripts.Scenario
+
+-- | Orgs, parties, governance rules, verifier registry (VER-001), config, verifier status, asset registry.
+seedCleanStart : Script Ledger
+seedCleanStart = allocateParties >>= seedCleanStartWith
+
+seedCleanStartWith : Parties -> Script Ledger
+seedCleanStartWith = bootstrap
+
+-- | Registered, attested (ATT-001), PKG-001 v2 shared with Demo Lender A, review SUBMITTED; no proposal, no lock.
+seedMain : Script MainFixture
+seedMain = allocateParties >>= seedMainWith
+
+seedMainWith : Parties -> Script MainFixture
+seedMainWith parties = bootstrap parties >>= buildMainFixture

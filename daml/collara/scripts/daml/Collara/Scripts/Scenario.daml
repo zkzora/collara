@@ -1,0 +1,680 @@
+-- | Reusable Daml Script building blocks for the Collara synthetic demo. Every step goes through the real
+-- choices with the same single submitter the API uses, so the tests, the seed scripts and the API integration
+-- exercise one command sequence. Times are relative to ledger time; nothing is hard-coded to a calendar date.
+module Collara.Scripts.Scenario where
+
+import DA.Date (toDateUTC)
+import DA.Optional (fromSomeNote)
+import qualified DA.Set as Set
+import DA.Time (RelTime, addRelTime, days, minutes)
+import Daml.Script
+
+import Governance.Action (GovernableAction)
+import Governance.Confirmation (GovernanceConfirmation)
+import Governance.ExecutionResult (GovernanceExecutionResult)
+import Governance.Rules
+
+import Collara.Audit hiding (AuditPermission(..))
+import qualified Collara.Audit as Audit
+import Collara.Config
+import Collara.Control
+import Collara.Evidence
+import Collara.Financing hiding (AssessmentStatus(..))
+import qualified Collara.Financing as Fin
+import Collara.Governance.Proposals
+import Collara.Governance.Registry
+import Collara.Registration
+import Collara.Release hiding (ReleaseOutcome(..), ReleaseStatus(..))
+import qualified Collara.Release as Rel
+import Collara.Types
+import Collara.Verification hiding (VerificationStatus(..))
+
+-- * Synthetic fixture constants (docs/_research/synthesis.md §1.6)
+
+fixtureNamespace, fixtureCaseRef, fixtureAssetId, fixturePackageRef, cncScope : Text
+fixtureNamespace = "collara-localnet"
+fixtureCaseRef = "CL-001"
+fixtureAssetId = "ASSET-DEMO-001"
+fixturePackageRef = "PKG-001"
+cncScope = "CNC_MACHINERY"
+
+-- | Fixture hashes are SHA-256 (lowercase hex) of synthetic label strings, not of files:
+-- documents "synthetic:<docRef>:<slug>:v<N>" (e.g. "synthetic:DOC-001:invoice:v1"),
+-- manifests "synthetic:PKG-001:manifest:v<N>".
+hashInvoiceV1, hashPhotosV1, hashInspectionV1, hashInspectionV2, hashMaintenanceV1, hashMaintenanceV2 : Text
+hashInvoiceV1 = "8d24047a96ad595116211206cf8ec06acabd464e732bf32c7551632a69e9aab0"
+hashPhotosV1 = "8bfab457ba9f13a6d52a000baf10a0548ab018f15fc4df66f85d10355856eb25"
+hashInspectionV1 = "efe58c5d9bd84bfe24a0e176c8831a3d221689628a5b64dd699b5dfa314d70e3"
+hashInspectionV2 = "76e83a1b46f73b87cd4791aaf9166fceef817b038fa037c11309e9b9cdaf2f5e"
+hashMaintenanceV1 = "101a1bea0283609fe372fd1ef681e56360fa875e4d659a50db76c5bceee69c18"
+hashMaintenanceV2 = "d86c4274921a88ab0fddebe55c8593191b5eb18f538566cbf2e92baf5780ef3c"
+
+hashManifestV1, hashManifestV2, hashManifestV3 : Text
+hashManifestV1 = "ec6ddb981bb9ea659644f49e9ccd6dded0430c5d999ccef81470c04d941a027c"
+hashManifestV2 = "b3cc20c09b9351787c51d6f7c5288a077684f4fd27649fdba3a666162cbe0097"
+hashManifestV3 = "d750db4aef59fa51ebea224d33434aed180cdfa13703000a57a7aebee3f631d0"
+
+-- | Identity commitment = SHA-256 of "<MANUFACTURER>|<MODEL>|<SERIAL>", each trimmed and upper-cased:
+-- sha256("DEMO MACHINE WORKS (SYNTHETIC)|DEMO-CNC-500|SYNTH-CNC-001"). The ledger only compares the value.
+demoIdentityCommitment : Text
+demoIdentityCommitment = "d0d834d9a619c26a7822a4ebe5a27ec5b4c4c440c7e2c4067f7c1d9343b27658"
+
+-- | Validity of the fixture attestation and of the genesis accreditation.
+attestationValidity, accreditationValidity : RelTime
+attestationValidity = days 180
+accreditationValidity = days 365
+
+-- | Opaque in-org actor references (stand-ins for membership ids; never names or e-mails on the ledger).
+ownerActor, dealerActor, verifierActor, registrarActor, analystActor, approverActor, lenderIntakeActor : Text
+ownerActor = "mbr:manufacturer-owner"
+dealerActor = "mbr:dealer-contributor"
+verifierActor = "mbr:verifier-inspector"
+registrarActor = "svc:registrar"
+analystActor = "mbr:lender-a-analyst"
+approverActor = "mbr:lender-a-approver"
+lenderIntakeActor = "svc:lender-a-intake"
+
+-- * Parties
+
+-- | Party roles the bootstrap allocates (one business party per organisation, plus governance).
+data Parties = Parties
+  with
+    registrar : Party   -- ^ Collara registrar / operator ("CollaraRegistrar")
+    governance : Party  -- ^ governance party: Tier A local party ("CollaraGovernance")
+    seat1 : Party       -- ^ governance seat 1 ("gov-seat-1", Demo Lender A mandate)
+    seat2 : Party       -- ^ governance seat 2 ("gov-seat-2", Demo Lender B mandate)
+    seat3 : Party       -- ^ governance seat 3 ("gov-seat-3", Demo Auditor mandate)
+    owner : Party       -- ^ Demo Manufacturer: borrower / asset owner ("DemoManufacturer")
+    dealer : Party      -- ^ Demo CNC Dealer ("DemoCNCDealer")
+    verifier : Party    -- ^ Demo Verifier, VER-001 ("DemoVerifier")
+    lenderA : Party     -- ^ Demo Lender A, selected lender ("DemoLenderA")
+    lenderB : Party     -- ^ Demo Lender B, unrelated lender ("DemoLenderB")
+    auditor : Party     -- ^ Demo Auditor ("DemoAuditor")
+  deriving (Eq, Show)
+
+allocateParties : Script Parties
+allocateParties = do
+  let hint = allocatePartyByHint . PartyIdHint
+  registrar <- hint "CollaraRegistrar"
+  governance <- hint "CollaraGovernance"
+  seat1 <- hint "gov-seat-1"
+  seat2 <- hint "gov-seat-2"
+  seat3 <- hint "gov-seat-3"
+  owner <- hint "DemoManufacturer"
+  dealer <- hint "DemoCNCDealer"
+  verifier <- hint "DemoVerifier"
+  lenderA <- hint "DemoLenderA"
+  lenderB <- hint "DemoLenderB"
+  auditor <- hint "DemoAuditor"
+  pure Parties with ..
+
+-- * Governance (Tier A: DM GovernanceRules with a local governance party)
+
+-- | Members act as themselves and read as the governance party (DM topology: members host it).
+memberCtx : Parties -> Party -> SubmitOptions
+memberCtx p member = actAs member <> readAs p.governance
+
+confirmAs : Parties -> ContractId GovernanceRules -> Party -> ContractId GovernableAction
+  -> Script (ContractId GovernanceConfirmation)
+confirmAs p rulesCid member proposalCid = do
+  r <- submit (memberCtx p member) $ exerciseCmd rulesCid GovernanceRules_ConfirmAction with
+    confirmer = member
+    actionProposalCid = proposalCid
+  pure r.confirmationCid
+
+executeAs : Parties -> ContractId GovernanceRules -> Party -> ContractId GovernableAction
+  -> [ContractId GovernanceConfirmation] -> Script (ContractId GovernanceExecutionResult)
+executeAs p rulesCid executor proposalCid confirmations = do
+  r <- submit (memberCtx p executor) $ exerciseCmd rulesCid GovernanceRules_ExecuteConfirmedAction with
+    executor
+    actionProposalCid = proposalCid
+    confirmations
+  pure r.executionResultCid
+
+-- | Seats 1 and 2 confirm; seat 2 executes.
+governTwoOfThree : Parties -> ContractId GovernanceRules -> ContractId GovernableAction
+  -> Script (ContractId GovernanceExecutionResult)
+governTwoOfThree p rulesCid proposalCid = do
+  c1 <- confirmAs p rulesCid p.seat1 proposalCid
+  c2 <- confirmAs p rulesCid p.seat2 proposalCid
+  executeAs p rulesCid p.seat2 proposalCid [c1, c2]
+
+-- * Bootstrap ("clean-start" seed profile)
+
+data Ledger = Ledger
+  with
+    parties : Parties
+    rulesCid : ContractId GovernanceRules
+    registryCid : ContractId VerifierRegistry
+    accreditationCid : ContractId VerifierAccreditation
+    configCid : ContractId CollaraConfig
+    mirrorCid : ContractId VerifierStatusMirror
+    assetRegistryCid : ContractId AssetRegistry
+  deriving (Eq, Show)
+
+bootstrap : Parties -> Script Ledger
+bootstrap p = do
+  now <- getTime
+  assetRegistryCid <- submit p.registrar $ createCmd AssetRegistry with
+    registrar = p.registrar
+    namespace = fixtureNamespace
+    issuedAssetIds = Set.empty
+    issuedIdentityCommitments = Set.empty
+    version = 0
+  rulesCid <- submit p.governance $ createCmd GovernanceRules with
+    governanceParty = p.governance
+    members = Set.fromList [p.seat1, p.seat2, p.seat3]
+    threshold = 2
+    actionConfirmationTimeout = minutes 30
+    additionalProposers = None
+  bootCid <- submit p.seat1 $ createCmd BootstrapVerifierRegistryProposal with
+    governanceParty = p.governance
+    proposer = p.seat1
+    operator = p.registrar
+    registryId = fixtureNamespace
+    genesisVerifiers =
+      [ GenesisVerifier with
+          verifier = p.verifier
+          verifierRef = "VER-001"
+          orgName = "Demo Verifier"
+          scope = [cncScope]
+          validUntil = Some (addRelTime now accreditationValidity) ]
+    proposalDeadline = addRelTime now (days 1)
+    reason = "Synthetic demo bootstrap"
+  _ <- governTwoOfThree p rulesCid (toInterfaceContractId bootCid)
+  registryCid <- fst <$> queryOne p.registrar (\(r : VerifierRegistry) -> r.registryId == fixtureNamespace)
+  accreditationCid <- fst <$> queryOne p.verifier (\(a : VerifierAccreditation) -> a.verifierRef == "VER-001")
+  configCid <- submit p.registrar $ createCmd CollaraConfig with
+    registrar = p.registrar
+    namespace = fixtureNamespace
+    governanceParty = p.governance
+    suspensionPolicy = REQUIRE_ACTIVE_VERIFIER
+    configVersion = 1
+    directory = [p.verifier, p.lenderA, p.lenderB]
+  mirrorCid <- submit p.registrar $ exerciseCmd configCid Config_PublishVerifierStatus with
+    accreditationCid
+    sourceRef = "GP-000"
+  pure Ledger with parties = p; ..
+
+-- | Exactly one active contract of template `t` visible to `party` that satisfies `pred`.
+queryOne : forall t. (Template t, HasEnsure t) => Party -> (t -> Bool) -> Script (ContractId t, t)
+queryOne party pred = do
+  rows <- queryFilter @t party pred
+  case rows of
+    [row] -> pure row
+    _ -> fail ("Expected exactly one matching contract, found " <> show (length rows))
+
+-- * Registration
+
+data AssetSpec = AssetSpec
+  with
+    assetId : Text
+    requestRef : Text
+    equipment : EquipmentIdentity
+    identityCommitment : Text
+  deriving (Eq, Show)
+
+demoAsset : AssetSpec
+demoAsset = AssetSpec with
+  assetId = fixtureAssetId
+  requestRef = "REG-001"
+  equipment = EquipmentIdentity with
+    manufacturer = "Demo Machine Works (synthetic)"
+    model = "DEMO-CNC-500"
+    serialNumber = "SYNTH-CNC-001"
+  identityCommitment = demoIdentityCommitment
+
+requestRegistration : Ledger -> AssetSpec -> Script (ContractId AssetRegistrationRequest)
+requestRegistration l spec = submit l.parties.owner $ createCmd AssetRegistrationRequest with
+  owner = l.parties.owner
+  registrar = l.parties.registrar
+  namespace = fixtureNamespace
+  requestRef = spec.requestRef
+  equipmentClass = "CNC machining center"
+  equipment = spec.equipment
+  details = PassportDetails with
+    yearOfManufacture = Some 2019
+    locationScope = "Demo Manufacturer facility · Ohio, US (declared)"
+  identityCommitment = spec.identityCommitment
+  ownerClaimRef = "CLAIM-" <> spec.requestRef
+
+-- | Registrar reserves the id (top-level, registrar only), then accepts the request with the ticket.
+-- Returns the ledger with the new `AssetRegistry` contract id.
+registerAsset : Ledger -> AssetSpec -> Script (Ledger, ContractId AssetControl, ContractId AssetPassport)
+registerAsset l spec = do
+  let p = l.parties
+  requestCid <- requestRegistration l spec
+  (assetRegistryCid, ticketCid) <- submit p.registrar $ exerciseCmd l.assetRegistryCid Registry_Reserve with
+    assetId = spec.assetId
+    owner = p.owner
+    requestRef = spec.requestRef
+    identityCommitment = spec.identityCommitment
+    actorRef = registrarActor
+  (controlCid, passportCid) <- submit p.registrar $ exerciseCmd requestCid Request_Accept with
+    ticketCid
+    actorRef = registrarActor
+  let l' = l with assetRegistryCid
+  pure (l', controlCid, passportCid)
+
+-- * Evidence
+
+entry : Text -> Text -> Int -> Text -> Party -> Text -> ManifestEntry
+entry docRef docType docVersion sha256 source contributorRef = ManifestEntry with ..
+
+manifestV1Entries, manifestV2Entries, manifestV3Entries : Parties -> [ManifestEntry]
+manifestV1Entries p =
+  [ entry "DOC-001" "INVOICE" 1 hashInvoiceV1 p.dealer dealerActor
+  , entry "DOC-002" "EQUIPMENT_PHOTOS" 1 hashPhotosV1 p.owner ownerActor
+  , entry "DOC-003" "INSPECTION_REPORT" 1 hashInspectionV1 p.owner ownerActor
+  , entry "DOC-004" "MAINTENANCE_SUMMARY" 1 hashMaintenanceV1 p.owner ownerActor ]
+manifestV2Entries p =
+  [ entry "DOC-001" "INVOICE" 1 hashInvoiceV1 p.dealer dealerActor
+  , entry "DOC-002" "EQUIPMENT_PHOTOS" 1 hashPhotosV1 p.owner ownerActor
+  , entry "DOC-003" "INSPECTION_REPORT" 2 hashInspectionV2 p.owner ownerActor
+  , entry "DOC-004" "MAINTENANCE_SUMMARY" 1 hashMaintenanceV1 p.owner ownerActor ]
+-- | A later material change (maintenance summary v2), used by tests of stale authorizations.
+manifestV3Entries p =
+  [ entry "DOC-001" "INVOICE" 1 hashInvoiceV1 p.dealer dealerActor
+  , entry "DOC-002" "EQUIPMENT_PHOTOS" 1 hashPhotosV1 p.owner ownerActor
+  , entry "DOC-003" "INSPECTION_REPORT" 2 hashInspectionV2 p.owner ownerActor
+  , entry "DOC-004" "MAINTENANCE_SUMMARY" 2 hashMaintenanceV2 p.owner ownerActor ]
+
+-- | The manifest entries whose record owner is `source`, as share entries.
+sharedDocumentsFrom : Party -> [ManifestEntry] -> [SharedDocument]
+sharedDocumentsFrom source entries =
+  [ SharedDocument with docRef = e.docRef; docVersion = e.docVersion; sha256 = e.sha256; source = e.source
+  | e <- entries, e.source == source ]
+
+contributeInvoice : Ledger -> Script (ContractId DealerContribution)
+contributeInvoice l = submit l.parties.dealer $ createCmd DealerContribution with
+  dealer = l.parties.dealer
+  owner = l.parties.owner
+  caseRef = fixtureCaseRef
+  docRef = "DOC-001"
+  docType = "INVOICE"
+  docVersion = 1
+  sha256 = hashInvoiceV1
+  contributorRef = dealerActor
+  verificationUseConsented = True
+
+-- | Creates manifest v1 and anchors it on the control.
+createManifestV1 : Ledger -> ContractId AssetControl -> Script (ContractId EvidenceManifest, ContractId AssetControl)
+createManifestV1 l controlCid = do
+  let p = l.parties
+  manifestCid <- submit p.owner $ createCmd EvidenceManifest with
+    owner = p.owner
+    registrar = p.registrar
+    namespace = fixtureNamespace
+    assetId = fixtureAssetId
+    packageRef = fixturePackageRef
+    version = 1
+    manifestHash = hashManifestV1
+    entries = manifestV1Entries p
+  controlCid' <- submit p.owner $ exerciseCmd manifestCid Manifest_Anchor with controlCid; actorRef = ownerActor
+  pure (manifestCid, controlCid')
+
+newManifestVersion : Ledger -> ContractId EvidenceManifest -> [ManifestEntry] -> Text -> ContractId AssetControl
+  -> Script (ContractId EvidenceManifest, ContractId AssetControl)
+newManifestVersion l manifestCid entries hash controlCid =
+  submit l.parties.owner $ exerciseCmd manifestCid Manifest_NewVersion with
+    newEntries = entries
+    newManifestHash = hash
+    controlCid
+    actorRef = ownerActor
+
+-- * Verification
+
+requestVerification : Ledger -> ContractId EvidenceManifest -> Script (ContractId VerificationRequest)
+requestVerification l manifestCid = do
+  now <- getTime
+  submit l.parties.owner $ exerciseCmd manifestCid Manifest_RequestVerification with
+    verifier = l.parties.verifier
+    requestRef = "VR-001"
+    passportVersion = 1
+    caseRef = Some fixtureCaseRef
+    equipmentScope = cncScope
+    checklist = ["Serial number consistency", "Equipment photos", "Document consistency", "Inspected condition",
+                 "Location evidence", "Maintenance evidence"]
+    dueBy = Some (addRelTime now (days 10))
+    actorRef = ownerActor
+
+acceptAssignment : Ledger -> ContractId VerificationRequest -> Script (ContractId VerificationRequest)
+acceptAssignment l requestCid = submit l.parties.verifier $ exerciseCmd requestCid VR_AcceptAssignment with
+  configCid = l.configCid
+  accreditationCid = l.accreditationCid
+  actorRef = verifierActor
+
+fixtureChecks : [CheckItem]
+fixtureChecks =
+  [ CheckItem "Serial number consistency" "Plate matches declared serial (synthetic)" CHECKED
+  , CheckItem "Equipment photos" "Six photos reviewed" CHECKED
+  , CheckItem "Document consistency" "Invoice date differs from delivery note by 2 days" CHECKED_NOTED
+  , CheckItem "Inspected condition" "Operational at inspection" CHECKED
+  , CheckItem "Location evidence" "Declared location reviewed" REVIEWED_DOCUMENTS
+  , CheckItem "Ownership and lien status" "Outside the verifier mandate" NOT_CHECKED ]
+
+-- | Issues `attestationRef` on the request, valid from now for `validity`.
+issueAttestation : Ledger -> ContractId VerificationRequest -> Text -> RelTime -> ContractId VerifierAccreditation
+  -> Script (ContractId VerificationAttestation)
+issueAttestation l requestCid attestationRef validity accreditationCid = do
+  now <- getTime
+  submit l.parties.verifier $ issueAttestationCmd l.configCid requestCid attestationRef now validity accreditationCid
+
+issueAttestationCmd : ContractId CollaraConfig -> ContractId VerificationRequest -> Text -> Time -> RelTime
+  -> ContractId VerifierAccreditation -> Commands (ContractId VerificationAttestation)
+issueAttestationCmd configCid requestCid attestationRef now validity accreditationCid =
+  exerciseCmd requestCid VR_IssueAttestation with
+    configCid
+    accreditationCid
+    attestationRef
+    checks = fixtureChecks
+    limitations = "Scoped inspection. Ownership and lien status were not checked."
+    method = "On-site inspection (synthetic)"
+    inspectedAt = now
+    validFrom = now
+    validUntil = addRelTime now validity
+    supersedes = None
+    actorRef = verifierActor
+
+-- * Main fixture ("main" seed profile)
+
+data MainFixture = MainFixture
+  with
+    ledger : Ledger
+    controlCid : ContractId AssetControl
+      -- ^ AVAILABLE, control v3, anchored to PKG-001 v2, shared with Demo Lender A.
+    passportCid : ContractId AssetPassport
+    manifestCid : ContractId EvidenceManifest
+      -- ^ PKG-001 v2.
+    contributionCid : ContractId DealerContribution
+    attestationCid : ContractId VerificationAttestation
+      -- ^ ATT-001.
+    dealerShareCid : ContractId PackageShare
+      -- ^ SHR-001: the dealer's invoice, consented by the dealer, for Demo Lender A.
+    ownerShareCid : ContractId PackageShare
+      -- ^ SHR-002: the owner's documents, for Demo Lender A.
+    disclosureCid : ContractId AttestationDisclosure
+    assessmentCid : ContractId CollateralAssessment
+      -- ^ CA-001, SUBMITTED.
+  deriving (Eq, Show)
+
+-- | Builds the main fixture: registration -> manifest v1 -> verification with a change request -> manifest v2
+-- -> attestation ATT-001 -> share with Demo Lender A -> lender assessment SUBMITTED. No proposal, no lock.
+buildMainFixture : Ledger -> Script MainFixture
+buildMainFixture = buildMainFixtureValidFor attestationValidity
+
+-- | The main fixture with ATT-001 valid for `validity` from issuance (tests use short validities).
+buildMainFixtureValidFor : RelTime -> Ledger -> Script MainFixture
+buildMainFixtureValidFor validity l0 = do
+  let p = l0.parties
+  (l, control1, passportCid) <- registerAsset l0 demoAsset
+  contributionCid <- contributeInvoice l
+  (manifest1, control2) <- createManifestV1 l control1
+  request1 <- requestVerification l manifest1
+  request2 <- acceptAssignment l request1
+  request3 <- submit p.verifier $ exerciseCmd request2 VR_RequestChanges with
+    note = "Inspection report v1 does not cover the spindle; please upload the full scoped report."
+    actorRef = verifierActor
+  (manifestCid, control3) <- newManifestVersion l manifest1 (manifestV2Entries p) hashManifestV2 control2
+  request4 <- submit p.owner $ exerciseCmd manifestCid Manifest_SubmitToVerification with
+    requestCid = request3
+    actorRef = ownerActor
+  attestationCid <- issueAttestation l request4 "ATT-001" validity l.accreditationCid
+  shared <- shareWithLender l manifestCid control3 attestationCid p.lenderA "SHR-001" "SHR-002"
+  assessmentCid <- openAssessment l p.lenderA shared.disclosureCid "CA-001"
+  pure MainFixture with
+    ledger = l
+    controlCid = shared.controlCid
+    dealerShareCid = shared.dealerShareCid
+    ownerShareCid = shared.ownerShareCid
+    disclosureCid = shared.disclosureCid
+    ..
+
+data Shared = Shared
+  with
+    dealerShareCid : ContractId PackageShare
+    ownerShareCid : ContractId PackageShare
+    controlCid : ContractId AssetControl
+    disclosureCid : ContractId AttestationDisclosure
+  deriving (Eq, Show)
+
+-- | The owner's "share with selected lender" action, in this order (one submitter each):
+-- 1. owner creates `PackageShareProposal` (dealer documents only); 2. dealer `Consent_Grant`;
+-- 3. owner creates the owner-documents `PackageShare`; 4. owner `Control_ShareWithLender`;
+-- 5. owner `Att_DiscloseTo`.
+shareWithLender : Ledger -> ContractId EvidenceManifest -> ContractId AssetControl -> ContractId VerificationAttestation
+  -> Party -> Text -> Text -> Script Shared
+shareWithLender l manifestCid controlCid attestationCid lender dealerShareRef ownerShareRef = do
+  let p = l.parties
+  now <- getTime
+  manifest <- fromSomeNote "manifest not visible to owner" <$> queryContractId p.owner manifestCid
+  let expiresAt = addRelTime now (days 30)
+  proposalCid <- submit p.owner $ createCmd PackageShareProposal with
+    owner = p.owner
+    dealer = p.dealer
+    recipient = lender
+    shareRef = dealerShareRef
+    purpose = "LENDER_REVIEW"
+    caseRef = fixtureCaseRef
+    evidence = anchorOf manifest
+    documents = sharedDocumentsFrom p.dealer manifest.entries
+    permission = VIEW_DOWNLOAD
+    expiresAt
+  dealerShareCid <- submit p.dealer $ exerciseCmd proposalCid Consent_Grant with actorRef = dealerActor
+  ownerShareCid <- submit p.owner $ createCmd PackageShare with
+    owner = p.owner
+    consenters = []
+    recipient = lender
+    shareRef = ownerShareRef
+    purpose = "LENDER_REVIEW"
+    caseRef = fixtureCaseRef
+    evidence = anchorOf manifest
+    documents = sharedDocumentsFrom p.owner manifest.entries
+    permission = VIEW_DOWNLOAD
+    expiresAt
+  controlCid <- submit p.owner $ exerciseCmd controlCid Control_ShareWithLender with lender; actorRef = ownerActor
+  disclosureCid <- submit p.owner $ exerciseCmd attestationCid Att_DiscloseTo with
+    recipient = lender
+    purpose = "LENDER_REVIEW"
+    disclosureCaseRef = fixtureCaseRef
+    actorRef = ownerActor
+  pure Shared with ..
+
+-- | The lender's intake: the review snapshot is copied from the lender's verifier-signed disclosure.
+snapshotFromDisclosure : Party -> ContractId AttestationDisclosure -> Script ReviewSnapshot
+snapshotFromDisclosure lender disclosureCid = do
+  disclosure <- fromSomeNote "disclosure not visible to lender" <$> queryContractId lender disclosureCid
+  let a = disclosure.attestation
+  pure ReviewSnapshot with
+    evidence = a.evidence
+    attestationRef = a.attestationRef
+    attestationVerifier = a.verifier
+    attestationValidUntil = a.validUntil
+
+openAssessment : Ledger -> Party -> ContractId AttestationDisclosure -> Text -> Script (ContractId CollateralAssessment)
+openAssessment l lender disclosureCid assessmentRef = do
+  snapshot <- snapshotFromDisclosure lender disclosureCid
+  submit lender $ createCmd CollateralAssessment with
+    lender
+    borrower = l.parties.owner
+    assessmentRef
+    caseRef = fixtureCaseRef
+    namespace = fixtureNamespace
+    assetId = fixtureAssetId
+    snapshot
+    valuation = None
+    policyRef = "CP-2026-CNC-01"
+    status = Fin.SUBMITTED
+    version = 1
+    lastActorRef = lenderIntakeActor
+
+-- * Lender review, proposal and activation
+
+fixtureValuation : Script Valuation
+fixtureValuation = do
+  now <- getTime
+  pure Valuation with
+    value = Money with amount = 150000.00; currency = "USD"
+    source = "Synthetic desktop valuation"
+    valuationDate = toDateUTC now
+    limitations = "Desktop valuation from synthetic evidence; no physical appraisal."
+
+-- | IN_REVIEW (analyst) -> saved valuation (analyst) -> PENDING_APPROVAL (analyst) -> ELIGIBLE (approver).
+reviewToEligible : Party -> ContractId CollateralAssessment -> Text
+  -> Script (ContractId CollateralAssessment, ContractId LenderDecisionNotice)
+reviewToEligible lender assessmentCid noticeRef = do
+  valuation <- fixtureValuation
+  a1 <- submit lender $ exerciseCmd assessmentCid Assessment_StartReview with actorRef = analystActor
+  a2 <- submit lender $ exerciseCmd a1 Assessment_Save with
+    newValuation = valuation; newPolicyRef = "CP-2026-CNC-01"; actorRef = analystActor
+  a3 <- submit lender $ exerciseCmd a2 Assessment_SubmitForApproval with actorRef = analystActor
+  submit lender $ exerciseCmd a3 Assessment_Approve with
+    noticeRef
+    sharedFeedback = "Eligible for this lender and case. Financing is not yet active."
+    actorRef = approverActor
+
+fixturePrincipal : Money
+fixturePrincipal = Money with amount = 100000.00; currency = "USD"
+
+issueProposal : Party -> ContractId CollateralAssessment -> Text -> Script (ContractId FinancingProposal)
+issueProposal lender assessmentCid proposalRef = do
+  now <- getTime
+  submit lender $ exerciseCmd assessmentCid Assessment_IssueProposal with
+    proposalRef
+    principal = fixturePrincipal
+    termMetadata = "Synthetic 36-month equipment financing terms"
+    externalLegalRef = "LEGAL-DEMO-" <> proposalRef
+    expiresAt = addRelTime now (days 14)
+    actorRef = approverActor
+
+acceptProposal : Ledger -> ContractId FinancingProposal -> Text -> Int -> Script (ContractId FinancingAgreement)
+acceptProposal l proposalCid proposalRef expectedVersion =
+  submit l.parties.owner $ exerciseCmd proposalCid Proposal_Accept with
+    expectedProposalRef = proposalRef
+    expectedVersion
+    actorRef = ownerActor
+
+-- | Borrower authorizes activation against the current control version (read from the borrower's own view).
+authorizeActivation : Ledger -> ContractId FinancingAgreement -> ContractId AssetControl -> Text -> RelTime
+  -> Script (ContractId PledgeActivationAuthorization)
+authorizeActivation l agreementCid controlCid authorizationRef validity = do
+  let p = l.parties
+  now <- getTime
+  control <- fromSomeNote "control not visible to owner" <$> queryContractId p.owner controlCid
+  submit p.owner $ exerciseCmd agreementCid Agreement_AuthorizeActivation with
+    authorizationRef
+    expectedControlVersion = control.controlVersion
+    expiresAt = addRelTime now validity
+    actorRef = ownerActor
+
+activate : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization -> Text
+  -> Script (ContractId CollateralLock)
+activate l lender controlCid authorizationCid lockRef =
+  submit lender $ activateCmd l lender controlCid authorizationCid lockRef
+
+activateCmd : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization -> Text
+  -> Commands (ContractId CollateralLock)
+activateCmd l lender controlCid authorizationCid lockRef =
+  exerciseCmd controlCid Control_Activate with
+    lender
+    authorizationCid
+    configCid = l.configCid
+    verifierStatusCid = l.mirrorCid
+    lockRef
+    actorRef = approverActor
+
+data Financed = Financed
+  with
+    fixture : MainFixture
+    eligibleAssessmentCid : ContractId CollateralAssessment
+    noticeCid : ContractId LenderDecisionNotice
+    proposalCid : ContractId FinancingProposal
+      -- ^ FP-001 v1, consumed by the acceptance.
+    agreementCid : ContractId FinancingAgreement
+    authorizationCid : ContractId PledgeActivationAuthorization
+  deriving (Eq, Show)
+
+-- | From the main fixture: eligible -> proposal FP-001 v1 -> exact-version acceptance -> AUTH-001.
+financeToAuthorization : MainFixture -> Script Financed
+financeToAuthorization fixture = do
+  let l = fixture.ledger
+      lender = l.parties.lenderA
+  (eligibleAssessmentCid, noticeCid) <- reviewToEligible lender fixture.assessmentCid "LDN-001"
+  proposalCid <- issueProposal lender eligibleAssessmentCid "FP-001"
+  agreementCid <- acceptProposal l proposalCid "FP-001" 1
+  authorizationCid <- authorizeActivation l agreementCid fixture.controlCid "AUTH-001" (days 7)
+  pure Financed with ..
+
+requestRelease : Ledger -> ContractId CollateralLock -> Text -> Script (ContractId ReleaseRequest)
+requestRelease l lockCid releaseRequestRef = do
+  let p = l.parties
+  submit p.owner $ createCmd ReleaseRequest with
+    requester = p.owner
+    owner = p.owner
+    lender = p.lenderA
+    lockCid
+    lockRef = "PL-001"
+    caseRef = fixtureCaseRef
+    namespace = fixtureNamespace
+    assetId = fixtureAssetId
+    releaseRequestRef
+    reason = EXTERNAL_LOAN_COMPLETION
+    noteRef = "NOTE-" <> releaseRequestRef
+    status = Rel.REQUESTED
+    version = 1
+    requestedByRef = ownerActor
+
+data HappyPath = HappyPath
+  with
+    financed : Financed
+    lockCid : ContractId CollateralLock
+    rejectedRequestCid : ContractId ReleaseRequest
+      -- ^ RR-001, already consumed by the rejection.
+    rejectionCid : ContractId ReleaseDecision
+    authorizedRequestCid : ContractId ReleaseRequest
+      -- ^ RR-002, consumed by the authorization.
+    releasedControlCid : ContractId AssetControl
+    releasedRecordCid : ContractId CollateralLockReleased
+    authorizationDecisionCid : ContractId ReleaseDecision
+    ownerGrantCid : ContractId AuditGrant
+    lenderGrantCid : ContractId AuditGrant
+  deriving (Eq, Show)
+
+-- | Full walkthrough after the main fixture: activation PL-001, release request RR-001 rejected (lock stays
+-- active), RR-002 authorized (control recreated), then one audit grant per record owner.
+runHappyPath : MainFixture -> Script HappyPath
+runHappyPath fixture = do
+  let l = fixture.ledger
+      p = l.parties
+  financed <- financeToAuthorization fixture
+  lockCid <- activate l p.lenderA fixture.controlCid financed.authorizationCid "PL-001"
+  rejectedRequestCid <- requestRelease l lockCid "RR-001"
+  rejectionCid <- submit p.lenderA $ exerciseCmd rejectedRequestCid Release_Reject with
+    decisionRef = "RD-001"
+    sharedReason = "Repayment confirmation has not been received."
+    actorRef = approverActor
+  authorizedRequestCid <- requestRelease l lockCid "RR-002"
+  (releasedControlCid, releasedRecordCid, authorizationDecisionCid) <-
+    submit p.lenderA $ exerciseCmd authorizedRequestCid Release_Authorize with
+      decisionRef = "RD-002"
+      actorRef = approverActor
+  now <- getTime
+  ownerGrantCid <- submit p.owner $ createCmd AuditGrant with
+    grantor = p.owner
+    auditor = p.auditor
+    grantRef = "AG-001"
+    caseRef = fixtureCaseRef
+    scopes = [EVIDENCE_MANIFEST, ATTESTATION]
+    permission = Audit.EXPORT
+    purpose = "Synthetic audit of case CL-001"
+    expiresAt = addRelTime now (days 30)
+  lenderGrantCid <- submit p.lenderA $ createCmd AuditGrant with
+    grantor = p.lenderA
+    auditor = p.auditor
+    grantRef = "AG-002"
+    caseRef = fixtureCaseRef
+    scopes = [DECISION_OUTCOME, PLEDGE_RELEASE_EVENTS]
+    permission = Audit.EXPORT
+    purpose = "Synthetic audit of case CL-001"
+    expiresAt = addRelTime now (days 30)
+  pure HappyPath with ..

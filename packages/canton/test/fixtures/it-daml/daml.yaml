@@ -1,0 +1,12 @@
+# Test-only Daml package for the @collara/canton integration tests (never part of the app).
+# Build: pnpm --filter @collara/canton build:it-dar   (runs `dpm build` here)
+sdk-version: 3.5.12
+name: collara-canton-it
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+build-options:
+  - --target=2.2
+  - -Werror=template-interface-depends-on-daml-script

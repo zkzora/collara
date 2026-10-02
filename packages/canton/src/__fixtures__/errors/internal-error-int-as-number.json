@@ -1,0 +1,17 @@
+{
+  "status": 500,
+  "body": {
+    "code": "LEDGER_API_INTERNAL_ERROR",
+    "cause": "Expected ujson.Str (data: 42)",
+    "correlationId": "28902fba0a61d7900e68e5e53948b618",
+    "traceId": "28902fba0a61d7900e68e5e53948b618",
+    "context": {
+      "throwableO": "Some(ujson.Value$InvalidData: Expected ujson.Str (data: 42))"
+    },
+    "resources": [],
+    "errorCategory": 4,
+    "grpcCodeValue": 13,
+    "retryInfo": null,
+    "definiteAnswer": false
+  }
+}

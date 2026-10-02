@@ -1,0 +1,15 @@
+{
+  "status": 400,
+  "body": {
+    "code": "INVALID_ARGUMENT",
+    "cause": "The submitted request has invalid arguments: true is not a valid numeric value",
+    "correlationId": "59af8473d4f57ab5663f92ee2bf48af7",
+    "traceId": "59af8473d4f57ab5663f92ee2bf48af7",
+    "context": {},
+    "resources": [],
+    "errorCategory": 8,
+    "grpcCodeValue": 3,
+    "retryInfo": null,
+    "definiteAnswer": false
+  }
+}

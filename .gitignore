@@ -35,3 +35,7 @@ blob-report/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# next.js (NEXT_DIST_DIR may point at .next-<name>/ for parallel builds)
+.next*/
+next-env.d.ts

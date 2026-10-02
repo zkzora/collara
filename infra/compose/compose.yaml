@@ -1,0 +1,82 @@
+# Collara local infrastructure for machines with Docker: PostgreSQL, SeaweedFS (S3) and Keycloak.
+#
+# UNTESTED on the authoring machine (no Docker). The verified path is the native Windows setup in
+# docs/setup.md; these services mirror it (same versions, ports, bucket and realm).
+#
+# From the repo root, after `node scripts/dev/init-env.mjs` (creates .env with dev-only secrets):
+#   docker compose --env-file .env -f infra/compose/compose.yaml up -d
+#   docker compose --env-file .env -f infra/compose/compose.yaml ps
+#   docker compose --env-file .env -f infra/compose/compose.yaml down      # add -v to delete the data volumes
+#
+# Every port is published on 127.0.0.1 only. Development only: synthetic data, plain HTTP, start-dev.
+name: collara-infra
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    environment:
+      # Dev-only credentials, the same as the WSL setup (DATABASE_URL in .env.example).
+      POSTGRES_USER: collara
+      POSTGRES_PASSWORD: collara_dev
+      POSTGRES_DB: collara
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Creates collara_test on the first start of an empty volume.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collara -d collara"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    # No command: per the SeaweedFS README the image runs `weed mini` with data in /data, takes its
+    # admin S3 identity from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and creates S3_BUCKET. Never
+    # run it without the keys: SeaweedFS without credentials serves every bucket anonymously.
+    environment:
+      AWS_ACCESS_KEY_ID: ${COLLARA_S3_ACCESS_KEY:-collara-dev}
+      AWS_SECRET_ACCESS_KEY: ${COLLARA_S3_SECRET_KEY:?set COLLARA_S3_SECRET_KEY in .env}
+      S3_BUCKET: ${COLLARA_S3_BUCKET:-collara-evidence}
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      # GET /healthz answers 200 without credentials (checked against the native 4.48 binary).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: ["start-dev", "--import-realm", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?set KC_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      # Keycloak substitutes ${COLLARA_OIDC_CLIENT_SECRET} in the realm file during import.
+      COLLARA_OIDC_CLIENT_SECRET: ${COLLARA_OIDC_CLIENT_SECRET:?set COLLARA_OIDC_CLIENT_SECRET in .env}
+    ports:
+      # Same host ports as the native setup, so the issuer is http://localhost:18080/realms/collara.
+      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:19000:9000"
+    volumes:
+      - ../keycloak/collara-realm.json:/opt/keycloak/data/import/collara-realm.json:ro
+    healthcheck:
+      # The image has no curl or wget; bash /dev/tcp asks the management port for /health/ready.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  postgres-data: {}
+  seaweedfs-data: {}

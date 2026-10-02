@@ -1,0 +1,198 @@
+import { randomUUID } from "node:crypto";
+import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
+import type { DbHandle } from "@collara/db";
+import { ERROR_COPY } from "@collara/domain";
+import Fastify, { type FastifyServerOptions } from "fastify";
+import {
+  hasZodFastifySchemaValidationErrors,
+  isResponseSerializationError,
+  jsonSchemaTransform,
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from "fastify-type-provider-zod";
+import packageJson from "../package.json" with { type: "json" };
+import type { Config } from "./config";
+import { isProblemError, problemError, PROBLEM_CONTENT_TYPE, problems, type ProblemError } from "./errors";
+import { loggerOptions } from "./logger";
+import { actorResolution } from "./plugins/actor";
+import { security } from "./plugins/security";
+import { sessions } from "./plugins/session";
+import { authRoutes } from "./routes/auth";
+import { commandRoutes, verifierRoutes } from "./routes/commands";
+import { evidenceRoutes } from "./routes/evidence";
+import { pilotRoutes } from "./routes/pilot";
+import { demoRoutes, meRoutes } from "./routes/session";
+import { systemRoutes } from "./routes/system";
+import { CommandService } from "./services/commands";
+import { probeLedger, type HealthCheck } from "./services/health";
+import { createDbProjectionReader, unavailableLedgerGateway, type LedgerGateway, type ProjectionReader } from "./services/ledger";
+import { createOidcService, type OidcService } from "./services/oidc";
+import { createS3Storage, type StorageService } from "./services/storage";
+
+export const API_VERSION = packageJson.version;
+
+export interface BuildAppOptions {
+  config: Config;
+  /** Override the logger (tests pass `false` or a stream-backed pino). Defaults to the redacting pino options. */
+  logger?: FastifyServerOptions["logger"];
+  /** Database handle. Without one only health and docs are served (UI_MOCK without PostgreSQL). */
+  db?: DbHandle | null;
+  /** Object storage; defaults to S3 from config (null when unconfigured: evidence endpoints answer 503). */
+  storage?: StorageService | null;
+  /** Ledger command port; defaults to a gateway that reports the ledger as unavailable. */
+  ledger?: LedgerGateway;
+  projections?: ProjectionReader;
+  /** OIDC client; defaults to discovery from OIDC_* config (null when unconfigured). */
+  oidc?: OidcService | null;
+  /** Ledger reachability probe for health (defaults to the LocalNet bootstrap state + /readyz). */
+  probeLedger?: () => Promise<HealthCheck>;
+  clock?: () => Date;
+}
+
+/** Services available to route plugins (also decorated on the instance as `services`). */
+export interface AppServices {
+  readonly db: DbHandle;
+  readonly commands: CommandService;
+  readonly projections: ProjectionReader;
+  readonly storage: StorageService | null;
+  readonly ledger: LedgerGateway;
+  readonly oidc: OidcService | null;
+  readonly clock: () => Date;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    services: AppServices | null;
+  }
+}
+
+function toProblem(error: unknown): { problem: ProblemError; log: boolean } {
+  if (isProblemError(error)) return { problem: error, log: error.statusCode >= 500 };
+  if (hasZodFastifySchemaValidationErrors(error)) {
+    const issues = error.validation.map((issue) => ({
+      path: `${error.validationContext ?? "body"}${issue.instancePath.replaceAll("/", ".")}`,
+      message: issue.message ?? "Invalid value",
+    }));
+    return { problem: problems.validation(issues), log: false };
+  }
+  const status = numberField(error, "statusCode") ?? 500;
+  if (status >= 500 || status < 400 || isResponseSerializationError(error)) return { problem: problems.internal(), log: true };
+  // Client errors raised by Fastify itself (bad JSON, unsupported media type, payload too large, rate limit).
+  const message = error instanceof Error ? error.message : undefined;
+  switch (status) {
+    case 401:
+      return { problem: problems.unauthenticated(), log: false };
+    case 403:
+      return { problem: problems.forbidden(), log: false };
+    case 404:
+      return { problem: problems.unavailable(), log: false };
+    case 409:
+      return { problem: problems.stateConflict(), log: false };
+    case 429:
+      return { problem: problems.rateLimited(), log: false };
+    default:
+      return { problem: problemError("validation_error", message ?? ERROR_COPY.VALIDATION, undefined, status), log: false };
+  }
+}
+
+export async function buildApp(options: BuildAppOptions) {
+  const { config } = options;
+  const clock = options.clock ?? (() => new Date());
+  const app = Fastify({
+    logger: options.logger ?? loggerOptions(config),
+    trustProxy: config.TRUST_PROXY ?? false,
+    // Request ids are generated here; a client-supplied x-request-id is not trusted.
+    genReqId: () => randomUUID(),
+    requestIdHeader: false,
+  }).withTypeProvider<ZodTypeProvider>();
+
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+
+  app.setErrorHandler((error, request, reply) => {
+    const { problem, log } = toProblem(error);
+    if (log) request.log.error({ err: error }, "request failed");
+    return reply
+      .code(problem.problem.status)
+      .type(PROBLEM_CONTENT_TYPE)
+      .send({ ...problem.problem, instance: `urn:collara:request:${request.id}` });
+  });
+  app.setNotFoundHandler((request, reply) =>
+    reply
+      .code(404)
+      .type(PROBLEM_CONTENT_TYPE)
+      .send({ ...problems.unavailable().problem, instance: `urn:collara:request:${request.id}` }),
+  );
+
+  await app.register(security, { config });
+  await app.register(rateLimit, {
+    global: false,
+    // The thrown object reaches the error handler, which renders the 429 problem.
+    errorResponseBuilder: (_request, context) => Object.assign(new Error(`Rate limit exceeded, retry in ${context.after}`), { statusCode: 429 }),
+  });
+
+  await app.register(swagger, {
+    openapi: {
+      info: { title: "Collara API", version: API_VERSION, description: "Synthetic demo data only. Errors are application/problem+json (RFC 9457)." },
+    },
+    transform: jsonSchemaTransform,
+  });
+  await app.register(swaggerUi, {
+    routePrefix: "/api/docs",
+    staticCSP: true,
+    // The docs are served over plain http locally; upgrade-insecure-requests would break their assets.
+    transformStaticCSP: (header) => header.replace(/\s*upgrade-insecure-requests;?/, ""),
+  });
+
+  const db = options.db ?? null;
+  const storage = options.storage === undefined ? createS3Storage(config) : options.storage;
+  await app.register(systemRoutes, {
+    prefix: "/api/system",
+    mode: config.COLLARA_MODE,
+    version: API_VERSION,
+    db,
+    storage,
+    probeLedger: options.probeLedger ?? (() => probeLedger({ statePath: config.COLLARA_LOCALNET_STATE })),
+    workerStaleAfterSeconds: config.WORKER_STALE_AFTER_SECONDS,
+    clock,
+  });
+
+  if (!db) {
+    app.decorate("services", null);
+    return app;
+  }
+
+  const ledger = options.ledger ?? unavailableLedgerGateway;
+  const projections = options.projections ?? createDbProjectionReader(db.db);
+  const commands = new CommandService(db.db, ledger, clock);
+  const oidc = options.oidc === undefined ? createOidcService(config) : options.oidc;
+  app.decorate("services", { db, commands, projections, storage, ledger, oidc, clock } satisfies AppServices);
+
+  await app.register(sessions, { config, db: db.db, clock });
+  await app.register(actorResolution, { db: db.db });
+
+  await app.register(authRoutes, { prefix: "/api/auth", config, db: db.db, oidc, clock });
+  await app.register(meRoutes, { prefix: "/api/me", mode: config.COLLARA_MODE });
+  await app.register(demoRoutes, { prefix: "/api/demo", db: db.db, mode: config.COLLARA_MODE, demoSessionsEnabled: config.DEMO_SESSIONS_ENABLED });
+  await app.register(pilotRoutes, {
+    prefix: "/api/pilot-requests",
+    db: db.db,
+    clock,
+    rateLimit: { max: config.PILOT_RATE_LIMIT_MAX, timeWindowMs: config.PILOT_RATE_LIMIT_WINDOW_MS },
+  });
+  await app.register(commandRoutes, { prefix: "/api/commands", commands });
+  await app.register(verifierRoutes, { prefix: "/api/verifiers", projections, indexed: false });
+  await app.register(evidenceRoutes, { prefix: "/api/evidence", db: db.db, storage, commands, projections, clock });
+
+  return app;
+}
+
+export type CollaraApp = Awaited<ReturnType<typeof buildApp>>;
+
+function numberField(value: unknown, key: string): number | undefined {
+  const field = typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+  return typeof field === "number" ? field : undefined;
+}

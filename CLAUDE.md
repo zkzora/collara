@@ -27,7 +27,7 @@ Internal packages export TypeScript source (no build step); imports without file
 - Install: `pnpm install` (root). Checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`. Per package: `pnpm --filter @collara/web <script>`.
 - Daml: SDK at `%APPDATA%\dpm` (not on PATH). PowerShell: `$env:Path = "$env:APPDATA\dpm\bin;$env:Path"; dpm build --all`. Git Bash: `export PATH="$APPDATA/dpm/bin:$PATH"; dpm.cmd build --all` (bash needs `dpm.cmd`). Set `JDK_JAVA_OPTIONS=-Xmx1g` for sandbox/test. Stop a sandbox with `taskkill /PID <pid> /T /F` (Git Bash: `taskkill //PID <pid> //T //F`).
 - Windows shells: PowerShell 5.1 has no `&&`; Git Bash rewrites `/mnt/...` paths unless `MSYS_NO_PATHCONV=1`. Keep the repo path short (Daml package-database paths hit Windows MAX_PATH).
-- PostgreSQL (dev, WSL Ubuntu 16.14): `postgres://collara:collara_dev@127.0.0.1:5432/collara` (test DB `collara_test`). WSL stops when idle; `scripts/dev/wsl-keepalive` keeps it up. Unit tests use PGlite.
+- PostgreSQL (dev, WSL Ubuntu 16.14): `postgres://collara:collara_dev@127.0.0.1:5432/collara` (test DB `collara_test`). WSL stops when idle; `pnpm db:up` (`scripts/dev/wsl-postgres.mjs up`) starts it with a keepalive. Unit tests use PGlite.
 
 ## Ports
 

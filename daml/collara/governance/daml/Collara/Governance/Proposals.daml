@@ -1,0 +1,169 @@
+-- | Collara governed actions, plugged into DLC-link Decentralization Manager's `GovernanceRules`
+-- (governance-core-v1) through the `GovernableAction` interface (governance-action-v1).
+--
+-- DM conventions (docs/CUSTOM_DAML_TEMPLATES.md): signatory `proposer`, observer `governanceParty`, stable
+-- `actionLabel`, and an `executeImpl` that needs no authority beyond {proposer, governanceParty}.
+-- DM confirmations expire, but proposals do not; staleness is enforced here by a proposal deadline and by
+-- pinning the registry contract id and version.
+module Collara.Governance.Proposals where
+
+import DA.Foldable (mapA_)
+import DA.List (unique)
+import qualified DA.Set as Set
+import Governance.Action
+
+import Collara.Governance.Registry
+
+-- | Permanent audit labels (DM records them in `GovernanceExecutionResult.actionLabel`). Never rename.
+bootstrapLabel, addVerifierLabel, suspendVerifierLabel : Text
+bootstrapLabel = "CollaraBootstrapVerifierRegistry"
+addVerifierLabel = "CollaraAddVerifier"
+suspendVerifierLabel = "CollaraSuspendVerifier"
+
+data GenesisVerifier = GenesisVerifier
+  with
+    verifier : Party
+    verifierRef : Text
+    orgName : Text
+    scope : [Text]
+    validUntil : Optional Time
+  deriving (Eq, Show)
+
+assertBeforeDeadline : Time -> Update ()
+assertBeforeDeadline proposalDeadline = do
+  now <- getTime
+  assertMsg "Proposal deadline passed" (now <= proposalDeadline)
+
+-- | Fetches the pinned registry and checks it belongs to this governance and is still at the expected version.
+fetchPinnedRegistry : Party -> ContractId VerifierRegistry -> Int -> Update VerifierRegistry
+fetchPinnedRegistry governanceParty registryCid expectedVersion = do
+  reg <- fetch registryCid
+  assertMsg "Registry of another governance" (reg.governanceParty == governanceParty)
+  assertMsg "Stale registry version" (reg.version == expectedVersion)
+  pure reg
+
+-- | Creates the verifier registry (version 0) and the genesis accreditations through a governed execute, so
+-- bootstrap is on the governance audit trail. Without contract keys nothing prevents a second registry from
+-- being bootstrapped by a second governed proposal; that is a governance decision, not a Collara invariant.
+template BootstrapVerifierRegistryProposal
+  with
+    governanceParty : Party
+    proposer : Party
+    operator : Party
+    registryId : Text
+    genesisVerifiers : [GenesisVerifier]
+    proposalDeadline : Time
+    reason : Text
+  where
+    signatory proposer
+    observer governanceParty
+    ensure registryId /= "" && reason /= ""
+      && unique (map (.verifier) genesisVerifiers)
+      && all (\g -> g.verifierRef /= "" && g.orgName /= "" && not (null g.scope)) genesisVerifiers
+
+    interface instance GovernableAction for BootstrapVerifierRegistryProposal where
+      view = GovernableActionView with
+        governanceParty
+        proposer
+        actionLabel = bootstrapLabel
+        description = "Bootstrap verifier registry " <> registryId <> " (v0) with "
+          <> show (length genesisVerifiers) <> " genesis verifier(s) "
+          <> show (map (.verifierRef) genesisVerifiers) <> ": " <> reason
+      executeImpl = do
+        assertBeforeDeadline proposalDeadline
+        _ <- create VerifierRegistry with
+          governanceParty
+          operator
+          registryId
+          version = 0
+          activeVerifiers = Set.fromList (map (.verifier) genesisVerifiers)
+        mapA_ (\g -> create VerifierAccreditation with
+                  governanceParty
+                  operator
+                  verifier = g.verifier
+                  verifierRef = g.verifierRef
+                  orgName = g.orgName
+                  scope = g.scope
+                  status = ACTIVE
+                  validUntil = g.validUntil
+                  registryId
+                  registryVersion = 0
+                  reason)
+          genesisVerifiers
+
+template AddVerifierProposal
+  with
+    governanceParty : Party
+    proposer : Party
+    registryCid : ContractId VerifierRegistry
+    expectedVersion : Int
+    verifier : Party
+    verifierRef : Text
+    orgName : Text
+    scope : [Text]
+    validUntil : Optional Time
+    proposalDeadline : Time
+    reason : Text
+  where
+    signatory proposer
+    observer governanceParty
+    ensure verifierRef /= "" && orgName /= "" && not (null scope) && reason /= "" && expectedVersion >= 0
+
+    interface instance GovernableAction for AddVerifierProposal where
+      view = GovernableActionView with
+        governanceParty
+        proposer
+        actionLabel = addVerifierLabel
+        description = "Add verifier " <> verifierRef <> " " <> show verifier <> " (" <> orgName <> "), scope "
+          <> show scope <> ", registry v" <> show expectedVersion <> ": " <> reason
+      executeImpl = do
+        assertBeforeDeadline proposalDeadline
+        reg <- fetchPinnedRegistry governanceParty registryCid expectedVersion
+        _ <- exercise registryCid Registry_Add with verifier
+        _ <- create VerifierAccreditation with
+          governanceParty
+          operator = reg.operator
+          verifier
+          verifierRef
+          orgName
+          scope
+          status = ACTIVE
+          validUntil
+          registryId = reg.registryId
+          registryVersion = expectedVersion + 1
+          reason
+        pure ()
+
+template SuspendVerifierProposal
+  with
+    governanceParty : Party
+    proposer : Party
+    registryCid : ContractId VerifierRegistry
+    expectedVersion : Int
+    accreditationCid : ContractId VerifierAccreditation
+    verifier : Party
+    proposalDeadline : Time
+    reason : Text
+  where
+    signatory proposer
+    observer governanceParty
+    ensure reason /= "" && expectedVersion >= 0
+
+    interface instance GovernableAction for SuspendVerifierProposal where
+      view = GovernableActionView with
+        governanceParty
+        proposer
+        actionLabel = suspendVerifierLabel
+        description = "Suspend verifier " <> show verifier <> ", registry v" <> show expectedVersion <> ": " <> reason
+      executeImpl = do
+        assertBeforeDeadline proposalDeadline
+        reg <- fetchPinnedRegistry governanceParty registryCid expectedVersion
+        acc <- fetch accreditationCid
+        assertMsg "Accreditation mismatch"
+          (acc.verifier == verifier && acc.governanceParty == governanceParty
+            && acc.registryId == reg.registryId && acc.status == ACTIVE)
+        _ <- exercise registryCid Registry_Remove with verifier
+        _ <- exercise accreditationCid Accreditation_Suspend with
+          suspendReason = reason
+          newRegistryVersion = expectedVersion + 1
+        pure ()

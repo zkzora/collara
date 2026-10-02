@@ -1,0 +1,26 @@
+{
+  "status": 404,
+  "body": {
+    "code": "CONTRACT_NOT_FOUND",
+    "cause": "Contract could not be found with id 00ec70c97e441b7a0307296e330f815d1d27662c2b85dc0310196f76d98893ee55ca121220a0b04757fcde7f692a3b04f55f9fe6ebac290107059932314a777f9378e1301e",
+    "correlationId": "5138e2be-61fe-402a-9182-94186b31879f",
+    "traceId": "aefc2ffec9dcfb02e4dadb857b59a46d",
+    "context": {
+      "participant": "'sandbox'",
+      "category": "11",
+      "tid": "aefc2ffec9dcfb02e4dadb857b59a46d",
+      "definite_answer": "false",
+      "commands": "{readAs: [], deduplicationPeriod: {duration: 'PT168H'}, submittedAt: '2026-10-01T22:17:51.261748Z', submissionId: '5138e2be-61fe-402a-9182-94186b31879f', actAs: ['CapHolder-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854'], commandId: 'cap-consume-2-muq3hmv3', userId: 'cap-holder-muq3hmv3', workflowId: }"
+    },
+    "resources": [
+      [
+        "ErrorResource(CONTRACT_ID)",
+        "00ec70c97e441b7a0307296e330f815d1d27662c2b85dc0310196f76d98893ee55ca121220a0b04757fcde7f692a3b04f55f9fe6ebac290107059932314a777f9378e1301e"
+      ]
+    ],
+    "errorCategory": 11,
+    "grpcCodeValue": 5,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

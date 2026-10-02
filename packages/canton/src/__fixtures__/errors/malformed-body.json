@@ -1,0 +1,4 @@
+{
+  "status": 400,
+  "body": "Invalid value for: body (Missing required field at 'commands', Missing required field at 'commandId', Missing required field at 'actAs')"
+}

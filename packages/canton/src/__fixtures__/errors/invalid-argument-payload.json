@@ -1,0 +1,20 @@
+{
+  "status": 400,
+  "body": {
+    "code": "INVALID_ARGUMENT",
+    "cause": "The submitted request has invalid arguments: Could not read Numeric string \"abc\"",
+    "correlationId": "6a6c93da-cc6e-4174-9cd9-6e17c53cfd31",
+    "traceId": "a63368a23abff6bb9f7ea05a4d6c3f78",
+    "context": {
+      "participant": "'sandbox'",
+      "definite_answer": "false",
+      "tid": "a63368a23abff6bb9f7ea05a4d6c3f78",
+      "category": "8"
+    },
+    "resources": [],
+    "errorCategory": 8,
+    "grpcCodeValue": 3,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

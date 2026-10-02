@@ -1,0 +1,46 @@
+-- | Value types shared by the Collara workflow templates.
+module Collara.Types where
+
+import qualified DA.Text as T
+
+-- | Money is always a decimal amount plus an explicit ISO 4217 currency code. Never sum across currencies.
+data Money = Money
+  with
+    amount : Numeric 2
+    currency : Text
+  deriving (Eq, Show)
+
+validCurrency : Text -> Bool
+validCurrency c = T.length c == 3 && T.isUpper c
+
+validMoney : Money -> Bool
+validMoney m = m.amount > 0.0 && validCurrency m.currency
+
+-- | Identifies one exact evidence package version. `manifestHash` is the SHA-256 (hex) of the canonical
+-- manifest serialization, computed off-ledger by the API; the ledger compares it, it cannot recompute it.
+data EvidenceAnchor = EvidenceAnchor
+  with
+    packageRef : Text
+    manifestVersion : Int
+    manifestHash : Text
+  deriving (Eq, Show)
+
+validAnchor : EvidenceAnchor -> Bool
+validAnchor a = a.packageRef /= "" && a.manifestVersion >= 1 && a.manifestHash /= ""
+
+-- | What a lender reviewed: the evidence package version and a lender-held copy of the attestation facts it
+-- relied on (taken from its verifier-signed `AttestationDisclosure`). Carried, unchanged, from the assessment
+-- into the proposal, the agreement and the activation authorization.
+data ReviewSnapshot = ReviewSnapshot
+  with
+    evidence : EvidenceAnchor
+    attestationRef : Text
+    attestationVerifier : Party
+    attestationValidUntil : Time
+  deriving (Eq, Show)
+
+validSnapshot : ReviewSnapshot -> Bool
+validSnapshot s = validAnchor s.evidence && s.attestationRef /= ""
+
+nonEmptyTexts : [Text] -> Bool
+nonEmptyTexts = all (/= "")

@@ -1,0 +1,128 @@
+-- | Lender review and exact-version acceptance (S 11.7 #5); terms only between borrower and lender.
+module Collara.Tests.Financing where
+
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Collara.Financing hiding (AssessmentStatus(..))
+import qualified Collara.Financing as Fin
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Util
+import Collara.Types
+
+-- | Main fixture, assessment ELIGIBLE and FP-001 v1 issued.
+issuedFrom : Script MainFixture -> Script (MainFixture, ContractId CollateralAssessment, ContractId FinancingProposal)
+issuedFrom build = do
+  f <- build
+  (eligibleCid, _) <- reviewToEligible f.ledger.parties.lenderA f.assessmentCid "LDN-001"
+  proposalCid <- issueProposal f.ledger.parties.lenderA eligibleCid "FP-001"
+  pure (f, eligibleCid, proposalCid)
+
+accept : MainFixture -> ContractId FinancingProposal -> Text -> Int -> Script (Either SubmitError (ContractId FinancingAgreement))
+accept f proposalCid ref version = trySubmit f.ledger.parties.owner $ exerciseCmd proposalCid Proposal_Accept with
+  expectedProposalRef = ref; expectedVersion = version; actorRef = ownerActor
+
+test_accept_wrong_version_fails : Script ()
+test_accept_wrong_version_fails = do
+  (f, _, proposalCid) <- issuedFrom seedMain
+  rVersion <- accept f proposalCid "FP-001" 2
+  expectFailure "Proposal version mismatch" rVersion
+  rRef <- accept f proposalCid "FP-002" 1
+  expectFailure "Proposal version mismatch" rRef
+  Right agreementCid <- accept f proposalCid "FP-001" 1
+  agreementRecord <- fetchAs f.ledger.parties.owner agreementCid
+  assertEq "accepted version" 1 agreementRecord.proposalVersion
+
+-- | Changing terms creates v2 and consumes v1: the old contract cannot be accepted, and v2 needs its own version.
+test_accept_stale_version_fails : Script ()
+test_accept_stale_version_fails = do
+  (f, _, v1) <- issuedFrom seedMain
+  let p = f.ledger.parties
+  now <- getTime
+  v2 <- submit p.lenderA $ exerciseCmd v1 Proposal_Revise with
+    newPrincipal = Money with amount = 95000.00; currency = "USD"
+    newTermMetadata = "Synthetic 36-month equipment financing terms"
+    newExternalLegalRef = "LEGAL-DEMO-FP-001-v2"
+    newExpiresAt = addRelTime now (days 14)
+    actorRef = approverActor
+  rOld <- accept f v1 "FP-001" 1
+  expectConsumed rOld
+  rStale <- accept f v2 "FP-001" 1
+  expectFailure "Proposal version mismatch" rStale
+  Right agreementCid <- accept f v2 "FP-001" 2
+  agreementRecord <- fetchAs p.owner agreementCid
+  assertEq "accepted terms" (2, Money 95000.00 "USD") (agreementRecord.proposalVersion, agreementRecord.principal)
+
+test_expired_proposal_cannot_be_accepted : Script ()
+test_expired_proposal_cannot_be_accepted = do
+  (f, _, proposalCid) <- issuedFrom seedMain
+  passTime (days 15)
+  r <- accept f proposalCid "FP-001" 1
+  expectFailure "Proposal has expired" r
+
+test_withdraw_only_before_acceptance : Script ()
+test_withdraw_only_before_acceptance = do
+  (f, _, proposalCid) <- issuedFrom seedMain
+  let p = f.ledger.parties
+  Right _ <- accept f proposalCid "FP-001" 1
+  r <- trySubmit p.lenderA $ exerciseCmd proposalCid Proposal_Withdraw with reason = "late"; actorRef = approverActor
+  expectConsumed r
+
+-- | Proposals require an ELIGIBLE assessment; a changed snapshot returns the review to NEEDS_INFORMATION.
+test_proposal_requires_current_eligibility : Script ()
+test_proposal_requires_current_eligibility = do
+  f <- seedMain
+  let p = f.ledger.parties
+  now <- getTime
+  rNotEligible <- trySubmit p.lenderA $ exerciseCmd f.assessmentCid Assessment_IssueProposal with
+    proposalRef = "FP-001"; principal = fixturePrincipal; termMetadata = ""; externalLegalRef = ""
+    expiresAt = addRelTime now (days 14); actorRef = approverActor
+  expectFailure "Assessment is not eligible" rNotEligible
+  (eligibleCid, _) <- reviewToEligible p.lenderA f.assessmentCid "LDN-001"
+  eligible <- fetchAs p.lenderA eligibleCid
+  changed <- submit p.lenderA $ exerciseCmd eligibleCid Assessment_UpdateSnapshot with
+    newSnapshot = eligible.snapshot with evidence = EvidenceAnchor fixturePackageRef 3 hashManifestV3
+    actorRef = analystActor
+  assessment <- fetchAs p.lenderA changed
+  assertEq "review status" Fin.NEEDS_INFORMATION assessment.status
+  rStale <- trySubmit p.lenderA $ exerciseCmd changed Assessment_IssueProposal with
+    proposalRef = "FP-001"; principal = fixturePrincipal; termMetadata = ""; externalLegalRef = ""
+    expiresAt = addRelTime now (days 14); actorRef = approverActor
+  expectFailure "Assessment is not eligible" rStale
+
+-- | Neither side can create terms, agreements or authorizations alone; the borrower cannot decide for the lender.
+test_terms_need_both_parties : Script ()
+test_terms_need_both_parties = do
+  (f, eligibleCid, proposalCid) <- issuedFrom seedMain
+  let p = f.ledger.parties
+  proposal <- fetchAs p.owner proposalCid
+  rProposal <- trySubmit p.owner $ createCmd proposal with principal = Money 1.00 "USD"
+  expectAuthorizationFailure rProposal
+  Right agreementCid <- accept f proposalCid "FP-001" 1
+  agreementRecord <- fetchAs p.owner agreementCid
+  rAgreementOwner <- trySubmit p.owner $ createCmd agreementRecord with agreementRef = "FP-FORGED"
+  expectAuthorizationFailure rAgreementOwner
+  rAgreementLender <- trySubmit p.lenderA $ createCmd agreementRecord with agreementRef = "FP-FORGED"
+  expectAuthorizationFailure rAgreementLender
+  now <- getTime
+  rAuthorizeLender <- trySubmit p.lenderA $ exerciseCmd agreementCid Agreement_AuthorizeActivation with
+    authorizationRef = "AUTH-X"; expectedControlVersion = 3; expiresAt = addRelTime now (days 7)
+    actorRef = approverActor
+  expectAuthorizationFailure rAuthorizeLender
+  rDecide <- trySubmit p.owner $ exerciseCmd eligibleCid Assessment_Reject with
+    noticeRef = "LDN-X"; sharedFeedback = ""; actorRef = ownerActor
+  expectNotVisible rDecide
+
+test_money_must_be_positive_with_iso_currency : Script ()
+test_money_must_be_positive_with_iso_currency = do
+  (f, _, v1) <- issuedFrom seedMain
+  let p = f.ledger.parties
+  now <- getTime
+  let revise principal = trySubmit p.lenderA $ exerciseCmd v1 Proposal_Revise with
+        newPrincipal = principal; newTermMetadata = ""; newExternalLegalRef = ""
+        newExpiresAt = addRelTime now (days 14); actorRef = approverActor
+  rZero <- revise (Money 0.00 "USD")
+  expectPreconditionFailure rZero
+  rCurrency <- revise (Money 100.00 "usd")
+  expectPreconditionFailure rCurrency

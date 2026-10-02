@@ -1,0 +1,135 @@
+-- | Controlled registration: unique issuance through the registrar-only registry, and no replacement control
+-- (S 11.7 #3).
+module Collara.Tests.Registration where
+
+import Daml.Script
+
+import Collara.Control
+import Collara.Registration
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Util
+
+-- | A second physical machine (different serial), used to show that only the asset id or identity clash fails.
+otherSerial : AssetSpec
+otherSerial = demoAsset with
+  assetId = "ASSET-TEST-002"
+  requestRef = "REG-002"
+  equipment = demoAsset.equipment with serialNumber = "SYNTH-CNC-002"
+  -- sha256("DEMO MACHINE WORKS (SYNTHETIC)|DEMO-CNC-500|SYNTH-CNC-002")
+  identityCommitment = "230065246b04a3bcad151f74c6c9024b16698709678d56cb047c89027047dd39"
+
+reserve : Ledger -> AssetSpec -> Script (Either SubmitError (ContractId AssetRegistry, ContractId IssuanceTicket))
+reserve l spec = trySubmit l.parties.registrar $ exerciseCmd l.assetRegistryCid Registry_Reserve with
+  assetId = spec.assetId
+  owner = l.parties.owner
+  requestRef = spec.requestRef
+  identityCommitment = spec.identityCommitment
+  actorRef = registrarActor
+
+test_registration_issues_control_and_passport : Script ()
+test_registration_issues_control_and_passport = do
+  l0 <- seedCleanStart
+  let p = l0.parties
+  (l, controlCid, passportCid) <- registerAsset l0 demoAsset
+  control <- fetchAs p.owner controlCid
+  assertEq "control" (fixtureAssetId, 1, None, None) (control.assetId, control.controlVersion, control.evidence, control.sharedLender)
+  passport <- fetchAs p.owner passportCid
+  assertEq "passport" (fixtureAssetId, 1) (passport.assetId, passport.passportVersion)
+  registry <- fetchAs p.registrar l.assetRegistryCid
+  assertEq "registry version" 1 registry.version
+  -- the owner never sees the registry set (no other party's registrations leak)
+  ownerView <- query @AssetRegistry p.owner
+  assertEq "owner sees no registry" 0 (length ownerView)
+
+test_duplicate_asset_id_rejected : Script ()
+test_duplicate_asset_id_rejected = do
+  l0 <- seedCleanStart
+  (l, _, _) <- registerAsset l0 demoAsset
+  _ <- requestRegistration l (otherSerial with assetId = fixtureAssetId)
+  r <- reserve l (otherSerial with assetId = fixtureAssetId)
+  expectFailure "Asset id already issued" r
+
+test_duplicate_identity_rejected : Script ()
+test_duplicate_identity_rejected = do
+  l0 <- seedCleanStart
+  (l, _, _) <- registerAsset l0 demoAsset
+  r <- reserve l (demoAsset with assetId = "ASSET-TEST-002"; requestRef = "REG-002")
+  expectFailure "Identity already registered" r
+  -- a different machine registers normally
+  (_, controlCid, _) <- registerAsset l otherSerial
+  control <- fetchAs l.parties.owner controlCid
+  assertEq "second asset" "ASSET-TEST-002" control.assetId
+
+-- | An issuance ticket is single-use and bound to one request.
+test_issuance_ticket_single_use_and_bound : Script ()
+test_issuance_ticket_single_use_and_bound = do
+  l0 <- seedCleanStart
+  let p = l0.parties
+  request1 <- requestRegistration l0 demoAsset
+  request2 <- requestRegistration l0 otherSerial
+  Right (registryCid, ticket1) <- reserve l0 demoAsset
+  let l = l0 with assetRegistryCid = registryCid
+  rMismatch <- trySubmit p.registrar $ exerciseCmd request2 Request_Accept with ticketCid = ticket1; actorRef = registrarActor
+  expectFailure "Ticket does not match this request" rMismatch
+  _ <- submit p.registrar $ exerciseCmd request1 Request_Accept with ticketCid = ticket1; actorRef = registrarActor
+  replay <- requestRegistration l demoAsset
+  rReplay <- trySubmit p.registrar $ exerciseCmd replay Request_Accept with ticketCid = ticket1; actorRef = registrarActor
+  expectConsumed rReplay
+  controls <- query @AssetControl p.owner
+  assertEq "exactly one control" 1 (length controls)
+
+-- | Neither the owner nor the registrar alone can mint a control, ticket or registry entry.
+test_no_replacement_control : Script ()
+test_no_replacement_control = do
+  l0 <- seedCleanStart
+  let p = l0.parties
+  (l, controlCid, _) <- registerAsset l0 demoAsset
+  control <- fetchAs p.owner controlCid
+  rOwner <- trySubmit p.owner $ createCmd control with controlVersion = 7
+  expectAuthorizationFailure rOwner
+  rRegistrar <- trySubmit p.registrar $ createCmd control with controlVersion = 7
+  expectAuthorizationFailure rRegistrar
+  rTicket <- trySubmit p.owner $ createCmd IssuanceTicket with
+    registrar = p.registrar; owner = p.owner; namespace = fixtureNamespace; assetId = "ASSET-TEST-002"
+    requestRef = "REG-X"; identityCommitment = "x"
+  expectAuthorizationFailure rTicket
+  rReserve <- trySubmit p.owner $ exerciseCmd l.assetRegistryCid Registry_Reserve with
+    assetId = "ASSET-TEST-002"; owner = p.owner; requestRef = "REG-X"; identityCommitment = "x"; actorRef = ownerActor
+  expectNotVisible rReserve
+  controls <- query @AssetControl p.owner
+  assertEq "exactly one control" 1 (length controls)
+
+-- | The commitment is computed on-ledger from the declared equipment: the documented fixture hash matches, a
+-- request with any other commitment is rejected, and case/whitespace variants of a serial are the same identity.
+test_identity_commitment_computed_on_ledger : Script ()
+test_identity_commitment_computed_on_ledger = do
+  assertEq "fixture commitment" demoIdentityCommitment (identityCommitmentOf demoAsset.equipment)
+  assertEq "other fixture commitment" otherSerial.identityCommitment (identityCommitmentOf otherSerial.equipment)
+  l0 <- seedCleanStart
+  rMismatch <- trySubmit l0.parties.owner $ createCmd AssetRegistrationRequest with
+    owner = l0.parties.owner; registrar = l0.parties.registrar; namespace = fixtureNamespace; requestRef = "REG-X"
+    equipmentClass = "CNC machining center"; equipment = demoAsset.equipment
+    details = PassportDetails with yearOfManufacture = None; locationScope = ""
+    identityCommitment = otherSerial.identityCommitment; ownerClaimRef = "CLAIM-X"
+  expectPreconditionFailure rMismatch
+  (l, _, _) <- registerAsset l0 demoAsset
+  let variant = demoAsset with
+        assetId = "ASSET-TEST-002"
+        requestRef = "REG-002"
+        equipment = EquipmentIdentity with
+          manufacturer = "  demo machine works (synthetic) "; model = "demo-cnc-500"; serialNumber = "synth-cnc-001 "
+  assertEq "variant commitment" demoIdentityCommitment (identityCommitmentOf variant.equipment)
+  _ <- requestRegistration l variant
+  r <- reserve l variant
+  expectFailure "Identity already registered" r
+
+test_declined_request_issues_nothing : Script ()
+test_declined_request_issues_nothing = do
+  l <- seedCleanStart
+  let p = l.parties
+  request <- requestRegistration l demoAsset
+  submit p.registrar $ exerciseCmd request Request_Decline with reasonCode = "REGISTRATION_DECLINED"; actorRef = registrarActor
+  assertArchived "request" p.owner request
+  controls <- query @AssetControl p.owner
+  assertEq "no control" 0 (length controls)

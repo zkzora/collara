@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "bootstrappedAt": "2026-10-01T22:44:47.990Z",
+  "topology": "sandbox-1-participant",
+  "cantonVersion": "3.5.19",
+  "audience": "https://collara.local/ledger-api",
+  "jsonApiUrl": "http://127.0.0.1:7575",
+  "participantId": "sandbox::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+  "participants": {
+    "sandbox": {
+      "jsonApiUrl": "http://127.0.0.1:7575",
+      "participantId": "sandbox::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "ledgerEndAtBootstrap": 43
+    }
+  },
+  "parties": {
+    "CollaraRegistrar": {
+      "party": "CollaraRegistrar::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "registrar-svc"
+    },
+    "CollaraGovernance": {
+      "party": "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "governance-svc"
+    },
+    "DemoManufacturer": {
+      "party": "DemoManufacturer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "borrower-svc"
+    },
+    "DemoCNCDealer": {
+      "party": "DemoCNCDealer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "dealer-svc"
+    },
+    "DemoVerifier": {
+      "party": "DemoVerifier::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "verifier-svc"
+    },
+    "DemoLenderA": {
+      "party": "DemoLenderA::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "lender-a-svc"
+    },
+    "DemoLenderB": {
+      "party": "DemoLenderB::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "lender-b-svc"
+    },
+    "DemoAuditor": {
+      "party": "DemoAuditor::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "auditor-svc"
+    },
+    "GovSeat1": {
+      "party": "GovSeat1::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "gov-seat-1-svc"
+    },
+    "GovSeat2": {
+      "party": "GovSeat2::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "gov-seat-2-svc"
+    },
+    "GovSeat3": {
+      "party": "GovSeat3::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "participant": "sandbox",
+      "user": "gov-seat-3-svc"
+    }
+  },
+  "users": [
+    {
+      "id": "registrar-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "CollaraRegistrar",
+      "primaryParty": "CollaraRegistrar::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "CollaraRegistrar::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "CollaraRegistrar::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "governance-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "CollaraGovernance",
+      "primaryParty": "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "borrower-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoManufacturer",
+      "primaryParty": "DemoManufacturer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoManufacturer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoManufacturer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "dealer-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoCNCDealer",
+      "primaryParty": "DemoCNCDealer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoCNCDealer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoCNCDealer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "verifier-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoVerifier",
+      "primaryParty": "DemoVerifier::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoVerifier::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoVerifier::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "lender-a-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoLenderA",
+      "primaryParty": "DemoLenderA::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoLenderA::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoLenderA::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "lender-b-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoLenderB",
+      "primaryParty": "DemoLenderB::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoLenderB::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoLenderB::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "auditor-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "DemoAuditor",
+      "primaryParty": "DemoAuditor::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "DemoAuditor::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "DemoAuditor::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "gov-seat-1-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "GovSeat1",
+      "primaryParty": "GovSeat1::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "GovSeat1::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "GovSeat1::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "gov-seat-2-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "GovSeat2",
+      "primaryParty": "GovSeat2::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "GovSeat2::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "GovSeat2::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "gov-seat-3-svc",
+      "participant": "sandbox",
+      "role": "org",
+      "party": "GovSeat3",
+      "primaryParty": "GovSeat3::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+      "actAs": [
+        "GovSeat3::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ],
+      "readAs": [
+        "GovSeat3::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "projector-svc",
+      "participant": "sandbox",
+      "role": "projector",
+      "actAs": [],
+      "readAs": [
+        "CollaraRegistrar::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "CollaraGovernance::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoManufacturer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoCNCDealer::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoVerifier::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoLenderA::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoLenderB::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "DemoAuditor::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "GovSeat1::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "GovSeat2::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715",
+        "GovSeat3::122049e563a317b0d779a15c889d734d337ad4a58cc19917682a8889e3b55b6c5715"
+      ]
+    },
+    {
+      "id": "collara-admin",
+      "participant": "sandbox",
+      "role": "admin",
+      "participantAdmin": true,
+      "actAs": [],
+      "readAs": []
+    }
+  ],
+  "packages": [
+    {
+      "file": "daml/collara/contracts/.daml/dist/collara-contracts-0.1.0.dar",
+      "name": "collara-contracts",
+      "version": "0.1.0",
+      "mainPackageId": "66efe1ca7ce256e5f534503aabb094492627b1a9a53bc583f82819fb7e754c68",
+      "sha256": "ec0854e152880057825fd35d45f0b1466810a9bde84db7aaec6a01a33fd99988"
+    },
+    {
+      "file": "daml/collara/governance/.daml/dist/collara-governance-0.1.0.dar",
+      "name": "collara-governance",
+      "version": "0.1.0",
+      "mainPackageId": "16cb6e82174e020290c7eba779951d25309fd2a23009f09d1ef4154b9bac2d7b",
+      "sha256": "df6910cd540f79cb11d0ba025a994989e529792c574da29db222db71c20f13fd"
+    }
+  ]
+}

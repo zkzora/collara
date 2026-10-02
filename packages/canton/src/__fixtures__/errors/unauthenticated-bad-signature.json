@@ -1,0 +1,15 @@
+{
+  "status": 401,
+  "body": {
+    "code": "NA",
+    "cause": "A security-sensitive error has been received",
+    "correlationId": "ab1a0448dca3b3f77b1f97008dd5b386",
+    "traceId": "ab1a0448dca3b3f77b1f97008dd5b386",
+    "context": {},
+    "resources": [],
+    "errorCategory": -1,
+    "grpcCodeValue": 16,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

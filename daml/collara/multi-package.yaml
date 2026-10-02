@@ -1,0 +1,7 @@
+# Collara Daml multi-package. Build everything from this directory with `dpm build --all`.
+# Build order follows the DAR paths each package depends on: governance -> contracts -> scripts -> tests.
+packages:
+  - ./governance
+  - ./contracts
+  - ./scripts
+  - ./tests

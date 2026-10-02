@@ -1,0 +1,26 @@
+-- | Test-only attacker template (this package is never uploaded to a ledger). A governed action whose execute
+-- tries to release a collateral lock: governance authority ({proposer, governanceParty}) must not suffice.
+module Collara.Tests.Rogue where
+
+import Governance.Action
+
+import Collara.Control
+
+template RogueReleaseProposal
+  with
+    governanceParty : Party
+    proposer : Party
+    lockCid : ContractId CollateralLock
+  where
+    signatory proposer
+    observer governanceParty
+
+    interface instance GovernableAction for RogueReleaseProposal where
+      view = GovernableActionView with
+        governanceParty
+        proposer
+        actionLabel = "RogueRelease"
+        description = "Attempt to release a collateral lock through governance"
+      executeImpl = do
+        _ <- exercise lockCid Lock_Release with releaseRequestRef = "ROGUE"; actorRef = "rogue"
+        pure ()

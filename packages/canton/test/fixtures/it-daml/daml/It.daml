@@ -1,0 +1,71 @@
+-- Test-only templates for the @collara/canton integration tests.
+module It where
+
+import DA.Map (Map)
+import DA.Set (Set)
+import DA.Text (intercalate)
+
+-- A consumable token: contention, deduplication and authorization tests.
+template Token
+  with
+    issuer : Party
+    owner : Party
+    amount : Numeric 2
+    label : Text
+  where
+    signatory issuer
+    observer owner
+    ensure amount > 0.0
+
+    choice Consume : ()
+      controller owner
+      do pure ()
+
+-- Visibility probe: the audience are observers; any other party must see nothing.
+template Notice
+  with
+    issuer : Party
+    audience : [Party]
+    body : Text
+  where
+    signatory issuer
+    observer audience
+
+    choice Withdraw : ()
+      controller issuer
+      do pure ()
+
+data Colour = Red | Green
+  deriving (Eq, Show)
+
+data Shape
+  = Circle with radius : Numeric 2
+  | Square Int
+  deriving (Eq, Show)
+
+-- Encoding probe for Daml JSON values over the JSON Ledger API v2.
+template ValueProbe
+  with
+    owner : Party
+    count : Int
+    price : Numeric 2
+    ratio : Decimal
+    at : Time
+    day : Date
+    flag : Bool
+    note : Optional Text
+    nested : Optional (Optional Int)
+    tags : [Text]
+    members : Set Party
+    limits : Map Text Int
+    colour : Colour
+    shape : Shape
+  where
+    signatory owner
+
+    -- Returns the Daml `show` of the decoded fields, to check the JSON encoding end to end.
+    nonconsuming choice Describe : Text
+      controller owner
+      do pure (intercalate " | "
+          [ show count, show price, show ratio, show at, show day, show note, show nested
+          , show members, show limits, show colour, show shape ])

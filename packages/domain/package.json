@@ -1,0 +1,24 @@
+{
+  "name": "@collara/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Collara domain: Zod schemas/DTOs, state vocabularies, permission policy, money, display ids, synthetic fixtures",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "decimal.js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

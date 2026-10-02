@@ -1,0 +1,83 @@
+-- | Governance-signed verifier registry and per-verifier accreditation.
+--
+-- Both templates are signed only by the governance party. They can therefore only be created or changed
+-- by a governed execute (`GovernableAction_Execute` runs with the governance party's authority) or by the
+-- governance party submitting directly (Tier A local party). Members never sign them.
+module Collara.Governance.Registry where
+
+import DA.Set (Set)
+import qualified DA.Set as Set
+
+-- | Registry status of a verifier. Suspension blocks new attestations; issued attestations stay historical.
+data VerifierStatus = ACTIVE | SUSPENDED
+  deriving (Eq, Show)
+
+-- | One per deployment. Every governed change archives it and recreates it with `version + 1`, so a proposal
+-- pinned to an older registry contract id is stale by construction.
+template VerifierRegistry
+  with
+    governanceParty : Party
+    operator : Party
+      -- ^ Collara operator / registrar party: read-model visibility only.
+    registryId : Text
+    version : Int
+    activeVerifiers : Set Party
+  where
+    signatory governanceParty
+    observer operator
+    ensure registryId /= "" && version >= 0
+
+    choice Registry_Add : ContractId VerifierRegistry
+      with
+        verifier : Party
+      controller governanceParty
+      do
+        assertMsg "Verifier already active" (not (Set.member verifier activeVerifiers))
+        create this with
+          version = version + 1
+          activeVerifiers = Set.insert verifier activeVerifiers
+
+    choice Registry_Remove : ContractId VerifierRegistry
+      with
+        verifier : Party
+      controller governanceParty
+      do
+        assertMsg "Verifier not active" (Set.member verifier activeVerifiers)
+        create this with
+          version = version + 1
+          activeVerifiers = Set.delete verifier activeVerifiers
+
+-- | Per-verifier capability. Attestation issuance fetches the verifier's current accreditation and checks that
+-- it is signed by the trusted governance party pinned in `CollaraConfig`.
+template VerifierAccreditation
+  with
+    governanceParty : Party
+    operator : Party
+    verifier : Party
+    verifierRef : Text
+      -- ^ Display reference, e.g. "VER-001". Never a contract id.
+    orgName : Text
+    scope : [Text]
+      -- ^ Equipment scopes, e.g. ["CNC_MACHINERY"].
+    status : VerifierStatus
+    validUntil : Optional Time
+    registryId : Text
+    registryVersion : Int
+      -- ^ Registry version produced by the governed action that created this accreditation.
+    reason : Text
+  where
+    signatory governanceParty
+    observer operator, verifier
+    ensure verifierRef /= "" && orgName /= "" && not (null scope) && registryId /= "" && registryVersion >= 0
+
+    choice Accreditation_Suspend : ContractId VerifierAccreditation
+      with
+        suspendReason : Text
+        newRegistryVersion : Int
+      controller governanceParty
+      do
+        assertMsg "Accreditation is not active" (status == ACTIVE)
+        create this with
+          status = SUSPENDED
+          reason = suspendReason
+          registryVersion = newRegistryVersion

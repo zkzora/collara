@@ -1,0 +1,306 @@
+-- | Verification requests, attestations and owner-controlled attestation disclosure.
+module Collara.Verification where
+
+import DA.Foldable (forA_)
+
+import Collara.Config
+import Collara.Governance.Registry
+import Collara.Types
+
+-- | Non-terminal request states. Terminal outcomes are the consuming choices: `VR_IssueAttestation` (ATTESTED),
+-- `VR_Reject` (REJECTED), `VR_DeclineAssignment` (DECLINED), `VR_Cancel` (CANCELLED).
+data VerificationStatus
+  = REQUESTED
+  | IN_REVIEW
+  | CHANGES_REQUESTED
+  deriving (Eq, Show)
+
+data CheckResult
+  = CHECKED
+  | CHECKED_NOTED
+  | REVIEWED_DOCUMENTS
+  | NOT_CHECKED
+  deriving (Eq, Show)
+
+data CheckItem = CheckItem
+  with
+    item : Text
+    finding : Text
+    result : CheckResult
+  deriving (Eq, Show)
+
+-- | A correction: the previous attestation (consumed, becomes SUPERSEDED) and the disclosures of it to withdraw.
+data Supersession = Supersession
+  with
+    previousCid : ContractId VerificationAttestation
+    previousDisclosureCids : [ContractId AttestationDisclosure]
+  deriving (Eq, Show)
+
+-- | Checks that `verifier` holds a live accreditation signed by the governance party pinned in the registrar's
+-- config, valid now and covering `equipmentScope`. Old (archived) accreditation ids fail on fetch.
+checkAccreditation : Party -> Text -> Party -> Text -> ContractId CollaraConfig -> ContractId VerifierAccreditation
+  -> Update (CollaraConfig, VerifierAccreditation)
+checkAccreditation registrar namespace verifier equipmentScope configCid accreditationCid = do
+  config <- fetch configCid
+  assertMsg "Config of another registrar or namespace" (config.registrar == registrar && config.namespace == namespace)
+  acc <- fetch accreditationCid
+  assertMsg "Untrusted registry: accreditation is not signed by the Collara governance party"
+    (acc.governanceParty == config.governanceParty)
+  assertMsg "Accreditation is for another verifier" (acc.verifier == verifier)
+  assertMsg "Verifier suspended" (acc.status == ACTIVE)
+  now <- getTime
+  assertMsg "Accreditation expired" (optional True (now <=) acc.validUntil)
+  assertMsg "Out of accreditation scope" (equipmentScope `elem` acc.scope)
+  pure (config, acc)
+
+-- | Created by the owner through `Manifest_RequestVerification`, so it references an existing manifest version.
+template VerificationRequest
+  with
+    owner : Party
+    verifier : Party
+    registrar : Party
+    namespace : Text
+    requestRef : Text
+    assetId : Text
+    passportVersion : Int
+    caseRef : Optional Text
+    evidence : EvidenceAnchor
+    equipmentScope : Text
+    checklist : [Text]
+    dueBy : Optional Time
+    status : VerificationStatus
+    version : Int
+    changeNote : Text
+  where
+    signatory owner
+    observer verifier
+    ensure nonEmptyTexts [namespace, requestRef, assetId, equipmentScope] && owner /= verifier
+      && validAnchor evidence && version >= 1
+
+    choice VR_AcceptAssignment : ContractId VerificationRequest
+      with
+        configCid : ContractId CollaraConfig
+        accreditationCid : ContractId VerifierAccreditation
+        actorRef : Text
+      controller verifier
+      do
+        assertMsg "Assignment is not open" (status == REQUESTED)
+        _ <- checkAccreditation registrar namespace verifier equipmentScope configCid accreditationCid
+        create this with status = IN_REVIEW; version = version + 1
+
+    choice VR_DeclineAssignment : ()
+      with
+        reason : Text
+        actorRef : Text
+      controller verifier
+      do
+        assertMsg "Assignment is not open" (status == REQUESTED)
+
+    choice VR_RequestChanges : ContractId VerificationRequest
+      with
+        note : Text
+        actorRef : Text
+      controller verifier
+      do
+        assertMsg "Request is not in review" (status == IN_REVIEW)
+        create this with status = CHANGES_REQUESTED; changeNote = note; version = version + 1
+
+    -- | Owner submits a newer version of the same evidence package (via `Manifest_SubmitToVerification`).
+    choice VR_SubmitNewEvidence : ContractId VerificationRequest
+      with
+        newEvidence : EvidenceAnchor
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "No changes were requested" (status == CHANGES_REQUESTED)
+        assertMsg "Evidence must be a newer version of the same package"
+          (newEvidence.packageRef == evidence.packageRef && newEvidence.manifestVersion > evidence.manifestVersion)
+        create this with status = IN_REVIEW; evidence = newEvidence; version = version + 1
+
+    -- | Only the assigned verifier, holding a live accreditation from the trusted governance party, can issue.
+    -- The registry status is re-checked here, at commit time.
+    choice VR_IssueAttestation : ContractId VerificationAttestation
+      with
+        configCid : ContractId CollaraConfig
+        accreditationCid : ContractId VerifierAccreditation
+        attestationRef : Text
+        checks : [CheckItem]
+        limitations : Text
+        method : Text
+        inspectedAt : Time
+        validFrom : Time
+        validUntil : Time
+        supersedes : Optional Supersession
+        actorRef : Text
+      controller verifier
+      do
+        assertMsg "Request is not in review" (status == IN_REVIEW)
+        (config, acc) <- checkAccreditation registrar namespace verifier equipmentScope configCid accreditationCid
+        supersedesRef <- case supersedes of
+          None -> pure None
+          Some s -> do
+            previous <- fetch s.previousCid
+            assertMsg "Superseded attestation is for another asset or owner"
+              (previous.verifier == verifier && previous.owner == owner && previous.assetId == assetId)
+            exercise s.previousCid Att_Supersede with
+              disclosureCids = s.previousDisclosureCids; supersededByRef = attestationRef
+            pure (Some previous.attestationRef)
+        now <- getTime
+        create VerificationAttestation with
+          verifier
+          owner
+          registrar
+          namespace
+          governanceParty = config.governanceParty
+          attestationRef
+          requestRef
+          verifierRef = acc.verifierRef
+          assetId
+          passportVersion
+          caseRef
+          evidence
+          equipmentScope
+          checks
+          limitations
+          method
+          inspectedAt
+          validFrom
+          validUntil
+          supersedesRef
+          issuedAt = now
+          issuedByRef = actorRef
+
+    choice VR_Reject : ()
+      with
+        reason : Text
+        actorRef : Text
+      controller verifier
+      do
+        assertMsg "Request is not under review" (status `elem` [IN_REVIEW, CHANGES_REQUESTED])
+
+    choice VR_Cancel : ()
+      with
+        actorRef : Text
+      controller owner
+      do pure ()
+
+-- | Immutable issued attestation (validity `VALID` until `validUntil`, then `EXPIRED` by computation).
+-- A correction is a new attestation that supersedes (consumes) this one; revocation leaves a record.
+template VerificationAttestation
+  with
+    verifier : Party
+    owner : Party
+    registrar : Party
+    namespace : Text
+    governanceParty : Party
+      -- ^ The governance party whose accreditation was checked at issuance.
+    attestationRef : Text
+    requestRef : Text
+    verifierRef : Text
+    assetId : Text
+    passportVersion : Int
+    caseRef : Optional Text
+    evidence : EvidenceAnchor
+    equipmentScope : Text
+    checks : [CheckItem]
+    limitations : Text
+    method : Text
+    inspectedAt : Time
+    validFrom : Time
+    validUntil : Time
+    supersedesRef : Optional Text
+    issuedAt : Time
+    issuedByRef : Text
+  where
+    signatory verifier
+    observer owner
+    ensure attestationRef /= "" && not (null checks) && validFrom <= validUntil && validAnchor evidence
+
+    -- | Owner-controlled sharing of a verifier-signed copy with one recipient. The verifier pre-authorizes this by
+    -- signing a template that has the choice; the verifier learns that the owner disclosed to the recipient.
+    nonconsuming choice Att_DiscloseTo : ContractId AttestationDisclosure
+      with
+        recipient : Party
+        purpose : Text
+        disclosureCaseRef : Text
+        actorRef : Text
+      controller owner
+      do
+        assertMsg "Recipient must be another party" (recipient /= owner && recipient /= verifier)
+        now <- getTime
+        create AttestationDisclosure with
+          verifier
+          owner
+          recipient
+          purpose
+          caseRef = disclosureCaseRef
+          attestationCid = self
+          attestation = this
+          disclosedAt = now
+
+    choice Att_Revoke : ContractId RevokedAttestation
+      with
+        reason : Text
+        disclosureCids : [ContractId AttestationDisclosure]
+        actorRef : Text
+      controller verifier
+      do
+        withdrawDisclosures self disclosureCids
+        now <- getTime
+        create RevokedAttestation with
+          verifier; owner; attestationRef; assetId; reason; revokedAt = now; revokedByRef = actorRef
+
+    choice Att_Supersede : ()
+      with
+        disclosureCids : [ContractId AttestationDisclosure]
+        supersededByRef : Text
+      controller verifier
+      do
+        withdrawDisclosures self disclosureCids
+
+withdrawDisclosures : ContractId VerificationAttestation -> [ContractId AttestationDisclosure] -> Update ()
+withdrawDisclosures attestationCid disclosureCids =
+  forA_ disclosureCids $ \d -> do
+    disclosure <- fetch d
+    assertMsg "Disclosure is of another attestation" (disclosure.attestationCid == attestationCid)
+    exercise d AttDisc_Withdraw
+
+-- | Verifier-signed copy of an attestation, visible to one recipient (e.g. the selected lender).
+template AttestationDisclosure
+  with
+    verifier : Party
+    owner : Party
+    recipient : Party
+    purpose : Text
+    caseRef : Text
+    attestationCid : ContractId VerificationAttestation
+    attestation : VerificationAttestation
+    disclosedAt : Time
+  where
+    signatory verifier, owner
+    observer recipient
+    ensure attestation.verifier == verifier && attestation.owner == owner
+
+    -- | Limits future visibility only. Previously shared copies may still exist.
+    choice AttDisc_Revoke : ()
+      with
+        actorRef : Text
+      controller owner
+      do pure ()
+
+    choice AttDisc_Withdraw : ()
+      controller verifier
+      do pure ()
+
+template RevokedAttestation
+  with
+    verifier : Party
+    owner : Party
+    attestationRef : Text
+    assetId : Text
+    reason : Text
+    revokedAt : Time
+    revokedByRef : Text
+  where
+    signatory verifier
+    observer owner

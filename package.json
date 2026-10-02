@@ -1,0 +1,43 @@
+{
+  "name": "collara",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.28.2",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "test": "pnpm -r run test",
+    "test:e2e": "pnpm --filter @collara/web run test:e2e",
+    "build": "pnpm --filter @collara/web run build && pnpm --filter @collara/api --filter @collara/worker run typecheck",
+    "dev:web": "pnpm --filter @collara/web run dev",
+    "dev:api": "pnpm --filter @collara/api run dev",
+    "dev:worker": "pnpm --filter @collara/worker run dev",
+    "env:init": "node scripts/dev/init-env.mjs",
+    "db:up": "node scripts/dev/wsl-postgres.mjs up",
+    "db:status": "node scripts/dev/wsl-postgres.mjs status",
+    "db:down": "node scripts/dev/wsl-postgres.mjs stop",
+    "db:migrate": "pnpm --filter @collara/api run db:migrate",
+    "db:seed": "pnpm --filter @collara/api run db:seed",
+    "db:bind-localnet": "pnpm --filter @collara/api run db:bind-localnet",
+    "infra:seaweed": "node scripts/infra/seaweedfs.mjs",
+    "infra:keycloak": "node scripts/infra/keycloak.mjs",
+    "localnet:up": "node scripts/localnet/up.mjs",
+    "localnet:up:3": "node scripts/localnet/up.mjs --participants=3",
+    "localnet:down": "node scripts/localnet/down.mjs",
+    "localnet:status": "node scripts/localnet/status.mjs",
+    "localnet:bootstrap": "node scripts/localnet/bootstrap.mjs",
+    "daml:check": "node daml/collara/check.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
+    "globals": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  }
+}

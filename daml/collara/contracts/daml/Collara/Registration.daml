@@ -1,0 +1,185 @@
+-- | Controlled registration: the owner asks, the registrar reserves a unique asset id and issues the canonical
+-- control together with the owner's passport.
+module Collara.Registration where
+
+import DA.Set (Set)
+import qualified DA.Set as Set
+import qualified DA.Text as T
+
+import Collara.Control
+import Collara.Types
+
+-- | Declared equipment identity used for registrar duplicate screening. Never a public identifier.
+data EquipmentIdentity = EquipmentIdentity
+  with
+    manufacturer : Text
+    model : Text
+    serialNumber : Text
+  deriving (Eq, Show)
+
+-- | Identity commitment: SHA-256 (lowercase hex) of "<MANUFACTURER>|<MODEL>|<SERIAL>", each part trimmed and
+-- ASCII upper-cased. Computed on-ledger, so a request's commitment always matches its declared equipment.
+-- Exact-match screening only: it does not prove global physical uniqueness.
+identityCommitmentOf : EquipmentIdentity -> Text
+identityCommitmentOf e =
+  T.sha256 (T.intercalate "|" (map (T.asciiToUpper . T.trim) [e.manufacturer, e.model, e.serialNumber]))
+
+-- | Mutable descriptive passport details.
+data PassportDetails = PassportDetails
+  with
+    yearOfManufacture : Optional Int
+    locationScope : Text
+  deriving (Eq, Show)
+
+-- | Opaque document reference plus integrity hash. Bytes stay in private storage.
+data DocumentRef = DocumentRef
+  with
+    docRef : Text
+    sha256 : Text
+  deriving (Eq, Show)
+
+template AssetRegistrationRequest
+  with
+    owner : Party
+    registrar : Party
+    namespace : Text
+    requestRef : Text
+    equipmentClass : Text
+    equipment : EquipmentIdentity
+    details : PassportDetails
+    identityCommitment : Text
+      -- ^ Must equal `identityCommitmentOf equipment` (checked by `ensure`).
+    ownerClaimRef : Text
+  where
+    signatory owner
+    observer registrar
+    ensure nonEmptyTexts [namespace, requestRef, equipmentClass, equipment.manufacturer, equipment.model,
+        equipment.serialNumber]
+      && identityCommitment == identityCommitmentOf equipment
+      && owner /= registrar
+
+    -- | Consumes the single-use ticket from `Registry_Reserve` and issues control v1 and passport v1.
+    choice Request_Accept : (ContractId AssetControl, ContractId AssetPassport)
+      with
+        ticketCid : ContractId IssuanceTicket
+        actorRef : Text
+      controller registrar
+      do
+        ticket <- fetch ticketCid
+        assertMsg "Ticket does not match this request"
+          (ticket.registrar == registrar && ticket.owner == owner && ticket.namespace == namespace
+            && ticket.requestRef == requestRef && ticket.identityCommitment == identityCommitment)
+        archive ticketCid
+        now <- getTime
+        controlCid <- create AssetControl with
+          registrar
+          owner
+          namespace
+          assetId = ticket.assetId
+          controlVersion = 1
+          evidence = None
+          sharedLender = None
+        passportCid <- create AssetPassport with
+          owner
+          registrar
+          namespace
+          assetId = ticket.assetId
+          passportVersion = 1
+          equipmentClass
+          equipment
+          details
+          identityCommitment
+          documents = []
+          registeredAt = now
+        pure (controlCid, passportCid)
+
+    -- | Generic decline. The reason code must never reveal another party's registration.
+    choice Request_Decline : ()
+      with
+        reasonCode : Text
+        actorRef : Text
+      controller registrar
+      do pure ()
+
+    choice Request_Withdraw : ()
+      with
+        actorRef : Text
+      controller owner
+      do pure ()
+
+-- | Registrar-only set of issued asset ids and identity commitments in one namespace. Exercised top-level by
+-- the registrar, never nested under an owner-signed choice, so no owner witnesses the set.
+template AssetRegistry
+  with
+    registrar : Party
+    namespace : Text
+    issuedAssetIds : Set Text
+    issuedIdentityCommitments : Set Text
+    version : Int
+  where
+    signatory registrar
+    ensure namespace /= "" && version >= 0
+
+    choice Registry_Reserve : (ContractId AssetRegistry, ContractId IssuanceTicket)
+      with
+        assetId : Text
+        owner : Party
+        requestRef : Text
+        identityCommitment : Text
+        actorRef : Text
+      controller registrar
+      do
+        assertMsg "Asset id already issued" (not (Set.member assetId issuedAssetIds))
+        assertMsg "Identity already registered" (not (Set.member identityCommitment issuedIdentityCommitments))
+        registryCid <- create this with
+          issuedAssetIds = Set.insert assetId issuedAssetIds
+          issuedIdentityCommitments = Set.insert identityCommitment issuedIdentityCommitments
+          version = version + 1
+        ticketCid <- create IssuanceTicket with registrar; owner; namespace; assetId; requestRef; identityCommitment
+        pure (registryCid, ticketCid)
+
+-- | Single-use permission to issue one control for one reserved asset id.
+template IssuanceTicket
+  with
+    registrar : Party
+    owner : Party
+    namespace : Text
+    assetId : Text
+    requestRef : Text
+    identityCommitment : Text
+  where
+    signatory registrar
+    observer owner
+    ensure assetId /= "" && requestRef /= ""
+
+-- | Owner-only passport. No valuation, no terms. Archiving or versioning it never touches control or lock.
+template AssetPassport
+  with
+    owner : Party
+    registrar : Party
+      -- ^ Reference only; not a stakeholder.
+    namespace : Text
+    assetId : Text
+    passportVersion : Int
+    equipmentClass : Text
+    equipment : EquipmentIdentity
+    details : PassportDetails
+    identityCommitment : Text
+    documents : [DocumentRef]
+    registeredAt : Time
+  where
+    signatory owner
+    ensure assetId /= "" && passportVersion >= 1
+
+    -- | Identity fields (manufacturer, model, serial) are immutable; changing them is a new registration.
+    choice Passport_NewVersion : ContractId AssetPassport
+      with
+        newDetails : PassportDetails
+        newDocuments : [DocumentRef]
+        actorRef : Text
+      controller owner
+      do
+        create this with
+          details = newDetails
+          documents = newDocuments
+          passportVersion = passportVersion + 1

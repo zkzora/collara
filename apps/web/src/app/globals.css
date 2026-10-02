@@ -1,0 +1,270 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Dark only: <html class="dark"> is permanent, so shadcn's dark: variants always apply. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Collara design tokens.
+ *
+ * Two surfaces share one set of semantic names (synthesis CR-33):
+ *   [data-surface="app"]        workspace palette (#101116 family). Also the :root default,
+ *                               so portalled popups, dialogs and toasts get it.
+ *   [data-surface="marketing"]  landing/docs palette (#08090A family).
+ * Values come from docs/_research/proto-dashboard.md §1 and proto-landing-docs.md §1.
+ * Tertiary text is raised to WCAG AA (CR-34): app #676A75 -> #8A8D98 (5.07:1 on #1C1D24),
+ * marketing #62666D -> #7E828A (4.86:1 on #111214). --fg-faint is decorative only, never text.
+ * Text on solid danger/tone fills is dark (--on-tone), never white (white on red was 2.88:1).
+ */
+
+:root,
+[data-surface="app"] {
+  --surface-page: #101116;
+  --surface-header: #101116;
+  --surface-nav: #0c0d11;
+  --surface-sunken: #0f1014;
+  --surface-1: #16171d;
+  --surface-2: #1c1d24;
+
+  --fg: #f4f5f7;
+  --fg-strong: #ffffff;
+  --fg-soft: #c9cbd3;
+  --fg-muted: #9a9ca6;
+  --fg-subtle: #8a8d98;
+  --fg-faint: #4e515b;
+  --on-primary: #0c0d11;
+
+  --line-subtle: rgb(255 255 255 / 0.06);
+  --line: rgb(255 255 255 / 0.08);
+  --line-control: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.12);
+  --line-hover: rgb(255 255 255 / 0.16);
+  --hover: rgb(255 255 255 / 0.05);
+  --selected: rgb(255 255 255 / 0.07);
+  --focus-ring: #c9cbd3;
+  --overlay: rgb(0 0 0 / 0.62);
+
+  --corner-sm: 6px;
+  --corner-md: 8px;
+  --corner-lg: 10px;
+  --corner-xl: 12px;
+  --corner-2xl: 14px;
+}
+
+[data-surface="marketing"] {
+  --surface-page: #08090a;
+  --surface-header: rgb(8 9 10 / 0.72);
+  --surface-nav: #08090a;
+  --surface-sunken: #0f1013;
+  --surface-1: #0e0f11;
+  --surface-2: #111214;
+
+  --fg: #f7f8f8;
+  --fg-strong: #ffffff;
+  --fg-soft: #c9cbd3;
+  --fg-muted: #9c9da1;
+  --fg-subtle: #7e828a;
+  --fg-faint: #3e3e44;
+  --on-primary: #08090a;
+
+  --line-subtle: rgb(255 255 255 / 0.06);
+  --line: rgb(255 255 255 / 0.08);
+  --line-control: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.12);
+  --line-hover: rgb(255 255 255 / 0.16);
+  --hover: rgb(255 255 255 / 0.05);
+  --selected: rgb(255 255 255 / 0.07);
+  --focus-ring: #c9cbd3;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --corner-sm: 6px;
+  --corner-md: 8px;
+  --corner-lg: 12px;
+  --corner-xl: 14px;
+  --corner-2xl: 16px;
+}
+
+/* Status tones (same hues on both surfaces). Always pair a tone with a text label or icon. */
+:root {
+  --tone-success: oklch(74% 0.13 155);
+  --tone-success-strong: oklch(80% 0.12 155);
+  --tone-warning: oklch(76% 0.14 55);
+  --tone-warning-strong: oklch(84% 0.1 60);
+  --tone-danger: oklch(70% 0.17 25);
+  --tone-danger-strong: oklch(80% 0.14 25);
+  --tone-info: oklch(74% 0.1 250);
+  --tone-info-strong: oklch(84% 0.08 250);
+  --tone-pending: oklch(82% 0.12 75);
+  --tone-pending-strong: oklch(88% 0.1 80);
+  --on-tone: #0c0d11;
+
+  /* Amber eyebrow/highlight accent used by the marketing pages and demo banners. */
+  --highlight: oklch(82% 0.12 75);
+  --highlight-strong: oklch(88% 0.1 80);
+
+  color-scheme: dark;
+}
+
+/*
+ * shadcn contract, re-evaluated on every surface root so a nested [data-surface]
+ * picks up its own palette.
+ */
+:root,
+[data-surface] {
+  --tone-neutral: var(--fg-subtle);
+  --tone-neutral-strong: var(--fg-muted);
+
+  --background: var(--surface-page);
+  --foreground: var(--fg);
+  --card: var(--surface-1);
+  --card-foreground: var(--fg);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--fg);
+  --primary: var(--fg);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--hover);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--selected);
+  --accent-foreground: var(--fg);
+  --destructive: var(--tone-danger);
+  --destructive-foreground: var(--on-tone);
+  --border: var(--line);
+  --input: var(--line-control);
+  --ring: var(--focus-ring);
+  --radius: var(--corner-lg);
+
+  --chart-1: var(--tone-info);
+  --chart-2: var(--tone-success);
+  --chart-3: var(--tone-pending);
+  --chart-4: var(--tone-warning);
+  --chart-5: var(--tone-danger);
+
+  --sidebar: var(--surface-nav);
+  --sidebar-foreground: var(--fg-muted);
+  --sidebar-primary: var(--fg);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--selected);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--focus-ring);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-heading: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-red-hat-mono), ui-monospace, monospace;
+
+  /* shadcn colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Collara semantic colors: bg-surface-1, text-fg-muted, border-line-strong, ... */
+  --color-surface-page: var(--surface-page);
+  --color-surface-header: var(--surface-header);
+  --color-surface-nav: var(--surface-nav);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-fg-strong: var(--fg-strong);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+  --color-on-primary: var(--on-primary);
+  --color-line-subtle: var(--line-subtle);
+  --color-line: var(--line);
+  --color-line-control: var(--line-control);
+  --color-line-strong: var(--line-strong);
+  --color-line-hover: var(--line-hover);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-overlay: var(--overlay);
+  --color-highlight: var(--highlight);
+  --color-highlight-strong: var(--highlight-strong);
+
+  /* Status tones: text-success, bg-danger/10, border-pending/30, text-info-strong, text-on-tone */
+  --color-success: var(--tone-success);
+  --color-success-strong: var(--tone-success-strong);
+  --color-warning: var(--tone-warning);
+  --color-warning-strong: var(--tone-warning-strong);
+  --color-danger: var(--tone-danger);
+  --color-danger-strong: var(--tone-danger-strong);
+  --color-info: var(--tone-info);
+  --color-info-strong: var(--tone-info-strong);
+  --color-pending: var(--tone-pending);
+  --color-pending-strong: var(--tone-pending-strong);
+  --color-neutral: var(--tone-neutral);
+  --color-neutral-strong: var(--tone-neutral-strong);
+  --color-on-tone: var(--on-tone);
+
+  /* Radii: rounded-sm 6px, rounded-md 8px (buttons, inputs), rounded-lg cards (10px app / 12px marketing) */
+  --radius-sm: var(--corner-sm);
+  --radius-md: var(--corner-md);
+  --radius-lg: var(--corner-lg);
+  --radius-xl: var(--corner-xl);
+  --radius-2xl: var(--corner-2xl);
+}
+
+@theme {
+  /* Prototype breakpoints: workspace collapses below 900px, marketing below 920px, tiles stack below 560px. */
+  --breakpoint-xs: 35rem;
+  --breakpoint-app: 56.25rem;
+  --breakpoint-site: 57.5rem;
+
+  --shadow-overlay: 0 30px 80px rgb(0 0 0 / 0.6);
+  --shadow-toast: 0 16px 40px rgb(0 0 0 / 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+}

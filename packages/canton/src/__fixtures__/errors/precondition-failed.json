@@ -1,0 +1,23 @@
+{
+  "status": 400,
+  "body": {
+    "code": "DAML_FAILURE",
+    "cause": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.PreconditionFailed:PreconditionFailed (error category 9): Template precondition violated: Token {issuer = 'CapIssuer-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854', owner = 'CapHolder-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854', amount = 0.0, label = \"cap\"}",
+    "correlationId": "0bc3d7e6-a780-46cb-bd24-8527c484baac",
+    "traceId": "ce26b3f88f706b01e6fac7669a0f4540",
+    "context": {
+      "participant": "'sandbox'",
+      "error_id": "UNHANDLED_EXCEPTION/DA.Exception.PreconditionFailed:PreconditionFailed",
+      "exercise_trace": "    in create command 3281ed45:It:Token.\n",
+      "category": "9",
+      "tid": "ce26b3f88f706b01e6fac7669a0f4540",
+      "definite_answer": "false",
+      "commands": "{readAs: [], deduplicationPeriod: {duration: 'PT168H'}, submittedAt: '2026-10-01T22:17:49.386408Z', submissionId: '0bc3d7e6-a780-46cb-bd24-8527c484baac', actAs: ['CapIssuer-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854'], commandId: 'cap-zero-muq3hmv3', userId: 'cap-issuer-muq3hmv3', workflowId: }"
+    },
+    "resources": [],
+    "errorCategory": 9,
+    "grpcCodeValue": 9,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

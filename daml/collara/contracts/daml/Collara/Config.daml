@@ -1,0 +1,110 @@
+-- | Deployment configuration and the registrar-maintained verifier status directory.
+module Collara.Config where
+
+import DA.List (unique)
+
+import Collara.Governance.Registry
+
+-- | What a new pledge activation requires of the verifier that issued the relied-on attestation.
+data SuspensionPolicy
+  = REQUIRE_ACTIVE_VERIFIER
+    -- ^ Default: a suspended verifier's attestations need re-review before a new activation.
+  | ALLOW_ISSUED_ATTESTATIONS
+    -- ^ Issued attestations stay usable after suspension (only new issuance is blocked).
+  deriving (Eq, Show)
+
+-- | One per namespace. Pins the trusted governance party, so an accreditation signed by any other party is
+-- rejected at attestation issuance.
+template CollaraConfig
+  with
+    registrar : Party
+    namespace : Text
+    governanceParty : Party
+    suspensionPolicy : SuspensionPolicy
+    configVersion : Int
+    directory : [Party]
+      -- ^ Parties that use config and verifier status as transaction inputs (verifiers, lenders).
+      -- Non-sensitive: no case, asset or financing data.
+  where
+    signatory registrar
+    observer directory
+    ensure namespace /= "" && configVersion >= 1 && unique directory && registrar `notElem` directory
+
+    choice Config_Update : ContractId CollaraConfig
+      with
+        newGovernanceParty : Party
+        newSuspensionPolicy : SuspensionPolicy
+        newDirectory : [Party]
+      controller registrar
+      do
+        create this with
+          governanceParty = newGovernanceParty
+          suspensionPolicy = newSuspensionPolicy
+          directory = newDirectory
+          configVersion = configVersion + 1
+
+    -- | Publishes the status of one accredited verifier, derived from the governance-signed accreditation.
+    nonconsuming choice Config_PublishVerifierStatus : ContractId VerifierStatusMirror
+      with
+        accreditationCid : ContractId VerifierAccreditation
+        sourceRef : Text
+      controller registrar
+      do
+        acc <- fetch accreditationCid
+        assertMsg "Untrusted registry: accreditation is not signed by the Collara governance party"
+          (acc.governanceParty == governanceParty)
+        create VerifierStatusMirror with
+          registrar
+          namespace
+          governanceParty
+          verifier = acc.verifier
+          verifierRef = acc.verifierRef
+          status = acc.status
+          registryVersion = acc.registryVersion
+          sourceRef
+          directory
+
+-- | Registrar-signed copy of one verifier's registry status. Pledge activation fetches this instead of the
+-- governance-signed accreditation, so governance member nodes are not informed of activations (synthesis R-06).
+-- Trade-off: activation trusts the registrar to keep the mirror in sync (latency). Issuance still checks the
+-- real accreditation.
+template VerifierStatusMirror
+  with
+    registrar : Party
+    namespace : Text
+    governanceParty : Party
+    verifier : Party
+    verifierRef : Text
+    status : VerifierStatus
+    registryVersion : Int
+    sourceRef : Text
+      -- ^ Opaque reference to the governance execution that produced the status (e.g. an update id).
+    directory : [Party]
+  where
+    signatory registrar
+    observer directory
+    ensure verifierRef /= "" && unique directory
+
+    -- | Re-derives the status from the verifier's current accreditation. An archived (superseded) accreditation
+    -- cannot be fetched, so the mirror can only be synced to a live governance-signed state.
+    choice Mirror_Sync : ContractId VerifierStatusMirror
+      with
+        configCid : ContractId CollaraConfig
+        accreditationCid : ContractId VerifierAccreditation
+        newSourceRef : Text
+      controller registrar
+      do
+        config <- fetch configCid
+        assertMsg "Config of another registrar or namespace"
+          (config.registrar == registrar && config.namespace == namespace)
+        acc <- fetch accreditationCid
+        assertMsg "Untrusted registry: accreditation is not signed by the Collara governance party"
+          (acc.governanceParty == config.governanceParty)
+        assertMsg "Accreditation is for another verifier" (acc.verifier == verifier)
+        create this with
+          governanceParty = config.governanceParty
+          verifierRef = acc.verifierRef
+          status = acc.status
+          registryVersion = acc.registryVersion
+          sourceRef = newSourceRef
+          directory = config.directory

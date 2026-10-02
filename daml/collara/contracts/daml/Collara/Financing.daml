@@ -1,0 +1,349 @@
+-- | Lender review and financing. Financing terms (principal, term metadata, legal reference) exist only in
+-- `FinancingProposal` and `FinancingAgreement`, whose stakeholders are exactly the lender and the borrower.
+-- Everything downstream (`PledgeActivationAuthorization`, lock, release records) carries references and hashes.
+module Collara.Financing where
+
+import DA.Optional (isSome)
+
+import Collara.Types
+
+-- | Lender review states. `NEEDS_INFORMATION`, `ELIGIBLE` and `REJECTED` are also the notice outcomes.
+data AssessmentStatus
+  = SUBMITTED
+  | IN_REVIEW
+  | NEEDS_INFORMATION
+  | PENDING_APPROVAL
+  | ELIGIBLE
+  | REJECTED
+  deriving (Eq, Show)
+
+data Valuation = Valuation
+  with
+    value : Money
+    source : Text
+    valuationDate : Date
+    limitations : Text
+  deriving (Eq, Show)
+
+-- | Lender-only record of the collateral review for one case. Internal notes and the internal risk view stay
+-- off-ledger (lender-org-scoped database rows). Analyst vs approver is an in-org mandate enforced by the API;
+-- every transition records the opaque `actorRef` of the member who acted.
+template CollateralAssessment
+  with
+    lender : Party
+    borrower : Party
+      -- ^ Reference only; the borrower is not a stakeholder.
+    assessmentRef : Text
+    caseRef : Text
+    namespace : Text
+    assetId : Text
+    snapshot : ReviewSnapshot
+    valuation : Optional Valuation
+    policyRef : Text
+    status : AssessmentStatus
+    version : Int
+    lastActorRef : Text
+  where
+    signatory lender
+    ensure nonEmptyTexts [assessmentRef, caseRef, namespace, assetId] && lender /= borrower
+      && validSnapshot snapshot && version >= 1
+      && optional True (\v -> validMoney v.value && v.source /= "") valuation
+
+    choice Assessment_StartReview : ContractId CollateralAssessment
+      with
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Review cannot start from this status" (status `elem` [SUBMITTED, NEEDS_INFORMATION])
+        create this with status = IN_REVIEW; version = version + 1; lastActorRef = actorRef
+
+    -- | The shared evidence or attestation changed: record the new snapshot and require a new review.
+    -- Any earlier eligibility is cleared.
+    choice Assessment_UpdateSnapshot : ContractId CollateralAssessment
+      with
+        newSnapshot : ReviewSnapshot
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is closed" (status /= REJECTED)
+        assertMsg "Snapshot is unchanged" (newSnapshot /= snapshot)
+        create this with
+          snapshot = newSnapshot; status = NEEDS_INFORMATION; version = version + 1; lastActorRef = actorRef
+
+    choice Assessment_Save : ContractId CollateralAssessment
+      with
+        newValuation : Valuation
+        newPolicyRef : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is not in review" (status == IN_REVIEW)
+        create this with
+          valuation = Some newValuation; policyRef = newPolicyRef; version = version + 1; lastActorRef = actorRef
+
+    choice Assessment_RequestInformation : (ContractId CollateralAssessment, ContractId LenderDecisionNotice)
+      with
+        noticeRef : Text
+        sharedFeedback : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is not in review" (status `elem` [IN_REVIEW, PENDING_APPROVAL])
+        decide this NEEDS_INFORMATION noticeRef sharedFeedback actorRef
+
+    choice Assessment_SubmitForApproval : ContractId CollateralAssessment
+      with
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is not in review" (status == IN_REVIEW)
+        assertMsg "A valuation is required before approval" (isSome valuation)
+        create this with status = PENDING_APPROVAL; version = version + 1; lastActorRef = actorRef
+
+    choice Assessment_Approve : (ContractId CollateralAssessment, ContractId LenderDecisionNotice)
+      with
+        noticeRef : Text
+        sharedFeedback : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is not pending approval" (status == PENDING_APPROVAL)
+        decide this ELIGIBLE noticeRef sharedFeedback actorRef
+
+    choice Assessment_Reject : (ContractId CollateralAssessment, ContractId LenderDecisionNotice)
+      with
+        noticeRef : Text
+        sharedFeedback : Text
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment cannot be rejected from this status" (status `elem` [IN_REVIEW, PENDING_APPROVAL])
+        decide this REJECTED noticeRef sharedFeedback actorRef
+
+    -- | Issues version 1 of a financing proposal for an eligible assessment. The review snapshot is copied
+    -- from this lender-signed assessment, so the proposal is bound to the evidence and attestation reviewed.
+    nonconsuming choice Assessment_IssueProposal : ContractId FinancingProposal
+      with
+        proposalRef : Text
+        principal : Money
+        termMetadata : Text
+        externalLegalRef : Text
+        expiresAt : Time
+        actorRef : Text
+      controller lender
+      do
+        assertMsg "Assessment is not eligible" (status == ELIGIBLE)
+        now <- getTime
+        assertMsg "Attestation is outside its validity period" (now <= snapshot.attestationValidUntil)
+        assertMsg "Proposal expiry must be in the future" (expiresAt > now)
+        create FinancingProposal with
+          lender
+          borrower
+          proposalRef
+          version = 1
+          caseRef
+          namespace
+          assetId
+          assessmentRef
+          snapshot
+          principal
+          termMetadata
+          externalLegalRef
+          expiresAt
+          issuedAt = now
+          issuedByRef = actorRef
+
+decide : CollateralAssessment -> AssessmentStatus -> Text -> Text -> Text
+  -> Update (ContractId CollateralAssessment, ContractId LenderDecisionNotice)
+decide a outcome noticeRef sharedFeedback actorRef = do
+  now <- getTime
+  assessmentCid <- create a with status = outcome; version = a.version + 1; lastActorRef = actorRef
+  noticeCid <- create LenderDecisionNotice with
+    lender = a.lender
+    borrower = a.borrower
+    noticeRef
+    caseRef = a.caseRef
+    assessmentRef = a.assessmentRef
+    outcome
+    sharedFeedback
+    decidedAt = now
+  pure (assessmentCid, noticeCid)
+
+-- | Borrower-visible outcome and shared feedback only (no valuation, no internal notes).
+template LenderDecisionNotice
+  with
+    lender : Party
+    borrower : Party
+    noticeRef : Text
+    caseRef : Text
+    assessmentRef : Text
+    outcome : AssessmentStatus
+    sharedFeedback : Text
+    decidedAt : Time
+  where
+    signatory lender
+    observer borrower
+    ensure noticeRef /= "" && outcome `elem` [NEEDS_INFORMATION, ELIGIBLE, REJECTED]
+
+template FinancingProposal
+  with
+    lender : Party
+    borrower : Party
+    proposalRef : Text
+    version : Int
+    caseRef : Text
+    namespace : Text
+    assetId : Text
+    assessmentRef : Text
+    snapshot : ReviewSnapshot
+    principal : Money
+    termMetadata : Text
+    externalLegalRef : Text
+    expiresAt : Time
+    issuedAt : Time
+    issuedByRef : Text
+  where
+    signatory lender
+    observer borrower
+    ensure nonEmptyTexts [proposalRef, caseRef, namespace, assetId, assessmentRef] && version >= 1
+      && lender /= borrower && validMoney principal && validSnapshot snapshot
+
+    -- | Acceptance is bound to this exact contract and the version the borrower reviewed.
+    -- Accepting does not disburse funds and does not activate the pledge.
+    choice Proposal_Accept : ContractId FinancingAgreement
+      with
+        expectedProposalRef : Text
+        expectedVersion : Int
+        actorRef : Text
+      controller borrower
+      do
+        assertMsg "Proposal version mismatch" (expectedProposalRef == proposalRef && expectedVersion == version)
+        now <- getTime
+        assertMsg "Proposal has expired" (now <= expiresAt)
+        create FinancingAgreement with
+          lender
+          borrower
+          agreementRef = proposalRef
+          proposalVersion = version
+          caseRef
+          namespace
+          assetId
+          assessmentRef
+          snapshot
+          principal
+          termMetadata
+          externalLegalRef
+          acceptedAt = now
+          acceptedByRef = actorRef
+
+    choice Proposal_Decline : ()
+      with
+        reason : Text
+        actorRef : Text
+      controller borrower
+      do pure ()
+
+    -- | Only possible before acceptance, because acceptance consumes the proposal.
+    choice Proposal_Withdraw : ()
+      with
+        reason : Text
+        actorRef : Text
+      controller lender
+      do pure ()
+
+    -- | A terms change is a new version that needs a new acceptance; the old version is consumed.
+    choice Proposal_Revise : ContractId FinancingProposal
+      with
+        newPrincipal : Money
+        newTermMetadata : Text
+        newExternalLegalRef : Text
+        newExpiresAt : Time
+        actorRef : Text
+      controller lender
+      do
+        now <- getTime
+        assertMsg "Proposal expiry must be in the future" (newExpiresAt > now)
+        create this with
+          version = version + 1
+          principal = newPrincipal
+          termMetadata = newTermMetadata
+          externalLegalRef = newExternalLegalRef
+          expiresAt = newExpiresAt
+          issuedAt = now
+          issuedByRef = actorRef
+
+-- | Accepted terms. Stakeholders: lender and borrower only. Accepted is not funded.
+template FinancingAgreement
+  with
+    lender : Party
+    borrower : Party
+    agreementRef : Text
+    proposalVersion : Int
+    caseRef : Text
+    namespace : Text
+    assetId : Text
+    assessmentRef : Text
+    snapshot : ReviewSnapshot
+    principal : Money
+    termMetadata : Text
+    externalLegalRef : Text
+    acceptedAt : Time
+    acceptedByRef : Text
+  where
+    signatory lender, borrower
+    ensure agreementRef /= "" && proposalVersion >= 1 && validMoney principal && validSnapshot snapshot
+
+    -- | The borrower's separate consent to pledge activation. The authorization copies references and the review
+    -- snapshot from this agreement; it never carries principal, currency or terms.
+    nonconsuming choice Agreement_AuthorizeActivation : ContractId PledgeActivationAuthorization
+      with
+        authorizationRef : Text
+        expectedControlVersion : Int
+        expiresAt : Time
+        actorRef : Text
+      controller borrower
+      do
+        now <- getTime
+        assertMsg "Authorization expiry must be in the future" (expiresAt > now)
+        assertMsg "Attestation is outside its validity period" (now <= snapshot.attestationValidUntil)
+        create PledgeActivationAuthorization with
+          lender
+          borrower
+          authorizationRef
+          caseRef
+          agreementRef
+          agreementVersion = proposalVersion
+          namespace
+          assetId
+          expectedControlVersion
+          snapshot
+          expiresAt
+          authorizedAt = now
+          authorizedByRef = actorRef
+
+-- | Single-use borrower authorization consumed by `Control_Activate`. No financing terms.
+template PledgeActivationAuthorization
+  with
+    lender : Party
+    borrower : Party
+    authorizationRef : Text
+    caseRef : Text
+    agreementRef : Text
+    agreementVersion : Int
+    namespace : Text
+    assetId : Text
+    expectedControlVersion : Int
+    snapshot : ReviewSnapshot
+    expiresAt : Time
+    authorizedAt : Time
+    authorizedByRef : Text
+  where
+    signatory lender, borrower
+    ensure nonEmptyTexts [authorizationRef, caseRef, agreementRef, namespace, assetId]
+      && expectedControlVersion >= 1 && validSnapshot snapshot
+
+    choice Auth_Withdraw : ()
+      with
+        actorRef : Text
+      controller borrower
+      do pure ()

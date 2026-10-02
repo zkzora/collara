@@ -1,0 +1,21 @@
+/*
+ * Public-site extras on top of globals.css (tokens come from [data-surface="marketing"]).
+ * Kept in cascade layer `base` so Tailwind utilities still win.
+ */
+@layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    html:has(> body [data-surface="marketing"]) {
+      scroll-behavior: smooth;
+    }
+  }
+
+  [data-surface="marketing"] {
+    text-rendering: optimizeLegibility;
+  }
+
+  /* The prototype had no focus styles (proto-landing-docs.md §7.3). */
+  [data-surface="marketing"] :is(a, button, summary, [tabindex="0"]):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}

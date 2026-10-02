@@ -1,0 +1,361 @@
+-- | Single-lock, activation and release invariants, and the attacks against them.
+module Collara.Tests.Pledge where
+
+import DA.Foldable (forA_)
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Collara.Control
+import Collara.Evidence
+import Collara.Financing hiding (AssessmentStatus(..))
+import qualified Collara.Financing as Fin
+import Collara.Release hiding (ReleaseOutcome(..), ReleaseStatus(..))
+import qualified Collara.Release as Rel
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Common
+import Collara.Tests.Util
+
+-- | Exactly one control token exists for the asset: `locks` CollateralLocks and the rest AssetControls.
+assertSingleToken : Parties -> Int -> Script ()
+assertSingleToken p expectedLocks = do
+  locks <- query @CollateralLock p.owner
+  controls <- query @AssetControl p.owner
+  assertEq "active collateral locks" expectedLocks (length locks)
+  assertEq "available asset controls" (1 - expectedLocks) (length controls)
+
+-- * One active pledge per asset (S 11.7 #1, #2)
+
+-- | A second activation of the same control fails, even with a second valid borrower authorization.
+test_second_activation_fails : Script ()
+test_second_activation_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  auth2 <- authorizeActivation l fin.agreementCid f.controlCid "AUTH-002" (days 7)
+  _ <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth2 "PL-002"
+  expectConsumed r
+  assertSingleToken p 1
+
+-- | The borrower double-deals: agreements and authorizations with Lender A (shared) and Lender B, both pinned to
+-- control v3. Lender B cannot activate a control that is not shared with it; once Lender A activates, the
+-- control is consumed and Lender B's attempt fails.
+test_competing_lenders_lender_a_first : Script ()
+test_competing_lenders_lender_a_first = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  finA <- financeToAuthorization f
+  disclosureB <- discloseTo f p.lenderB
+  (_, authB) <- financeLender l p.lenderB disclosureB "B01" f.controlCid
+  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  expectNotVisible rNotVisible
+  rNotShared <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  expectFailure "Control is not shared with this lender" rNotShared
+  _ <- activate l p.lenderA f.controlCid finA.authorizationCid "PL-001"
+  rLate <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  expectConsumed rLate
+  assertSingleToken p 1
+
+-- | The other order: the borrower revokes Lender A's view (control v3 -> v4) and shares with Lender B. Lender B
+-- activates; Lender A's authorization, pinned to v3, can no longer be used on any control.
+test_competing_lenders_lender_b_first : Script ()
+test_competing_lenders_lender_b_first = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  finA <- financeToAuthorization f
+  disclosureB <- discloseTo f p.lenderB
+  rTwoLenders <- trySubmit p.owner $ exerciseCmd f.controlCid Control_ShareWithLender with
+    lender = p.lenderB; actorRef = ownerActor
+  expectFailure "Control is already shared with a lender" rTwoLenders
+  revoked <- submit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with
+    lender = p.lenderA; actorRef = ownerActor
+  sharedB <- submit p.owner $ exerciseCmd revoked Control_ShareWithLender with lender = p.lenderB; actorRef = ownerActor
+  (_, authB) <- financeLender l p.lenderB disclosureB "B01" sharedB
+  _ <- activate l p.lenderB sharedB authB "PL-B01"
+  rOld <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid finA.authorizationCid "PL-001"
+  expectConsumed rOld
+  locksA <- query @CollateralLock p.lenderA
+  assertEq "Lender A holds no lock" 0 (length locksA)
+  assertSingleToken p 1
+
+-- | Revoking a lender's view invalidates its pending authorization, even if the lender is shared again.
+test_revoked_view_invalidates_authorization : Script ()
+test_revoked_view_invalidates_authorization = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  revoked <- submit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with
+    lender = p.lenderA; actorRef = ownerActor
+  reshared <- submit p.owner $ exerciseCmd revoked Control_ShareWithLender with lender = p.lenderA; actorRef = ownerActor
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA reshared fin.authorizationCid "PL-001"
+  expectFailure "Control version changed since authorization" r
+  assertSingleToken p 0
+
+-- * Activation preconditions (S 11.7 #5, #7, #8)
+
+-- | A new evidence version moves the control's anchor: the old authorization no longer matches, and an
+-- authorization re-pinned to the new control version still fails because the agreement reviewed PKG-001 v2.
+test_activation_after_manifest_bump_fails : Script ()
+test_activation_after_manifest_bump_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  (_, bumped) <- newManifestVersion l f.manifestCid (manifestV3Entries p) hashManifestV3 f.controlCid
+  rOldControl <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  expectConsumed rOldControl
+  rStaleAuth <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped fin.authorizationCid "PL-001"
+  expectFailure "Control version changed since authorization" rStaleAuth
+  repinned <- authorizeActivation l fin.agreementCid bumped "AUTH-002" (days 7)
+  rStaleEvidence <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped repinned "PL-001"
+  expectFailure "Evidence package changed since authorization" rStaleEvidence
+  assertSingleToken p 0
+
+test_activation_with_expired_attestation_fails : Script ()
+test_activation_with_expired_attestation_fails = do
+  l <- seedCleanStart
+  f <- buildMainFixtureValidFor (days 2) l
+  let p = l.parties
+  fin <- financeToAuthorization f
+  passTime (days 3)
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  expectFailure "Attestation is outside its validity period" r
+  now <- getTime
+  rReauthorize <- trySubmit p.owner $ exerciseCmd fin.agreementCid Agreement_AuthorizeActivation with
+    authorizationRef = "AUTH-002"; expectedControlVersion = 3; expiresAt = addRelTime now (days 7)
+    actorRef = ownerActor
+  expectFailure "Attestation is outside its validity period" rReauthorize
+  assertSingleToken p 0
+
+test_activation_with_expired_authorization_fails : Script ()
+test_activation_with_expired_authorization_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  passTime (days 8)
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  expectFailure "Activation authorization expired" r
+  assertSingleToken p 0
+
+-- | Lender B, never shared, cannot activate: it cannot see the control, cannot forge an authorization, and cannot
+-- act as Lender A.
+test_rogue_lender_cannot_activate : Script ()
+test_rogue_lender_cannot_activate = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  auth <- fetchAs p.lenderA fin.authorizationCid
+  rForge <- trySubmit p.lenderB $ createCmd auth with lender = p.lenderB
+  expectAuthorizationFailure rForge
+  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid fin.authorizationCid "PL-B"
+  expectNotVisible rNotVisible
+  -- even with read access to everything the borrower and Lender A hold, Lender B lacks authority
+  let readAll = actAs p.lenderB <> readAs p.owner <> readAs p.lenderA
+  rNotShared <- trySubmit readAll $ activateCmd l p.lenderB f.controlCid fin.authorizationCid "PL-B"
+  expectFailure "Control is not shared with this lender" rNotShared
+  rImpersonate <- trySubmit readAll $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-B"
+  expectAuthorizationFailure rImpersonate
+  assertSingleToken p 0
+
+-- | An authorization for another asset is rejected by the control.
+test_authorization_for_another_asset_fails : Script ()
+test_authorization_for_another_asset_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  snapshot <- snapshotFromDisclosure p.lenderA f.disclosureCid
+  other <- submit p.lenderA $ createCmd CollateralAssessment with
+    lender = p.lenderA
+    borrower = p.owner
+    assessmentRef = "CA-OTHER"
+    caseRef = "CL-OTHER"
+    namespace = fixtureNamespace
+    assetId = "ASSET-TEST-OTHER"
+    snapshot
+    valuation = None
+    policyRef = "CP-2026-CNC-01"
+    status = Fin.SUBMITTED
+    version = 1
+    lastActorRef = lenderIntakeActor
+  (eligible, _) <- reviewToEligible p.lenderA other "LDN-OTHER"
+  proposal <- issueProposal p.lenderA eligible "FP-OTHER"
+  agreementCid <- acceptProposal l proposal "FP-OTHER" 1
+  auth <- authorizeActivation l agreementCid f.controlCid "AUTH-OTHER" (days 7)
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth "PL-OTHER"
+  expectFailure "Authorization is for another asset" r
+  assertSingleToken p 0
+
+-- * Release authority (S 11.7 #6) and release requests (S 11.5)
+
+test_borrower_cannot_release : Script ()
+test_borrower_cannot_release = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let p = f.ledger.parties
+  r <- trySubmit p.owner $ exerciseCmd lockCid Lock_Release with releaseRequestRef = "RR-X"; actorRef = ownerActor
+  expectAuthorizationFailure r
+  assertActive "lock" p.owner lockCid
+
+-- | The built-in Archive needs registrar, owner and lender: no subset without the lender can remove the lock.
+test_archive_of_lock_needs_lender : Script ()
+test_archive_of_lock_needs_lender = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let p = f.ledger.parties
+  forA_ [actAs p.owner, actAs p.registrar, actAs p.owner <> actAs p.registrar] $ \ctx -> do
+    r <- trySubmit ctx $ archiveCmd lockCid
+    expectAuthorizationFailure r
+  assertActive "lock" p.owner lockCid
+  assertSingleToken p 1
+
+-- | Governance, verifier, auditor, dealer and Lender B cannot release: they cannot see the lock, and with read
+-- access they still lack the designated lender's authority.
+test_non_lenders_cannot_release : Script ()
+test_non_lenders_cannot_release = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let p = f.ledger.parties
+      release = exerciseCmd lockCid Lock_Release with releaseRequestRef = "RR-X"; actorRef = "attacker"
+  forA_ [p.governance, p.seat1, p.seat2, p.seat3, p.verifier, p.auditor, p.dealer, p.lenderB] $ \x -> do
+    rHidden <- trySubmit x release
+    expectNotVisible rHidden
+    rWithRead <- trySubmit (actAs x <> readAs p.owner) release
+    expectAuthorizationFailure rWithRead
+  assertActive "lock" p.owner lockCid
+
+-- | Requests (by the borrower or by the lender), information requests, responses, withdrawals and rejections
+-- never touch the lock.
+test_release_requests_leave_lock_active : Script ()
+test_release_requests_leave_lock_active = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  rr1 <- requestRelease l lockCid "RR-001"
+  assertActive "lock after request" p.owner lockCid
+  rr1b <- submit p.lenderA $ exerciseCmd rr1 Release_RequestInformation with
+    questionRef = "Q-001"; actorRef = approverActor
+  rWaiting <- trySubmit p.lenderA $ exerciseCmd rr1b Release_Authorize with decisionRef = "RD-X"; actorRef = approverActor
+  expectFailure "Release request is waiting for information" rWaiting
+  rr1c <- submit p.owner $ exerciseCmd rr1b Release_Respond with responseNoteRef = "A-001"; actorRef = ownerActor
+  assertActive "lock after information round" p.owner lockCid
+  _ <- submit p.lenderA $ exerciseCmd rr1c Release_Reject with
+    decisionRef = "RD-001"; sharedReason = "Repayment confirmation has not been received."; actorRef = approverActor
+  assertActive "lock after rejection" p.owner lockCid
+  rr2 <- requestRelease l lockCid "RR-002"
+  submit p.owner $ exerciseCmd rr2 Release_Withdraw with actorRef = ownerActor
+  assertActive "lock after withdrawal" p.owner lockCid
+  -- a request raised by the lender in an authorized case role
+  rr3 <- submit p.lenderA $ createCmd ReleaseRequest with
+    requester = p.lenderA
+    owner = p.owner
+    lender = p.lenderA
+    lockCid
+    lockRef = "PL-001"
+    caseRef = fixtureCaseRef
+    namespace = fixtureNamespace
+    assetId = fixtureAssetId
+    releaseRequestRef = "RR-003"
+    reason = ADMINISTRATIVE_CORRECTION
+    noteRef = "NOTE-RR-003"
+    status = Rel.REQUESTED
+    version = 1
+    requestedByRef = approverActor
+  assertActive "lock after lender-raised request" p.owner lockCid
+  assertSingleToken p 1
+  (_, _, decisionCid) <- submit p.lenderA $ exerciseCmd rr3 Release_Authorize with
+    decisionRef = "RD-003"; actorRef = approverActor
+  decision <- fetchAs p.owner decisionCid
+  assertEq "release outcome" Rel.AUTHORIZED decision.outcome
+  assertSingleToken p 0
+
+-- | A borrower-made request naming another lender cannot release: that lender cannot see the lock and is not the
+-- lock's designated lender; the borrower cannot authorize its own request.
+test_release_request_cannot_redirect_authority : Script ()
+test_release_request_cannot_redirect_authority = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  rrCid <- requestRelease l lockCid "RR-001"
+  rr <- fetchAs p.owner rrCid
+  redirected <- submit p.owner $ createCmd rr with lender = p.lenderB; releaseRequestRef = "RR-B"
+  rHidden <- trySubmit p.lenderB $ exerciseCmd redirected Release_Authorize with decisionRef = "RD-B"; actorRef = "x"
+  expectNotVisible rHidden
+  rWrongLender <- trySubmit (actAs p.lenderB <> readAs p.owner) $ exerciseCmd redirected Release_Authorize with
+    decisionRef = "RD-B"; actorRef = "x"
+  expectFailure "Release requires the designated lender's authorization." rWrongLender
+  rSelf <- trySubmit p.owner $ exerciseCmd rrCid Release_Authorize with decisionRef = "RD-X"; actorRef = ownerActor
+  expectAuthorizationFailure rSelf
+  rSelfLender <- trySubmit p.owner $ createCmd rr with lender = p.owner
+  expectPreconditionFailure rSelfLender
+  assertActive "lock" p.owner lockCid
+
+-- * Corrections, archive and expiry cannot bypass a lock (S 11.7 #4, #8)
+
+test_control_choices_impossible_while_locked : Script ()
+test_control_choices_impossible_while_locked = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  rCorrect <- trySubmit p.owner $ exerciseCmd f.controlCid Control_Correct with reason = "fix"; actorRef = ownerActor
+  expectConsumed rCorrect
+  rRetire <- trySubmit p.owner $ exerciseCmd f.controlCid Control_Retire with reason = "retire"; actorRef = ownerActor
+  expectConsumed rRetire
+  rRevoke <- trySubmit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with
+    lender = p.lenderA; actorRef = ownerActor
+  expectConsumed rRevoke
+  rEvidence <- trySubmit p.owner $ exerciseCmd f.manifestCid Manifest_NewVersion with
+    newEntries = manifestV3Entries p; newManifestHash = hashManifestV3; controlCid = f.controlCid; actorRef = ownerActor
+  expectConsumed rEvidence
+  rReplacement <- trySubmit p.owner $ createCmd AssetControl with
+    registrar = p.registrar; owner = p.owner; namespace = fixtureNamespace; assetId = fixtureAssetId
+    controlVersion = 99; evidence = None; sharedLender = None
+  expectAuthorizationFailure rReplacement
+  assertActive "lock" p.owner lockCid
+  assertSingleToken p 1
+
+test_passport_archive_keeps_lock : Script ()
+test_passport_archive_keeps_lock = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let p = f.ledger.parties
+  submit p.owner $ archiveCmd f.passportCid
+  assertArchived "passport" p.owner f.passportCid
+  assertActive "lock" p.owner lockCid
+  assertSingleToken p 1
+
+-- | Attestation expiry never releases an active pledge, and the lender can still release afterwards.
+test_attestation_expiry_never_releases : Script ()
+test_attestation_expiry_never_releases = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  passTime (days 200)
+  assertActive "lock after attestation expiry" p.owner lockCid
+  rr <- requestRelease l lockCid "RR-001"
+  _ <- submit p.lenderA $ exerciseCmd rr Release_Authorize with decisionRef = "RD-001"; actorRef = approverActor
+  assertSingleToken p 0
+
+-- * Replays of consumed contracts
+
+test_replays_of_consumed_contracts_fail : Script ()
+test_replays_of_consumed_contracts_fail = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  rAccept <- trySubmit p.owner $ exerciseCmd fin.proposalCid Proposal_Accept with
+    expectedProposalRef = "FP-001"; expectedVersion = 1; actorRef = ownerActor
+  expectConsumed rAccept
+  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  rActivate <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  expectConsumed rActivate
+  rr <- requestRelease l lockCid "RR-001"
+  _ <- submit p.lenderA $ exerciseCmd rr Release_Authorize with decisionRef = "RD-001"; actorRef = approverActor
+  rAuthorize <- trySubmit p.lenderA $ exerciseCmd rr Release_Authorize with decisionRef = "RD-001"; actorRef = approverActor
+  expectConsumed rAuthorize
+  rRelease <- trySubmit p.lenderA $ exerciseCmd lockCid Lock_Release with releaseRequestRef = "RR-001"; actorRef = approverActor
+  expectConsumed rRelease
+  assertSingleToken p 0

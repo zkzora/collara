@@ -1,0 +1,20 @@
+{
+  "status": 404,
+  "body": {
+    "code": "PACKAGE_NAMES_NOT_FOUND",
+    "cause": "The following package names do not match upgradable packages uploaded on this participant: [collara-canton-it].",
+    "correlationId": null,
+    "traceId": "30158532b9880112098dd3a5e0ee118a",
+    "context": {
+      "participant": "sandbox",
+      "definite_answer": "false",
+      "tid": "30158532b9880112098dd3a5e0ee118a",
+      "category": "11"
+    },
+    "resources": [],
+    "errorCategory": 11,
+    "grpcCodeValue": 5,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "realm": "collara",
+  "displayName": "Collara (local development)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "editUsernameAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "clients": [
+    {
+      "clientId": "collara-web",
+      "name": "Collara web (local development)",
+      "description": "Confidential client for the API's browser login: Authorization Code + PKCE S256 only. Local development with synthetic users.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${COLLARA_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "consentRequired": false,
+      "redirectUris": ["http://localhost:3000/api/auth/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "manufacturer.owner@demo.test",
+      "email": "manufacturer.owner@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo Manufacturer",
+      "lastName": "Owner",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "manufacturer.admin@demo.test",
+      "email": "manufacturer.admin@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo Manufacturer",
+      "lastName": "Admin",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "dealer.contributor@demo.test",
+      "email": "dealer.contributor@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo CNC Dealer",
+      "lastName": "Contributor",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "verifier.inspector@demo.test",
+      "email": "verifier.inspector@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo Verifier",
+      "lastName": "Inspector",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "lender-a.analyst@demo.test",
+      "email": "lender-a.analyst@demo.test",
+      "emailVerified": true,
+      "firstName": "Dana",
+      "lastName": "Reyes",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "lender-a.approver@demo.test",
+      "email": "lender-a.approver@demo.test",
+      "emailVerified": true,
+      "firstName": "Morgan",
+      "lastName": "Hale",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "lender-b.approver@demo.test",
+      "email": "lender-b.approver@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo Lender B",
+      "lastName": "Approver",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "auditor@demo.test",
+      "email": "auditor@demo.test",
+      "emailVerified": true,
+      "firstName": "Demo Auditor",
+      "lastName": "Auditor",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    },
+    {
+      "username": "operator@collara.test",
+      "email": "operator@collara.test",
+      "emailVerified": true,
+      "firstName": "Collara",
+      "lastName": "Operator",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "collara-demo-only", "temporary": false }]
+    }
+  ]
+}

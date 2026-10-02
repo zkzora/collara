@@ -1,0 +1,21 @@
+{
+  "status": 400,
+  "body": {
+    "code": "DAML_AUTHORIZATION_ERROR",
+    "cause": "Interpretation error: Error: node NodeId(0) (3281ed459fe197194d2a769c284b0f8713eb126c64575cdce04254ab5cfda38c:It:Token) requires authorizers CapIssuer-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854, but only CapHolder-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854 were given",
+    "correlationId": "e977ae9d-7ddd-46a8-b43c-39cabde402b7",
+    "traceId": "759ed0b6de5f838074be9d84c82ea2e6",
+    "context": {
+      "participant": "'sandbox'",
+      "category": "8",
+      "tid": "759ed0b6de5f838074be9d84c82ea2e6",
+      "definite_answer": "false",
+      "commands": "{readAs: [], deduplicationPeriod: {duration: 'PT168H'}, submittedAt: '2026-10-01T22:17:49.237224Z', submissionId: 'e977ae9d-7ddd-46a8-b43c-39cabde402b7', actAs: ['CapHolder-muq3hmv3::1220769af13f3642ca1e318cef5fff939347f356f39a2aa63cd30afd43931d62f854'], commandId: 'cap-forge-muq3hmv3', userId: 'cap-holder-muq3hmv3', workflowId: }"
+    },
+    "resources": [],
+    "errorCategory": 8,
+    "grpcCodeValue": 3,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

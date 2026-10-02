@@ -1,0 +1,29 @@
+// @collara/db — server-only persistence: Drizzle schema, committed SQL migrations, scoped queries.
+export * from "./schema";
+export {
+  createPgDatabase,
+  createPgliteDatabase,
+  MIGRATIONS_FOLDER,
+  type Db,
+  type DbHandle,
+  type DbOrTx,
+  type PgOptions,
+  type Schema,
+} from "./client";
+export { seedDemoIdentities, type SeedSummary } from "./seed";
+export {
+  GOVERNANCE_PARTY_HINT,
+  importLocalnetState,
+  type BindingImportSummary,
+  type LocalnetBindingSource,
+} from "./bindings";
+export {
+  allocateRef,
+  ledgerCheckpoints,
+  loadUserAuthority,
+  visibleContracts,
+  visibleEvents,
+  type UserAuthority,
+  type VisibleContractsQuery,
+  type VisibleEventsQuery,
+} from "./queries";
