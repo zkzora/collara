@@ -4,7 +4,7 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const control =
-  "w-full min-w-0 rounded-md border border-line-strong bg-surface-sunken px-2.5 text-[13px] text-fg outline-none transition-colors placeholder:text-fg-subtle hover:border-line-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-danger aria-invalid:ring-danger/20 disabled:opacity-60";
+  "w-full min-w-0 rounded-md border border-line-input bg-surface-sunken px-2.5 text-[13px] text-fg outline-none transition-colors placeholder:text-fg-subtle hover:border-line-input-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-danger aria-invalid:ring-danger/20 disabled:opacity-60";
 
 /**
  * Label + control + hint + error, wired with htmlFor / aria-describedby / aria-invalid so the error

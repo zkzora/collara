@@ -28,7 +28,7 @@ const KIND_OPTIONS: readonly { value: EventKind; label: string }[] = [
 ];
 
 const control =
-  "h-8 rounded-md border border-line-strong bg-surface-sunken px-2.5 text-[13px] text-fg outline-none hover:border-line-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "h-8 rounded-md border border-line-input bg-surface-sunken px-2.5 text-[13px] text-fg outline-none hover:border-line-input-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function toQuery(filters: AuditFilters): AuditEventQuery {
   return {

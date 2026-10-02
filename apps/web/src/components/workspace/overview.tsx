@@ -1,11 +1,8 @@
 "use client";
 
 import {
-  BOUNDARY_COPY,
   EMPTY_STATE_COPY,
-  FIGURE_LABELS,
   NEXT_ACTIONS,
-  NOT_AVAILABLE,
   OPEN_VERIFICATION_STATES,
   type CaseSummary,
   type Me,
@@ -13,7 +10,7 @@ import {
 } from "@collara/domain";
 import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { CaseTimeline } from "@/components/collara/case-timeline";
 import { EmptyState } from "@/components/collara/empty-state";
 import { ErrorState } from "@/components/collara/error-state";
@@ -36,6 +33,7 @@ import {
 } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { nextActionHref } from "./case/links";
+import { RecordedFigures } from "./overview/recorded-figures";
 import { joinParts } from "@/lib/format";
 
 type Persona = "lender" | "borrower" | "verifier" | "auditor" | "dealer" | "other";
@@ -239,16 +237,6 @@ function useActionRows(persona: Persona): {
   };
 }
 
-function Figure({ label, source }: { label: string; source: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <p className="text-[13px] text-fg-muted">{label}</p>
-      <p className="text-lg text-fg-muted">{NOT_AVAILABLE}</p>
-      <p className="text-[12px] leading-relaxed text-fg-subtle">{source}</p>
-    </div>
-  );
-}
-
 /** Overview `/app` (S §9.1): role-specific work queue, per-currency recorded figures, recent activity. */
 export function Overview() {
   const { me, mode, ledgerSync } = useSession();
@@ -295,17 +283,7 @@ export function Overview() {
         </Panel>
 
         <div className="flex flex-col gap-3.5">
-          {showFigures ? (
-            <Panel aria-label="Recorded figures" bodyClassName="flex flex-col gap-4">
-              <Figure
-                label={FIGURE_LABELS.RECORDED_PRINCIPAL}
-                source="Source: accepted proposals, ledger-committed · Not a valuation, balance, or TVL figure."
-              />
-              <div className="border-t border-line-subtle" />
-              <Figure label={FIGURE_LABELS.RECORDED_VALUATION} source="Source: verifier inspection reports · dated per attestation" />
-              <p className="text-[12px] text-fg-subtle">{BOUNDARY_COPY.VALUATION_PRINCIPAL_SEPARATE}</p>
-            </Panel>
-          ) : null}
+          <RecordedFigures expected={showFigures} />
 
           {me.navigation.includes("audit") ? (
             <Panel

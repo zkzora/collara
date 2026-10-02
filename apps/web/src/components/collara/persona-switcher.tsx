@@ -110,7 +110,7 @@ export function PersonaSwitcher({ className, onSwitched }: { className?: string;
         disabled={switching}
         aria-busy={switching}
         onChange={(event) => void change(event.target.value)}
-        className="h-8 w-full min-w-0 rounded-md border border-line-control bg-surface-sunken px-2 text-[12.5px] text-fg outline-none hover:border-line-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60"
+        className="h-8 w-full min-w-0 rounded-md border border-line-input bg-surface-sunken px-2 text-[12.5px] text-fg outline-none hover:border-line-input-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60"
       >
         {me.personaId ? null : (
           <option value="" disabled>

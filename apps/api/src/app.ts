@@ -34,6 +34,8 @@ import { createOidcService, type OidcService } from "./services/oidc";
 import { createS3Storage, type StorageService } from "./services/storage";
 import { CantonLedgerGateway, DEV_HMAC_SECRET, LedgerAccess } from "./ledger";
 import { workflowRoutes } from "./routes/workflow";
+import { directoryRoutes } from "./routes/directory";
+import { overviewRoutes } from "./routes/overview";
 import { createWorkflowServices } from "./workflow";
 
 export const API_VERSION = packageJson.version;
@@ -230,6 +232,8 @@ export async function buildApp(options: BuildAppOptions) {
   // Workflow modules (cases, assets, verification, reviews, proposals, pledges, release, access, audit,
   // reports, governance incl. GET /verifiers): one registration; each module declares its full paths under /api.
   await app.register(workflowRoutes, { prefix: "/api", services, workflow, mode: config.COLLARA_MODE });
+  await app.register(directoryRoutes, { prefix: "/api/directory", db: db.db });
+  await app.register(overviewRoutes, { prefix: "/api/overview", db: db.db, mode: config.COLLARA_MODE, clock });
 
   return app;
 }

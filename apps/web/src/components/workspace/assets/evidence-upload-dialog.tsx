@@ -154,7 +154,7 @@ export function EvidenceUploadDialog({
             aria-describedby={wired.describedBy}
             aria-invalid={wired.invalid || undefined}
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="w-full rounded-md border border-line-strong bg-surface-sunken px-2.5 py-1.5 text-[13px] text-fg file:mr-3 file:rounded-sm file:border-0 file:bg-surface-2 file:px-2.5 file:py-1 file:text-[12.5px] file:text-fg focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="w-full rounded-md border border-line-input bg-surface-sunken px-2.5 py-1.5 text-[13px] text-fg file:mr-3 file:rounded-sm file:border-0 file:bg-surface-2 file:px-2.5 file:py-1 file:text-[12.5px] file:text-fg focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           />
         )}
       </Field>

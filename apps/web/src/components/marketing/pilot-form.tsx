@@ -78,7 +78,7 @@ type Outcome = { kind: "idle" } | { kind: "error" } | { kind: "simulated" } | { 
 const controlClass =
   "h-10 rounded-md px-3 text-[15px] md:text-[15px] aria-invalid:border-danger aria-invalid:ring-0";
 const selectClass = cn(
-  "w-full min-w-0 border border-input bg-surface-sunken text-fg outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+  "w-full min-w-0 border border-line-input bg-surface-sunken text-fg outline-none transition-colors hover:border-line-input-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
   controlClass,
 );
 

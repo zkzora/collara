@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/collara/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { SectionNav } from "../audit/section-nav";
 import { caseTabHref } from "../case/links";
+import { CreateCaseLink } from "../cases/create-case-link";
 import { ASSET_TAB_LABELS, accessHref, assetTabHref } from "./links";
 import { useAssetDetail } from "./queries";
 import { PageCommands, PageCommandStatus } from "../audit/page-command";
@@ -25,6 +26,8 @@ export function useAssetPassport(): AssetDetail {
 
 function PassportHeader({ detail }: { detail: AssetDetail }) {
   const firstCase = detail.cases[0];
+  // Server-computed: owner organization with the borrower mandate, registered, no case holding the asset.
+  const canCreateCase = detail.allowedActions.includes("case.create");
   const owner = detail.owner ? `${detail.owner.name}${detail.ownerClaimSource ? ` (${detail.ownerClaimSource.toLowerCase()})` : ""}` : null;
   return (
     <PageHeader
@@ -40,14 +43,19 @@ function PassportHeader({ detail }: { detail: AssetDetail }) {
         .filter(Boolean)
         .join(" · ")}
       actions={
-        firstCase ? (
+        firstCase || canCreateCase ? (
           <>
-            <Link href={caseTabHref(firstCase.caseId, "summary")} className={buttonVariants({ variant: "outline" })}>
-              Open case {firstCase.caseId}
-            </Link>
-            <Link href={accessHref(firstCase.caseId)} className={buttonVariants({ variant: "outline" })}>
-              Review sharing <ArrowRightIcon aria-hidden="true" />
-            </Link>
+            {firstCase ? (
+              <>
+                <Link href={caseTabHref(firstCase.caseId, "summary")} className={buttonVariants({ variant: "outline" })}>
+                  Open case {firstCase.caseId}
+                </Link>
+                <Link href={accessHref(firstCase.caseId)} className={buttonVariants({ variant: "outline" })}>
+                  Review sharing <ArrowRightIcon aria-hidden="true" />
+                </Link>
+              </>
+            ) : null}
+            {canCreateCase ? <CreateCaseLink assetRef={detail.ref} /> : null}
           </>
         ) : null
       }

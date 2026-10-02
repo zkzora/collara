@@ -16,6 +16,10 @@
  * Tertiary text is raised to WCAG AA (CR-34): app #676A75 -> #8A8D98 (5.07:1 on #1C1D24),
  * marketing #62666D -> #7E828A (4.86:1 on #111214). --fg-faint is decorative only, never text.
  * Text on solid danger/tone fills is dark (--on-tone), never white (white on red was 2.88:1).
+ * Form-control boundaries (WCAG 1.4.11, >= 3:1 against adjacent colors) use --line-input, an opaque gray of the
+ * fg family: #6B6E7A is 3.31:1 on #1C1D24 (lightest app surface, dialogs) and 3.52-3.93:1 on every other surface;
+ * hover #8A8D98 is 5.07:1 or more. The translucent --line-* tokens (1.2-1.6:1) stay for decorative dividers.
+ * Checked by src/app/globals-contrast.test.ts.
  */
 
 :root,
@@ -39,6 +43,8 @@
   --line: rgb(255 255 255 / 0.08);
   --line-control: rgb(255 255 255 / 0.1);
   --line-strong: rgb(255 255 255 / 0.12);
+  --line-input: #6b6e7a;
+  --line-input-hover: #8a8d98;
   --line-hover: rgb(255 255 255 / 0.16);
   --hover: rgb(255 255 255 / 0.05);
   --selected: rgb(255 255 255 / 0.07);
@@ -72,6 +78,8 @@
   --line: rgb(255 255 255 / 0.08);
   --line-control: rgb(255 255 255 / 0.1);
   --line-strong: rgb(255 255 255 / 0.12);
+  --line-input: #6b6e7a;
+  --line-input-hover: #8a8d98;
   --line-hover: rgb(255 255 255 / 0.16);
   --hover: rgb(255 255 255 / 0.05);
   --selected: rgb(255 255 255 / 0.07);
@@ -208,6 +216,8 @@
   --color-line-subtle: var(--line-subtle);
   --color-line: var(--line);
   --color-line-control: var(--line-control);
+  --color-line-input: var(--line-input);
+  --color-line-input-hover: var(--line-input-hover);
   --color-line-strong: var(--line-strong);
   --color-line-hover: var(--line-hover);
   --color-hover: var(--hover);

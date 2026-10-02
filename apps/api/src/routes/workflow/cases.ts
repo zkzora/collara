@@ -7,19 +7,20 @@
 import { allocateRef, cases as casesTable } from "@collara/db";
 import {
   caseContext,
+  CASE_CREATE_COPY,
+  caseHoldsAsset,
   CaseDetailSchema,
   CaseListQuerySchema,
   CaseListSchema,
   CaseRefSchema,
+  checkAssetAction,
   checkCaseAction,
   commandResultSchema,
   CreateCaseRequestSchema,
   CreateVerificationRequestSchema,
   CREDIT_POLICY_REF,
-  DEMO_ORGANIZATIONS,
   EvidenceDocumentSchema,
   can,
-  hasMandate,
   isRelated,
   paginate,
   presentAssetSummary,
@@ -32,6 +33,7 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { problems } from "../../errors";
+import { inDirectory } from "../directory";
 import { recordAudit } from "../../services/audit";
 import {
   businessPartyOfOrg,
@@ -48,7 +50,7 @@ import type { WorkflowRouteOptions } from "./types";
 
 const CaseParams = z.object({ id: CaseRefSchema });
 /** INFERRED copy, same strings as the UI_MOCK client. */
-const ACTIVE_CASE = "This asset already has an active case workflow.";
+const ACTIVE_CASE = CASE_CREATE_COPY.ACTIVE_CASE;
 const DAY = 86_400_000;
 
 export const caseRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = async (app, { services, workflow, mode }) => {
@@ -124,16 +126,19 @@ export const caseRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = async (ap
         const { world, pctx } = await loadViewerWorld(db, member, mode, now());
         const asset = findAsset(world, input.assetRef);
         if (!asset || !presentAssetSummary(asset, world.cases, member, pctx)) throw problems.unavailable();
-        // Creating a case needs the borrower mandate on the asset owner organization (S §9.3).
-        if (asset.ownerOrgId !== member.orgId || !member.roles.includes("BORROWER") || !hasMandate(member, "BORROWER")) throw problems.forbidden();
-        if (DEMO_ORGANIZATIONS[input.selectedLenderOrgId]?.type !== "LENDER") {
-          throw problems.validation([{ path: "body.selectedLenderOrgId", message: "Select a lender organization." }]);
+        // Owner organization + borrower mandate (S §9.3), registered, no case holding the asset: the same domain
+        // check as the passport's allowed actions and the UI_MOCK client. Policy first (403), state after validation.
+        const check = checkAssetAction(asset, world.cases, member, "case.create", pctx.now, pctx);
+        if (!check.ok && check.reason !== "CONFLICT") assertCheck(check);
+        // Counterparties come from the onboarded directory (GET /api/directory/*), never from a static list.
+        const issues: { path: string; message: string }[] = [];
+        if (!(await inDirectory(db, "LENDER", input.selectedLenderOrgId))) issues.push({ path: "body.selectedLenderOrgId", message: "Select a lender organization." });
+        if (input.dealerOrgId !== undefined && !(await inDirectory(db, "DEALER", input.dealerOrgId))) {
+          issues.push({ path: "body.dealerOrgId", message: "Select a dealer organization." });
         }
-        if (input.dealerOrgId !== undefined && DEMO_ORGANIZATIONS[input.dealerOrgId]?.type !== "DEALER") {
-          throw problems.validation([{ path: "body.dealerOrgId", message: "Select a dealer organization." }]);
-        }
-        if (asset.lifecycle !== "REGISTERED") throw problems.stateConflict("Register the asset before creating a case.");
-        for (const c of world.cases) if (c.asset.ref === asset.ref && (c.lock?.state === "RELEASED" || c.review.state === "REJECTED")) finished.add(c.ref);
+        if (issues.length > 0) throw problems.validation(issues);
+        assertCheck(check);
+        for (const c of world.cases) if (c.asset.ref === asset.ref && !caseHoldsAsset(c)) finished.add(c.ref);
       }
 
       const { record, created } = await services.commands.createOrGetCommand({ actor: member, operation: "case.create", idempotencyKey: key, payload: input, target: "APPLICATION" });
