@@ -1,6 +1,6 @@
 # Governance (verifier registry)
 
-Status, 2026-10-02: **Tier A is implemented and tested on a local Canton 3.5.19 sandbox. Tier B (a real Decentralization Manager topology) was not attempted.** Everything here uses synthetic organizations and one local operator.
+Status, 2026-10-02: **Tier A is implemented and tested on a local Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet). Tier B (Decentralization Manager nodes and a decentralized governance party) was not attempted.** Everything here uses synthetic organizations and one local operator. Tier A uses DLC-link Decentralization Manager v1.12.0 `GovernanceRules` contracts with 2-of-3 seats, but the governance party is an ordinary local party: whoever holds its credential could act without the seat quorum (§4). Nothing here is a production-readiness or security claim.
 
 Governance in Collara administers the **verifier registry only**: adding a verifier and suspending one. It never touches collateral. The domain copy states it (`packages/domain/src/copy.ts`, `BOUNDARY_COPY.GOVERNANCE_SCOPE`):
 
@@ -25,9 +25,9 @@ Bootstrap (daml-model.md §7, B2–B8): the governance party creates `Governance
 
 ## 2. What the tests proved
 
-**Daml Script tests** (IDE ledger, `daml/collara/tests`, 60 tests passing as reported in `docs/PROGRESS.md`): one confirmation cannot execute; duplicate confirmations do not count twice; two distinct confirmations execute an Add (and a replay fails); a stale proposal cannot execute; a passed deadline or expired confirmations block execution; only members confirm and execute; registry contracts need governance authority; a duplicate active verifier is rejected; the proposer can cancel; a governed suspension works; governance cannot release a lock.
+**Daml Script tests** (IDE ledger, `daml/collara/tests`, 60 tests passing, last re-run recorded in [`verification.md`](verification.md)): one confirmation cannot execute; duplicate confirmations do not count twice; two distinct confirmations execute an Add (and a replay fails); a stale proposal cannot execute; a passed deadline or expired confirmations block execution; only members confirm and execute; registry contracts need governance authority; a duplicate active verifier is rejected; the proposer can cancel; a governed suspension works; governance cannot release a lock.
 
-**LOCALNET integration tests** on the Canton 3.5.19 sandbox (`apps/api/test/localnet/governance.it.test.ts`, part of the 49/49 run at commit `e320c59`). Each claim is checked through the API **and** on the ledger (ACS of the seat, registrar or verifier user); direct ledger submissions bypass the API's pre-checks to prove the ledger itself rejects:
+**LOCALNET integration tests** on the Canton 3.5.19 sandbox, one participant (`apps/api/test/localnet/governance.it.test.ts`, part of the 49/49 run at commit `c9337d3`, the same tree as `e320c59` before a history rewrite; later runs are recorded in [`verification.md`](verification.md)). Each claim is checked through the API **and** on the ledger (ACS of the seat, registrar or verifier user); direct ledger submissions bypass the API's pre-checks to prove the ledger itself rejects:
 
 | Test | Result |
 |---|---|
@@ -36,10 +36,19 @@ Bootstrap (daml-model.md §7, B2–B8): the governance party creates `Governance
 | Duplicate confirmation | A seat confirming twice does not count twice (API 409; the ledger accepts the duplicate contract but never counts it). |
 | Non-members | Demo Lender B's **business** party cannot confirm (ledger rejection); users without a seat get 404 on every governance mutation. |
 | Two distinct seats | Execution suspends the verifier: registry v1, accreditation `SUSPENDED`, mirror `SUSPENDED`, visible through `GET /api/verifiers`. |
-| Effect | The suspended verifier cannot issue an attestation (new accreditation: `Verifier suspended`; old one: archived). |
+| Effect | The suspended verifier cannot issue an attestation (new accreditation: `Verifier suspended`; old one: archived). The effect on pledge activation (below) is covered by the Daml Script test only, not by this suite. |
 | Stale proposal | After another proposal moved the registry (re-adding Demo Verifier as `VER-001`, registry v2), a competing proposal pinned to v1 fails to execute: API 409 and ledger rejection. |
 | Cancel | Only the proposer withdraws its open proposal; a withdrawn proposal cannot be confirmed. |
 | Reconciliation | Governance command records carry the seat submission context (ledger user, `actAs`), so an `UNKNOWN_OUTCOME` is reconciled against the right user's completions. |
+
+### Suspension policy (what a suspension changes)
+
+`CollaraConfig.suspensionPolicy` (`daml/collara/contracts/daml/Collara/Config.daml`) is `REQUIRE_ACTIVE_VERIFIER` in the demo seed (the default in `apps/api/src/ledger/builders.ts`). Under it:
+
+- **New work is blocked on the ledger.** `VR_AcceptAssignment` and `VR_IssueAttestation` (`Collara/Verification.daml`) check the verifier's governance-signed accreditation at commit (`Verifier suspended`). The API also refuses a new verification request to a verifier that is not active in the registry, before submitting (`apps/api/src/workflow/verification/ledger.ts`).
+- **Issued attestations are not revoked or reopened**, but they cannot back a **new** pledge activation. `Control_Activate` (`Collara/Control.daml`) does not read the accreditation (that would inform the governance members of the pledge); it fetches the registrar-signed `VerifierStatusMirror` of the attestation's verifier and, under this policy, requires it to be `ACTIVE`. The registrar re-syncs the mirror after a governed execution; until it does, the mirror can lag the suspension, and an activation in that window is not blocked. The API applies the same check before submitting (`apps/api/src/workflow/pledge/activation.ts`).
+- **Active locks are not affected.** A suspension never touches `CollateralLock`.
+- Daml Script test `test_suspension_blocks_new_activation_by_policy` (`daml/collara/tests`) shows a new activation failing after the mirror sync under `REQUIRE_ACTIVE_VERIFIER`, and proceeding after the registrar switches to `ALLOW_ISSUED_ATTESTATIONS`. The policy is registrar-controlled (`Config_Update`), one more reason the registrar is a trust assumption ([limitations](limitations.md#trust-assumptions)).
 
 ## 3. Three different thresholds
 
@@ -53,7 +62,7 @@ These are often conflated. Collara's documentation keeps them apart (research no
 
 - **Whoever holds the `CollaraGovernance` credential can sign registry contracts without any quorum.** The 2-of-3 rule binds the seats, not the governance party's own key (daml-model.md §8, item 4). Tier B removes this by making the governance party a decentralized party.
 - **One participant, one operator.** All seats, the governance party and every organization live on one local participant run by one operator, who sees every transaction. Seats are separate parties, which shows the authorization model, not operator independence. No local setup proves operator independence.
-- **Registrar mirror.** Pledge activation trusts the registrar's `VerifierStatusMirror`, which can lag a governed suspension; attestation issuance always checks the real accreditation (daml-model.md §8, item 3).
+- **Registrar mirror.** Pledge activation trusts the registrar's `VerifierStatusMirror`, which can lag a governed suspension; attestation issuance and assignment acceptance always check the real accreditation (daml-model.md §8, item 3). The registrar alone sets the suspension policy.
 
 ## 5. Tier B: not attempted, and why
 

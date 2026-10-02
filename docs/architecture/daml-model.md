@@ -405,9 +405,12 @@ Use package-name references. `#collara-contracts:` resolves to the uploaded `col
 
 Fixture hashes (synthetic): documents are SHA-256 of `synthetic:<docRef>:<slug>:v<N>`, manifests are SHA-256 of `synthetic:PKG-001:manifest:v<N>` (lowercase hex). The identity commitment is computed on-ledger (`identityCommitmentOf`; the demo value is `d0d834d9…7658`). Constants: `Collara.Scripts.Scenario`.
 
-## 10. Not verified here (next steps)
+## 10. Verified on a node since, and still not verified
 
-- Nothing has been run on a Canton node in this task: DAR upload, `dpm script` seeds, JSON encodings, parallel activation contention, `DUPLICATE_COMMAND` replay.
+Run since this document was first written (Canton 3.5.19 `dpm sandbox`, **one participant**; details in [`docs/verification.md`](../verification.md)): DAR upload through `POST /v2/dars`; the §7 bootstrap and main sequence submitted through the API's workflow runner (seed, 24 steps, idempotent replay); JSON encodings of these arguments; parallel `Control_Activate` contention (5 rounds, exactly one lock each, the loser rejected by the ledger with `CONTRACT_NOT_FOUND`); `DUPLICATE_COMMAND` replay returning the original command; release request and rejection leaving the lock active; stale proposal version rejected on the ledger; Tier A governance 2-of-3 through the API and on the ledger.
+
+Still not verified:
+
 - Witness-level privacy (who receives which transaction tree) is untested. It needs the 3-participant sandbox and per-party `TRANSACTION_SHAPE_LEDGER_EFFECTS` update streams, in particular for `Control_Activate` (Lender B, verifier), `VR_IssueAttestation` (registrar, governance) and `Release_Reject` (registrar).
 - Cross-participant input availability (the lender's participant must hold config, mirror and control) follows from observers. It is untested across participants.
 - Tier B (DM decentralized party) is not attempted. The Collara proposal templates are the same in both tiers.

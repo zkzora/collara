@@ -4,8 +4,8 @@ A walkthrough of the synthetic case **CL-001** (`ASSET-DEMO-001`, a `CNC machini
 
 What has been verified, and how:
 
-- **UI_MOCK:** the full click path below is automated by `apps/web/e2e/walkthrough.spec.ts` (Playwright), which passed in the integration check recorded in `docs/PROGRESS.md`. Button and dialog names in this script are the ones that spec asserts.
-- **LOCALNET:** the same steps were verified at the API level against the Canton 3.5.19 sandbox by `apps/api/test/localnet/*.it.test.ts` (49/49 at commit `e320c59`), with assertions on the ledger's active contracts. An automated browser walkthrough in LOCALNET is not part of this document's evidence; screen labels can change while the UI is being finished.
+- **UI_MOCK:** the full click path below is automated by `apps/web/e2e/walkthrough.spec.ts` (Playwright), which passed in the UI_MOCK suite recorded in [`docs/verification.md`](verification.md) (2026-10-02). Button and dialog names in this script are the ones that spec asserts. Actions are simulated in the browser; no ledger transaction is submitted.
+- **LOCALNET:** the same steps were verified at the API level against the Canton 3.5.19 sandbox (one participant, not Splice LocalNet) by `apps/api/test/localnet/*.it.test.ts` (49/49 at commit `c9337d3`), with assertions on the ledger's active contracts. Steps 1–8 were also run in the browser by `apps/web/e2e/localnet-walkthrough.spec.ts` (desktop project, passed on 2026-10-02, with the negative checks of §4 for Lender B, the verifier and the dealer; see [`docs/verification.md`](verification.md)). The governance steps (§5) and the clean-start steps (§6) are covered at the API level only. Screen labels can still change while in-progress UI work lands.
 
 ## 1. Before you start
 
@@ -50,7 +50,7 @@ Each step lists what to do, the Daml choice the API submits (daml-model.md §7, 
 
 Ledger: `Assessment_StartReview` and `Assessment_Save` (W1, W2), then `Assessment_SubmitForApproval` (W3) on `CollateralAssessment`, which is signed by Demo Lender A only: the valuation exists only in the lender's contract. Valuation (USD 150,000.00) and requested principal (USD 100,000.00) are separate figures; the review shows the ratio against the policy maximum.
 
-Check: on the **Decision** section the analyst sees `Your mandate (Lender Analyst) does not include collateral approval.` and no approve button. The analyst/approver split is a mandate enforced by the API (403); the ledger sees only the Demo Lender A party (see [limitations](limitations.md#authority)). In LOCALNET the internal notes are not stored.
+Check: on the **Decision** section the analyst sees `Your mandate (Lender Analyst) does not include collateral approval.` and no approve button. The analyst/approver split is a mandate enforced by the API (403); the ledger sees only the Demo Lender A party (see [limitations](limitations.md#authority)). In LOCALNET the internal notes are not stored (as verified on 2026-10-02; persisting them is in progress).
 
 ### Step 2: Morgan Hale (Lender Approver) records eligibility and issues the proposal
 
@@ -71,14 +71,14 @@ Ledger: `Proposal_Accept` (W6) checks the expected reference and version and cre
 1. Switch to Morgan Hale; on the case's Pledge section press **Activate pledge** and confirm. The page shows `Lock and activation evidence · PL-001`, and the activate button disappears.
 2. Optionally open `/app/assets/ASSET-DEMO-001/overview`: the asset is `Locked`, linked to `PL-001`.
 
-Ledger: before submitting, the API confirms that Demo Lender A still holds an active disclosure of the attestation (this check is off-ledger by design; `pledge.it.test.ts`). `Control_Activate` (W8) **consumes** the asset's single `AssetControl` (v3) and the authorization and creates `CollateralLock` (control version 4). It fails if the control is not shared with this lender, the control version or evidence anchor changed, the authorization or attestation expired, or the verifier is suspended. A second activation is impossible because the control no longer exists; parallel activations commit at most once (`concurrency.it.test.ts`: two parallel activations per round, exactly one lock, the other 409).
+Ledger: before submitting, the API confirms that Demo Lender A still holds an active disclosure of the attestation (this check is off-ledger by design; `pledge.it.test.ts`). `Control_Activate` (W8) **consumes** the asset's single `AssetControl` (v3) and the authorization and creates `CollateralLock` (control version 4). It fails if the control is not shared with this lender, the control version or evidence anchor changed, the authorization or attestation expired, or (under the `REQUIRE_ACTIVE_VERIFIER` policy) the registrar's verifier status mirror shows the attesting verifier suspended. Attestation revocation is not re-checked here; that is the API's off-ledger precheck above. A second activation is impossible because the control no longer exists; parallel activations commit at most once (`concurrency.it.test.ts`: two parallel activations per round, exactly one lock, the other 409).
 
 ### Step 5: Plant manager requests release
 
 1. Switch to the Plant manager; go to `/app/pledges`, open **PL-001**, press **Request release** (reason `EXTERNAL_LOAN_COMPLETION`, optional note and servicing reference) and confirm.
 2. The page shows `Release requested. The collateral lock remains active.` and the status `Active · release requested`.
 
-Ledger: a `ReleaseRequest` (W9) signed by the requester. Creating it never touches the lock. In LOCALNET the free-text note is not stored.
+Ledger: a `ReleaseRequest` (W9) signed by the requester. Creating it never touches the lock. In LOCALNET the free-text note is not stored (as verified on 2026-10-02; persisting it is in progress).
 
 Checks:
 

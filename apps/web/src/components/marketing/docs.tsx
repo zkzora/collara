@@ -30,13 +30,16 @@ import { PermissionMatrix } from "./permission-matrix";
 // resolves a conflict: capability status and chips come from the domain config (CR-45), the matrix
 // from the domain policy (CR-21), principal USD 100,000.00 (CR-12), seed-relative dates (§1.6),
 // governance semantics without reject votes (CR-28), and #setup lists no unverified commands.
+// Status statements follow what was actually run (docs/verification.md, 2026-10-02). Copy written
+// for the post-pre-build state is marked INFERRED (pending approval) where it appears.
 
 export const DOCS_SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "workflow", label: "Workflow" },
   { id: "roles", label: "Roles & permissions" },
   { id: "demo", label: "Synthetic demo scenario" },
-  { id: "governance", label: "Planned BitSafe governance" },
+  // INFERRED label (was "Planned BitSafe governance"; Tier A is implemented).
+  { id: "governance", label: "BitSafe governance" },
   { id: "setup", label: "Setup, API & tests" },
 ] as const;
 
@@ -56,16 +59,20 @@ function Chips({ statuses, labels = {} }: { statuses: readonly CapabilityStatus[
   );
 }
 
-export function PrebuildBanner() {
+/** Full-width status strip: the approved pre-build text, or the local-demo scope once items are implemented. */
+export function DocsStatusBanner({ prebuild }: { prebuild: boolean }) {
   return (
     <div className="border-b border-highlight/25 bg-highlight/8">
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-baseline gap-x-3.5 gap-y-1 px-5 py-[9px] text-[12.5px] site:px-8">
         <span className="font-mono text-[11px] font-medium tracking-[0.06em] text-[oklch(90%_0.08_80)] uppercase">
-          Pre-build
+          {/* INFERRED label (pending approval) for the non-pre-build state. */}
+          {prebuild ? "Pre-build" : "Local demo"}
         </span>
         <span className="text-[oklch(84%_0.06_80)]">
-          This documentation describes a specification and interactive UI mockups. No running implementation, deployed
-          contracts, API, or test suite exists yet.
+          {prebuild
+            ? "This documentation describes a specification and interactive UI mockups. No running implementation, deployed contracts, API, or test suite exists yet."
+            : // INFERRED copy (pending approval).
+              "Synthetic data only. Collara runs as a local demo on one machine, against a Canton 3.5.19 sandbox with one participant. Nothing is deployed, and nothing here is production-ready."}
         </span>
       </div>
     </div>
@@ -105,9 +112,59 @@ export function DocsSidebar() {
   );
 }
 
+// INFERRED copy (pending approval): the local-demo status card. Facts and counts from docs/verification.md
+// and docs/PROGRESS.md (2026-10-02); keep them in step with those records.
+const RUN_LOCALLY = [
+  "60 Daml Script tests of the contract model: invariants, attack attempts and contract visibility",
+  "LocalNet integration tests through the API on the sandbox: 49 workflow tests, and an 8-test adversarial sweep over 44 routes",
+  "Playwright in UI mockup mode, and a LocalNet browser walkthrough of CL-001 with negative checks",
+  "285 unit tests",
+] as const;
+
+const NOT_VERIFIED = [
+  "Witness-level privacy on three participants. With one participant, its operator sees every transaction.",
+  "Tier B governance: Decentralization Manager nodes and a decentralized governance party",
+  "Docker Compose and the container images",
+  "Keycloak sign-in through a browser, and Secure cookies over HTTPS",
+  "Ledger authentication with JWKS tokens for a real participant",
+  "Persistence across sandbox restarts: the sandbox keeps ledger state in memory",
+  "A passing CI run: the first GitHub Actions run failed during setup, and the fix has not yet run green",
+] as const;
+
+function RepoPath({ children }: { children: string }) {
+  return <code className="font-mono text-[12.5px] text-fg-soft">{children}</code>;
+}
+
+function ProjectStatusCard() {
+  return (
+    <DocsCard filled titleAs="h2" title="Project status: local demo build">
+      <p className="text-[14px] leading-[1.6] text-fg-muted">
+        What exists today runs on one machine with synthetic data. The public site and the workspace are one web app,
+        and the workspace has two modes. In UI mockup mode, state is projected locally in the browser and no ledger
+        transaction is submitted. In LocalNet mode, actions are Daml commands submitted through the API to a Canton
+        3.5.19 sandbox with one participant, with a projection worker, PostgreSQL and private evidence storage. That
+        sandbox is not Splice LocalNet, and nothing is deployed to a Canton Network. Nothing on this page is a claim of
+        production readiness or a security assurance.
+      </p>
+      <h3 className="mt-2 text-[13.5px] font-medium">Run on the authoring machine (2026-10-02)</h3>
+      <DocsList small items={RUN_LOCALLY} />
+      <h3 className="mt-2 text-[13.5px] font-medium">Not verified</h3>
+      <DocsList small items={NOT_VERIFIED} />
+      <p className="mt-2 text-[13.5px] leading-[1.6] text-fg-muted">
+        Details, including runs that could not complete, are in <RepoPath>docs/verification.md</RepoPath> and{" "}
+        <RepoPath>docs/limitations.md</RepoPath> in the Collara source repository.
+      </p>
+    </DocsCard>
+  );
+}
+
 export function OverviewSection({ prebuild }: { prebuild: boolean }) {
   return (
-    <DocsSection id="overview" kicker="01 · Overview" chips={<StatusChip status="SPECIFIED" />}>
+    <DocsSection
+      id="overview"
+      kicker="01 · Overview"
+      chips={prebuild ? <StatusChip status="SPECIFIED" /> : <Chips statuses={statusesOf("workspace")} />}
+    >
       <h1
         id="overview-title"
         className="text-[clamp(28px,3.4vw,38px)] leading-[1.15] font-medium tracking-[-0.025em] text-pretty"
@@ -117,7 +174,11 @@ export function OverviewSection({ prebuild }: { prebuild: boolean }) {
       <DocsLead strong>
         Collara is a private coordination workspace for used CNC equipment financing. It links an equipment passport
         with its evidence, verification scope, lender decision, and collateral workflow, and discloses each record only
-        to the counterparties named on it. It is being designed as Daml workflows on Canton.
+        to the counterparties named on it.{" "}
+        {prebuild
+          ? "It is being designed as Daml workflows on Canton."
+          : // INFERRED sentence (pending approval), replacing "It is being designed as Daml workflows on Canton."
+            "It is built as Daml workflows on Canton and runs today as a local demo with synthetic data."}
       </DocsLead>
       {prebuild ? (
         <DocsCard filled titleAs="h2" title="Project status: pre-build">
@@ -128,7 +189,9 @@ export function OverviewSection({ prebuild }: { prebuild: boolean }) {
             describes working software.
           </p>
         </DocsCard>
-      ) : null}
+      ) : (
+        <ProjectStatusCard />
+      )}
       <div className="grid gap-3.5 site:grid-cols-2">
         <DocsCard titleAs="h2" title="What Collara coordinates">
           <DocsList
@@ -350,7 +413,8 @@ const ROLE_CARDS = [
   {
     title: "Lender approver",
     mandate: "Lender · Approver mandate",
-    body: "Records the collateral decision, issues or withdraws proposals, co-authorizes activation, and authorizes or rejects release. Holds the organization's governance seat (planned).",
+    // INFERRED edit (pending approval): "(planned)" removed after the seat; Tier A governance is implemented.
+    body: "Records the collateral decision, issues or withdraws proposals, co-authorizes activation, and authorizes or rejects release. Holds the organization's governance seat.",
   },
   {
     title: "Auditor",
@@ -415,16 +479,22 @@ export function DemoSection({ now }: { now: Date }) {
       kicker="04 · Synthetic demo scenario"
       chips={
         <>
-          <Chips statuses={statusesOf("workspace")} />
-          <Chips statuses={statusesOf("localnet-demo")} labels={{ PLANNED: "LocalNet demo planned" }} />
+          {/* "LocalNet demo" is an INFERRED chip label (pending approval). */}
+          <Chips
+            statuses={statusesOf("localnet-demo")}
+            labels={{ PLANNED: "LocalNet demo planned", IMPLEMENTED: "LocalNet demo" }}
+          />
+          {statusesOf("workspace").includes("UI_MOCKUP") ? <StatusChip status="UI_MOCKUP" /> : null}
         </>
       }
     >
       <DocsH2 id="demo-title">One case, CL-001, modelled end to end</DocsH2>
       <DocsLead>
-        All organizations, people, documents, and amounts are synthetic. No funds are transferred. Today the scenario
-        runs as a local projection inside the workspace mockup; the planned LocalNet demo will replay the same scenario
-        against committed Daml contracts and add access-denial and authorization tests.
+        All organizations, people, documents, and amounts are synthetic. No funds are transferred.{" "}
+        {/* INFERRED (pending approval), replacing the pre-build "Today the scenario runs as a local projection…". */}
+        The scenario runs in two modes. In UI mockup mode it is a local projection inside the workspace. In LocalNet
+        mode it is seeded as committed Daml contracts on a local Canton 3.5.19 sandbox with one participant, and checked
+        by access-denial and authorization tests.
       </DocsLead>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] gap-3.5">
         <DocsCard title="Organizations" className="gap-0">
@@ -508,65 +578,124 @@ export function DemoSection({ now }: { now: Date }) {
           is seeded.
         </p>
       </div>
-      <DocsCard title="Known limits of the mockup" className="py-4">
-        <DocsList
-          small
-          items={[
-            "Ledger offsets, commit hashes, checksums, and timestamps are illustrative values, not outputs of a ledger.",
-            "Person names in the workspace (analyst, approver) are placeholders.",
-            "State changes are local to the browser session and reset on reload.",
-          ]}
-        />
-      </DocsCard>
+      <div className="grid gap-3.5 site:grid-cols-2">
+        {/* "Known limits of UI mockup mode" is an INFERRED title (was "Known limits of the mockup"). */}
+        <DocsCard title="Known limits of UI mockup mode" className="py-4">
+          <DocsList
+            small
+            items={[
+              "Ledger offsets, commit hashes, checksums, and timestamps are illustrative values, not outputs of a ledger.",
+              "Person names in the workspace (analyst, approver) are placeholders.",
+              "State changes are local to the browser session and reset on reload.",
+            ]}
+          />
+        </DocsCard>
+        {/* INFERRED copy (pending approval); see docs/limitations.md. */}
+        <DocsCard title="Known limits of LocalNet mode" className="py-4">
+          <DocsList
+            small
+            items={[
+              "One participant hosts every organization's party, so its operator sees every transaction. It is not a privacy boundary.",
+              "Ledger state is held in memory and is lost when the sandbox restarts.",
+              "Analyst and approver mandates are enforced by the API; the ledger sees only the organization's party.",
+              "Revocation of an attestation is checked by the API before pledge activation, not by the ledger at activation.",
+            ]}
+          />
+        </DocsCard>
+      </div>
     </DocsSection>
+  );
+}
+
+/** Tier A confirmation timeout on the sandbox (`actionConfirmationTimeout`, apps/api/src/seed/localnet.ts). */
+const LOCALNET_CONFIRMATION_TIMEOUT = "30 minutes";
+
+function TitleWithChip({ title, status }: { title: string; status: CapabilityStatus }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2.5">
+      {title} <StatusChip status={status} />
+    </span>
   );
 }
 
 export function GovernanceSection({ now }: { now: Date }) {
   const gov = buildScenario({ now, profile: "clean-start" }).governance;
   const deadlineDays = gov.proposalDeadlineDays;
-  const confirmationDays = Math.round(gov.confirmationTimeoutHours / 24);
+  const mockConfirmationDays = Math.round(gov.confirmationTimeoutHours / 24);
   return (
     <DocsSection
       id="governance"
-      kicker="05 · Planned BitSafe governance"
-      chips={<Chips statuses={statusesOf("governance")} labels={{ UI_MOCKUP: "UI simulation" }} />}
+      // INFERRED kicker and chip labels "Tier A implemented" / "Tier B planned" (pending approval).
+      kicker="05 · BitSafe governance"
+      chips={
+        <>
+          <Chips
+            statuses={statusesOf("governance")}
+            labels={{ IMPLEMENTED: "Tier A implemented", PLANNED: "Tier B planned" }}
+          />
+          <StatusChip status="UI_MOCKUP" label="UI simulation" />
+        </>
+      }
     >
       <DocsH2 id="governance-title">Verifier-registry administration by a governance set</DocsH2>
       <DocsLead>
         The BitSafe governance module is intended to decide which verifiers can be assigned to verification requests, so
-        that no single operator adds or suspends a verifier. It is a planned capability. The workspace contains a UI
-        simulation of it until the Decentralization Manager integration is implemented.
+        that no single operator adds or suspends a verifier.{" "}
+        {/* INFERRED (pending approval) from here, replacing "It is a planned capability. The workspace contains…". */}
+        Tier A is implemented: Decentralization Manager governance contracts with three seats and a 2-of-3 threshold, on
+        one local participant run by one operator, so it does not yet meet that aim. Tier B, a decentralized governance
+        party on Decentralization Manager nodes, has not been attempted. In UI mockup mode, the workspace simulates
+        governance in the browser.
       </DocsLead>
       <Callout tone="info">{BOUNDARY_COPY.GOVERNANCE_SCOPE}</Callout>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] items-start gap-3.5">
-        <DocsCard title="Design as simulated" className="gap-0">
+        {/* INFERRED title and rows "Rules contract", "Seat parties", "Expiry", "Suspension effect", "Trust limit"
+            (pending approval). The suspension row states Collara.Config REQUIRE_ACTIVE_VERIFIER as checked in
+            Collara.Verification (issuance, assignment) and Collara.Control (Control_Activate). */}
+        <DocsCard title="Design (Tier A)" className="gap-0">
           <KeyValues
             rows={[
+              ["Rules contract", "Decentralization Manager v1.12.0 GovernanceRules, on one local Canton participant"],
               ["Governance set", "Three seats: Demo Lender A, Demo Lender B, Demo Auditor"],
               ["Seat holder", "The organization's approver mandate (audit lead mandate for the auditor seat)"],
+              ["Seat parties", "One member party and ledger user per seat, never the organization's business party"],
               ["Proposal types", "Add verifier · Suspend verifier"],
               [
                 "Threshold",
                 `${gov.threshold} of ${gov.seats.length} seat confirmations make a proposal executable; seats confirm only (there is no reject vote) and the proposer may withdraw`,
               ],
               ["Execution", "A separate step after threshold, by any seat. Registry changes apply only on execution."],
-              ["Expiry", `${deadlineDays} days after opening if not executed; each confirmation lapses after ${confirmationDays} days`],
+              [
+                "Expiry",
+                `${deadlineDays} days after opening if not executed; each confirmation lapses after ${LOCALNET_CONFIRMATION_TIMEOUT} on the local sandbox (${mockConfirmationDays} days in UI mockup mode)`,
+              ],
               [
                 "Suspension effect",
-                "Blocks new assignments; attestations already issued remain valid and are not reopened",
+                "The verifier can no longer accept assignments or issue attestations; the ledger checks this at commit. Attestations already issued are not revoked or reopened. Under the default policy, REQUIRE_ACTIVE_VERIFIER, they cannot back a new pledge activation: activation checks the verifier status that the registrar publishes, which can lag the governed suspension. Active pledges are not affected.",
+              ],
+              [
+                "Trust limit",
+                "One operator runs every seat. The governance party is an ordinary local party: whoever holds its credential could sign registry changes without the seat quorum.",
               ],
             ]}
           />
         </DocsCard>
         <div className="flex flex-col gap-3.5">
-          <DocsCard
-            title={
-              <span className="flex flex-wrap items-center gap-2.5">
-                Simulated in the workspace today <StatusChip status="UI_MOCKUP" />
-              </span>
-            }
-          >
+          {/* INFERRED title and items (pending approval); evidence: docs/governance.md §2. */}
+          <DocsCard title={<TitleWithChip title="In LocalNet mode (Tier A)" status="IMPLEMENTED" />}>
+            <DocsList
+              small
+              items={[
+                "Proposals, confirmations and execution as committed contracts, each seat acting as its own party",
+                "Proposal deadline and confirmation expiry enforced on the ledger",
+                "Registry check when the owner requests verification (API) and when the verifier accepts or attests (ledger)",
+                "Re-adding a suspended verifier through an Add verifier proposal",
+                "Tested through the API and on the ledger: one confirmation cannot execute, a seat cannot count twice, a stale proposal fails, and users without a seat get 404",
+              ]}
+            />
+          </DocsCard>
+          {/* "Simulated in UI mockup mode" is an INFERRED title (was "Simulated in the workspace today"). */}
+          <DocsCard title={<TitleWithChip title="Simulated in UI mockup mode" status="UI_MOCKUP" />}>
             <DocsList
               small
               items={[
@@ -577,20 +706,15 @@ export function GovernanceSection({ now }: { now: Date }) {
               ]}
             />
           </DocsCard>
-          <DocsCard
-            title={
-              <span className="flex flex-wrap items-center gap-2.5">
-                Pending implementation <StatusChip status="PLANNED" />
-              </span>
-            }
-          >
+          {/* Items other than "Seat key management and membership changes" are INFERRED (pending approval). */}
+          <DocsCard title={<TitleWithChip title="Pending implementation" status="PLANNED" />}>
             <DocsList
               small
               items={[
-                "Decentralization Manager integration: proposals, votes, and execution as committed records",
+                "Tier B: Decentralization Manager nodes on separate participants and a decentralized governance party (not attempted)",
+                "Independent operators, one participant node per seat holder",
                 "Seat key management and membership changes",
-                "Enforcement of expiry and of the registry check at verifier assignment",
-                "Reinstatement of a suspended verifier (not yet specified)",
+                "Governance procedures: who may hold a seat, rotation and disputes (not yet specified)",
               ]}
             />
           </DocsCard>
@@ -600,46 +724,65 @@ export function GovernanceSection({ now }: { now: Date }) {
   );
 }
 
-const REPO_DOCS = [
-  "README.md",
-  "docs/architecture/ADR-0001-architecture-and-versions.md",
-  "docs/PROGRESS.md",
-] as const;
+// INFERRED copy (pending approval): the whole #setup section below except the kicker. The page itself still
+// lists no commands (synthesis §1.2: only verified commands, and those live in the repository documents).
+const REPO_DOCS: readonly { title: string; path: string; body: string }[] = [
+  {
+    title: "Setup",
+    path: "docs/setup.md",
+    body: "Local bring-up of PostgreSQL, SeaweedFS evidence storage, Keycloak, the Canton sandbox, the projection worker, the API and the web app in LocalNet mode. Its Docker Compose section is untested.",
+  },
+  {
+    title: "API reference",
+    path: "docs/api.md",
+    body: "The OpenAPI document, authentication, CSRF protection, idempotency, responses of ledger-backed actions and the error shape.",
+  },
+  {
+    title: "Tests",
+    path: "docs/verification.md",
+    body: "What was run on 2026-10-02 and what was observed: unit, Daml Script, LocalNet integration and adversarial tests, and Playwright in both modes. It also lists what was not verified.",
+  },
+  {
+    title: "Demo script",
+    path: "docs/demo.md",
+    body: "CL-001 step by step for each persona, in LocalNet and UI mockup modes, with negative checks.",
+  },
+];
+
+const MORE_REPO_DOCS = ["README.md", "docs/limitations.md", "docs/governance.md"] as const;
 
 export function SetupSection() {
   return (
     <DocsSection id="setup" kicker="06 · Setup, API reference & tests" chips={<Chips statuses={statusesOf("setup")} />}>
-      <DocsH2 id="setup-title">Added after a verified implementation</DocsH2>
+      <DocsH2 id="setup-title">In the source repository, written from local runs</DocsH2>
       <DocsLead>
-        This page intentionally contains no setup instructions, no API endpoints, and no test commands. These sections
-        will be written only once the implementation exists and has been verified against the LocalNet demo scenario.
-        Until then, treat any command, endpoint, or integration attributed to Collara as unverified.
+        Setup instructions, the API reference and the test record are kept in the Collara source repository, not on
+        this page. They were written from commands run on one Windows 11 machine against a Canton 3.5.19 sandbox with
+        one participant (not Splice LocalNet), with synthetic data only. Each one states what was not verified. None of
+        them is a production deployment guide or a security assurance.
       </DocsLead>
-      <p className="max-w-[680px] text-[13.5px] leading-[1.6] text-fg-muted">
-        Work-in-progress engineering notes live in the Collara source repository:{" "}
-        {REPO_DOCS.map((path, index) => (
-          <Fragment key={path}>
-            {index > 0 ? ", " : null}
-            <code className="font-mono text-[12.5px] text-fg-soft">{path}</code>
-          </Fragment>
-        ))}
-        . They describe a build in progress and are not verified setup instructions.
-      </p>
-      <ul className="grid gap-3.5 site:grid-cols-3">
-        {[
-          ["Setup", "Will cover a LocalNet deployment of the Daml workflows and the workspace. Not yet written."],
-          ["API reference", "Will document the commands and queries behind each workflow transition. Not yet written."],
-          ["Tests", "Will list the access-denial and authorization tests run against the demo scenario. Not yet written."],
-        ].map(([title, body]) => (
-          <li
-            key={title}
-            className="flex flex-col gap-1.5 rounded-[10px] border border-dashed border-white/14 px-5 py-[18px]"
-          >
-            <h3 className="text-[14px] font-medium text-fg-muted">{title}</h3>
-            <p className="text-[13px] leading-[1.6] text-fg-subtle">{body}</p>
+      <ul className="grid gap-3.5 site:grid-cols-2">
+        {REPO_DOCS.map((doc) => (
+          <li key={doc.path} className="flex flex-col gap-1.5 rounded-[10px] border border-line px-5 py-[18px]">
+            <h3 className="text-[14px] font-medium">{doc.title}</h3>
+            <p>
+              <RepoPath>{doc.path}</RepoPath>
+            </p>
+            <p className="text-[13px] leading-[1.6] text-fg-muted">{doc.body}</p>
           </li>
         ))}
       </ul>
+      <p className="max-w-[680px] text-[13.5px] leading-[1.6] text-fg-muted">
+        UI mockup mode needs only the web app. Its actions are recorded in the browser, and no ledger transaction is
+        submitted. Also in the repository:{" "}
+        {MORE_REPO_DOCS.map((path, index) => (
+          <Fragment key={path}>
+            {index > 0 ? ", " : null}
+            <RepoPath>{path}</RepoPath>
+          </Fragment>
+        ))}
+        .
+      </p>
     </DocsSection>
   );
 }

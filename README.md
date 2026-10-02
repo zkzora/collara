@@ -4,18 +4,25 @@ Collara is a private coordination workflow for equipment collateral (used CNC ma
 
 ## Status (2026-10-02)
 
+Every check named below ran on one authoring machine (Windows 11) with synthetic data; [`docs/verification.md`](docs/verification.md) has the commands and results. "LocalNet" here is a Canton 3.5.19 `dpm sandbox` with **one participant**, not Splice LocalNet; nothing is deployed to a Canton Network. Nothing here is a production-readiness or security claim.
+
 | Area | Status |
 |---|---|
-| `UI_MOCK` (web only, in-browser synthetic fixtures) | Implemented. Playwright e2e on desktop and mobile viewports; the full CL-001 walkthrough runs on desktop. |
-| `LOCALNET` (web → API → Canton 3.5.19 sandbox, worker projections, PostgreSQL, SeaweedFS) | Implemented: every workflow endpoint runs on the sandbox. 274 unit tests and 49 LOCALNET integration tests passed at commit `e320c59`. Single participant; 3-participant witness-privacy tests not run. |
+| `UI_MOCK` (web only, in-browser synthetic fixtures) | Implemented. Playwright UI_MOCK suite passed on desktop and mobile viewports (59 passed; the skips are viewport guards and LOCALNET-only tests); the full CL-001 walkthrough runs on desktop. Actions are simulated in the browser; no ledger transaction is submitted. |
+| `LOCALNET` (web → API → Canton 3.5.19 sandbox, worker projections, PostgreSQL, SeaweedFS) | Implemented: every workflow endpoint runs on the sandbox. 49 LOCALNET integration tests passed at commit `c9337d3`; the 8-test adversarial sweep (44 id routes) passed with S3 storage. The last full run (57 tests, in-memory storage) passed 55: the 2 failures assert presigned S3 URLs, which in-memory storage cannot produce; the full re-run with S3 is pending free disk space. A Playwright LOCALNET walkthrough of CL-001 and the negative checks passed in the browser (desktop). 285 unit tests passed. |
 | Daml model | Implemented: 60 invariant, attack and privacy tests + 4 script tests on the IDE ledger. |
-| Governance Tier A (DM `GovernanceRules` 2-of-3 on one local participant) | Implemented and tested on the sandbox. |
-| Governance Tier B (Decentralization Manager, decentralized party) | Planned, not attempted. |
-| CI (GitHub Actions) | Written and linted with actionlint; **not yet run on GitHub**. |
+| Governance Tier A (DLC-link DM v1.12.0 `GovernanceRules`, 2-of-3 seats, one local participant) | Implemented and tested on the sandbox. The governance party is an ordinary local party: its credential could act without the seat quorum. |
+| Verifier suspension | Default policy `REQUIRE_ACTIVE_VERIFIER` (`CollaraConfig.suspensionPolicy`): a suspended verifier cannot accept assignments or issue attestations (the ledger checks the governance-signed accreditation). Its issued attestations are not revoked, but `Control_Activate` requires the registrar's `VerifierStatusMirror` for that verifier to be `ACTIVE`, so they cannot back a new activation once the registrar has synced the mirror (it can lag the suspension). Existing locks are unaffected. |
+| Governance Tier B (Decentralization Manager nodes, decentralized party) | Planned, not attempted. |
+| CI (GitHub Actions) | Ran once on GitHub (2026-10-02) and **failed** in `actions/setup-node@v5` (its package-manager cache looked for pnpm before the workflow installed it). Fixed in `bf5e131`; **a passing run is not yet confirmed**. |
 | Container images, Compose `app`/`canton` profiles, hosting | Written; **untested** (no Docker on the authoring machine). Nothing is deployed. |
+| Demo sessions | The API refuses to start with `DEMO_SESSIONS_ENABLED=true` under `NODE_ENV=production` unless `DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true`. |
+| In progress (not done) | Verifier scoped evidence assignment; Create Case UI, overview per-currency totals and input contrast; persisted internal and release notes. |
 | Legal pages (BPD-1), INFERRED copy | Pending; block any public deployment. |
 
-Details and evidence: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Not verified:** witness-level privacy on 3 participants, Tier B governance, Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
+
+Evidence: [`docs/verification.md`](docs/verification.md) (what was run and observed) and [`docs/PROGRESS.md`](docs/PROGRESS.md). Commits cited in older notes (`e320c59`, `5ca4faa`, `8384a2b`, `3a3dd85`) are the same trees as `c9337d3`, `ea4ebf2`, `bbd1548` and `25265d0` on `main`, before a history rewrite.
 
 ## Documentation
 
@@ -29,6 +36,7 @@ Details and evidence: [`docs/PROGRESS.md`](docs/PROGRESS.md).
 | [`docs/architecture/daml-model.md`](docs/architecture/daml-model.md) | Daml templates, choices, invariants and trust assumptions |
 | [`docs/permissions.md`](docs/permissions.md) | Permission matrix, authority chain, field-level disclosure (generated from `@collara/domain`) |
 | [`docs/api.md`](docs/api.md) | OpenAPI, authentication, CSRF, idempotency, error shape |
+| [`docs/verification.md`](docs/verification.md) | What was run, observed results, and what was not verified |
 | [`docs/governance.md`](docs/governance.md) | Tier A governance, thresholds, Tier B and what a real deployment needs |
 | [`docs/limitations.md`](docs/limitations.md) | What Collara does not do or prove |
 | [`infra/deploy/README.md`](infra/deploy/README.md) | Deployment proposal and requirements (untested) |

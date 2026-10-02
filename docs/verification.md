@@ -5,7 +5,7 @@ Synthetic data only. Nothing here is a production-readiness or security claim.
 
 - Date: 2026-10-02, authoring machine (Windows 11, Node 24.16.0, pnpm 11.28.2, Canton 3.5.19 `dpm sandbox` with one
   participant, PostgreSQL 16.14 in WSL, SeaweedFS 4.48).
-- Code: HEAD `5ca4faa` plus the uncommitted LOCALNET presentation and verification changes described in
+- Code: HEAD `ea4ebf2` plus the uncommitted LOCALNET presentation and verification changes described in
   [LOCALNET presentation fixes](#localnet-presentation-fixes-in-this-change).
 - Isolation: every LOCALNET check below ran next to a live demo without touching it. It used its own namespace,
   database and ports: bootstrap `--prefix`, database `collara_<prefix>` or `collara_it_<prefix>`, API 4200,

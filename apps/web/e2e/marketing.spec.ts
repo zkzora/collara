@@ -104,7 +104,7 @@ test.describe("landing", () => {
 test.describe("docs", () => {
   test("keeps the section anchors and marks the current page", async ({ page }) => {
     await page.goto("/docs");
-    await expect(page).toHaveTitle("Collara — Docs (pre-build)");
+    await expect(page).toHaveTitle("Collara — Docs");
     for (const id of ["overview", "workflow", "roles", "demo", "governance", "setup"]) {
       await expect(page.locator(`section#${id}`)).toHaveCount(1);
     }
@@ -123,6 +123,37 @@ test.describe("docs", () => {
     await expect(matrix.getByText("No access").first()).toBeAttached();
     // #setup lists no commands.
     await expect(page.locator("section#setup pre")).toHaveCount(0);
+  });
+
+  test("states the verified scope, not the pre-build status", async ({ page }) => {
+    await page.goto("/docs");
+    // Capability status comes from the domain config; items verified locally are no longer pre-build.
+    await expect(page.getByText("Pre-build", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("None at this time")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Project status: local demo build" })).toBeVisible();
+    const overview = page.locator("section#overview");
+    await expect(overview).toContainText("Canton 3.5.19 sandbox with one participant");
+    await expect(overview).toContainText("not Splice LocalNet");
+    await expect(overview.getByRole("heading", { name: "Not verified" })).toBeVisible();
+    // The docs page is shown in every mode; it never carries the ledger confirmation copy.
+    await expect(page.getByText("Confirmed on the ledger.")).toHaveCount(0);
+
+    const capabilities = page.getByRole("region", { name: "Capability status" });
+    await expect(capabilities.getByRole("row", { name: /Decentralization Manager integration/ })).toContainText("Planned");
+    await expect(capabilities.getByRole("row", { name: /LocalNet demo with access-denial/ })).toContainText("Implemented");
+
+    // Governance: Tier A only, with the suspension policy stated precisely.
+    const governance = page.locator("section#governance");
+    await expect(governance).toContainText("Tier B");
+    await expect(governance).toContainText("REQUIRE_ACTIVE_VERIFIER");
+    await expect(governance).not.toContainText("attestations already issued remain valid");
+
+    // Setup points to the repository documents; UI mockup mode stays labelled as a simulation.
+    const setup = page.locator("section#setup");
+    for (const path of ["docs/setup.md", "docs/api.md", "docs/verification.md", "docs/demo.md"]) {
+      await expect(setup.getByText(path, { exact: true })).toBeVisible();
+    }
+    await expect(setup).toContainText("no ledger transaction is submitted");
   });
 });
 

@@ -1,6 +1,6 @@
 # Architecture overview
 
-How the pieces fit together as built at commit `e320c59` (2026-10-02). Decisions and pinned versions: [ADR-0001](ADR-0001-architecture-and-versions.md). Contracts, choices and invariants: [daml-model.md](daml-model.md). Limits: [`docs/limitations.md`](../limitations.md).
+How the pieces fit together as built at commit `c9337d3` (2026-10-02). Decisions and pinned versions: [ADR-0001](ADR-0001-architecture-and-versions.md). Contracts, choices and invariants: [daml-model.md](daml-model.md). Limits: [`docs/limitations.md`](../limitations.md).
 
 ## 1. Components
 
@@ -93,7 +93,7 @@ stateDiagram-v2
 ## 6. Projection worker
 
 - One loop per configured participant source, reading `/v2/updates` with the `LEDGER_EFFECTS` transaction shape as the read-only `projector-svc` user, from a durable checkpoint in `ledger_sources`.
-- Each transaction is applied atomically; rows are keyed by update id and node id and inserted idempotently, so a replay or a restart converges (verified by the worker's live kill/restart IT, commit `1107971`).
+- Each transaction is applied atomically; rows are keyed by update id and node id and inserted idempotently, so a replay or a restart converges (verified by the worker's live kill/restart IT, commit `0a3e843`).
 - Contracts are stored with their signatories and observers; archive events keep the exercising choice, argument and acting parties, which is how terminal outcomes without a successor contract are read.
 - **Reset detection:** a new participant id or a ledger end behind the checkpoint marks the source `RESET_DETECTED` and stops projecting it; only an explicit operator command (`pnpm --filter @collara/worker projection:reset -- --source <source> --yes`, which rebuilds the source from offset 0) clears it.
 - It also advances command states (`PROJECTED`, `PROJECTION_DELAYED`), reconciles `UNKNOWN_OUTCOME` commands, and runs export jobs from leased PostgreSQL job rows (scoped JSON/CSV with a cut-off, a watermark and a SHA-256 checksum, written to private storage).

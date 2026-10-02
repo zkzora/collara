@@ -2,7 +2,7 @@
 # `dpm sandbox`, PostgreSQL 16 and SeaweedFS 4.48 on one runner.
 #
 # NOT YET RUN ON GITHUB. On the authoring machine (Windows, native services, no Docker) the same tests passed
-# 49/49 against the sandbox (commit e320c59). This workflow file itself has only been linted with actionlint;
+# 49/49 against the sandbox (commit c9337d3). This workflow file itself has only been linted with actionlint;
 # the service-container setup in particular has never been exercised. Expect to adjust it on the first run.
 #
 # Trigger it from the Actions tab (workflow_dispatch). It needs about 2 GB of RAM for the sandbox.

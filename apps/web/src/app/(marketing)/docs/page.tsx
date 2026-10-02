@@ -4,9 +4,9 @@ import { connection } from "next/server";
 import {
   DemoSection,
   DocsSidebar,
+  DocsStatusBanner,
   GovernanceSection,
   OverviewSection,
-  PrebuildBanner,
   RolesSection,
   SetupSection,
   WorkflowDocsSection,
@@ -14,25 +14,34 @@ import {
 import { MarketingPage } from "@/components/marketing/marketing-page";
 import { Container } from "@/components/marketing/primitives";
 
-export const metadata: Metadata = {
-  title: { absolute: "Collara — Docs (pre-build)" },
-  description:
-    "Collara documentation: overview, workflow, roles and permissions, synthetic demo scenario, and planned BitSafe governance. Pre-build specification.",
-};
+// The pre-build notices stay only while no capability is verified as implemented (CR-45). The capability
+// config is static, so this is decided once per build.
+const prebuild = !hasImplementedCapability();
+
+export const metadata: Metadata = prebuild
+  ? {
+      title: { absolute: "Collara — Docs (pre-build)" },
+      description:
+        "Collara documentation: overview, workflow, roles and permissions, synthetic demo scenario, and planned BitSafe governance. Pre-build specification.",
+    }
+  : {
+      // INFERRED title and description (pending approval) for the local-demo build.
+      title: { absolute: "Collara — Docs" },
+      description:
+        "Collara documentation: overview, workflow, roles and permissions, synthetic demo scenario, BitSafe governance, and where to find setup, API and test records. Local demo with synthetic data.",
+    };
 
 export default async function DocsPage() {
   // Scenario dates are relative to the request time, like the synthetic fixtures (synthesis §1.6).
   await connection();
   const now = new Date();
-  // The pre-build notices stay only while no capability is verified as implemented (CR-45).
-  const prebuild = !hasImplementedCapability();
 
   return (
     <MarketingPage
       current="docs"
       footerNote={prebuild ? "Documentation v0.1 draft · pre-build." : "Documentation v0.1 draft."}
     >
-      {prebuild ? <PrebuildBanner /> : null}
+      <DocsStatusBanner prebuild={prebuild} />
       <Container className="pt-14 pb-24">
         <div className="grid items-start gap-14 site:grid-cols-[220px_minmax(0,1fr)]">
           <DocsSidebar />
