@@ -65,7 +65,7 @@ Analyst vs approver, and any other in-org mandate, are enforced by the API. Ever
 | D6 | `Agreement_AuthorizeActivation` takes `authorizationRef, expectedControlVersion, expiresAt, actorRef`. Attestation and manifest data come from the agreement's snapshot | The borrower cannot mistype or alter what was reviewed. |
 | D7 | `Control_Activate` also takes `configCid` | The suspension policy and the trusted governance party come from the registrar-signed config. |
 | D8 | `Proposal_Accept` checks `expectedProposalRef` and `expectedVersion`; added `Proposal_Revise` (consumes vN, creates vN+1) | "A terms change means a new version and a new acceptance." |
-| D9 | `PackageShareProposal` lists **only the dealer's documents**. The owner shares its own documents with a separate owner-signed `PackageShare` | The dealer never sees metadata (doc refs, hashes) of the owner's documents. Permission matrix: dealer = "own contribution + granted". |
+| D9 | `PackageShareProposal` lists **only the dealer's documents**. The owner shares its own documents with a separate owner-signed `PackageShare` | The dealer never sees metadata (doc refs, hashes) of the owner's documents. Permission matrix: dealer = "own contribution + granted". The verifier's evidence grants follow the same rule (§4.6, "Verification evidence grants") |
 | D10 | `AssetRegistry` also keeps `issuedIdentityCommitments`. `AssetRegistrationRequest` enforces `identityCommitment == identityCommitmentOf equipment` (SHA-256 of `MANUFACTURER\|MODEL\|SERIAL`, trimmed and ASCII upper-cased, computed on-ledger) | On-ledger exact-match duplicate screening that cannot be fooled by a mismatched owner-supplied hash. It is not proof of global physical uniqueness. |
 | D11 | `ReleaseRequest` `ensure requester ∈ {owner, lender}`; `Release_Authorize` requires status `REQUESTED` | Release request states per §1.5 #11. |
 | D12 | Corrections: `VR_IssueAttestation{supersedes = Some Supersession}` consumes the old attestation (`Att_Supersede`) and withdraws its disclosures (`AttDisc_Withdraw`, verifier-controlled). `Att_Revoke` leaves a `RevokedAttestation` record | Issued records are never edited, and superseded copies stop being visible to recipients. |
@@ -195,6 +195,24 @@ Accreditation check (at accept and at issue, at commit time): config of the requ
 
 **`PackageShare`**. S owner + `consenters`; O recipient. Same fields plus `consenters`. Every document's `source` must be the owner or a consenter, so the owner cannot share a dealer document without the dealer's signature (tested). Choices: `Share_Revoke` (c, owner) and `Share_WithdrawConsent` (c, a consenter; `consenter`). The API must check for an active, unexpired share covering the document at every download.
 
+**Verification evidence grants** (API, 2026-10-02; no template change). The assigned verifier receives exactly the documents the owner selects for one verification request, never the whole manifest:
+
+| Field of the `PackageShare` | Value |
+|---|---|
+| `purpose` | `"VERIFICATION"` (lender shares use `"LENDER_REVIEW"`) |
+| `recipient` | the request's `verifier` (from the governance-signed accreditation, never from the browser) |
+| `shareRef` | `<requestRef>-G<manifestVersion>` (owner documents) or `<requestRef>-G<manifestVersion>-D<n>` (dealer n). It binds the grant to one request and one evidence version |
+| `evidence` | the request's anchor (the manifest the documents come from) |
+| `documents` | the selected **owner** documents with the exact `docVersion` and `sha256` of that manifest |
+| `permission`, `expiresAt` | `VIEW_DOWNLOAD`; the request's `dueBy`, else 30 days (also when `dueBy` has passed at a resubmission) |
+| `caseRef` | the request's case, or `""` for an asset-level request |
+
+- **Same correlated sequence.** `POST /cases/:id/verification-requests` and `POST /assets/:id/verification-requests` run `manifest` → `request` (`Manifest_RequestVerification`) → `grant` (create the owner-signed `PackageShare`) under one parent command. `POST /verifications/:id/evidence-submissions` runs `manifest` → `submit` (`Manifest_SubmitToVerification`) → `grant` for the new version, then `revoke-<ref>` (`Share_Revoke`) / `withdraw-<ref>` (`ShareProposal_Withdraw`) for every other `VERIFICATION` grant of the package. The resubmission's selection is the request body's, else the documents granted for the previous version. Every selected document must be finalized (AVAILABLE with a server SHA-256, so it is an entry of the manifest the request points at), and at least one must be the owner's own (400 otherwise, before anything is submitted).
+- **Dealer documents.** `validShare` forbids the owner from granting a dealer document alone. The owner creates a `PackageShareProposal` (`-D<n>`) for the dealer's selected documents **only** when the dealer's active `DealerContribution` of the case for that exact version and hash has `verificationUseConsented = True`; otherwise the document is not shared. The verifier receives it after the dealer's own `Consent_Grant` (API `POST /cases/:id/verification-consent`, invited dealer only; not in the web route table yet). `verificationUseConsented` is the dealer's standing precondition; `Consent_Grant` is the per-recipient signature the ledger requires.
+- **Download (API, at every request, on the verifier's fresh ACS).** An active `PackageShare` with purpose `VERIFICATION`, recipient = the caller's party, not expired, covering the exact version (and the stored file's SHA-256 must equal the grant's), the caller holds the `VERIFIER` role, and an **open** `VerificationRequest` names the caller as verifier, has the grant's owner, is the request the `shareRef` names, and has the grant's anchor. Access therefore ends at attestation, rejection, decline or cancellation, at expiry and at a resubmission (new anchor; the old grant is also revoked). Another verifier, the dealer (owner documents), Lender B and the auditor get the 404-shaped answer; the verifier gets 403 for a visible document's ungranted version.
+- **Attestation.** `VR_IssueAttestation` copies the request's anchor (`evidence`). Before submitting it the API requires a live grant of that request for that anchor. The read model reports the attestation's supporting versions from the grants of its request and anchor (owner and verifier views; lender copies keep the package entries of the anchor). The attestation contract does **not** list document versions: disclosing the reviewed subset to lenders on-ledger would need a new `VerificationAttestation` field (not done).
+- **Read model.** Verification grants are not case shares (`case.shares` lists lender shares only). The verifier's `VerificationFacts.documentRefs`/`documentVersions` are its live grants of that request for the request's current anchor (empty once declined or cancelled), and its document rows are limited to those versions. Requests seeded without a grant (the main fixture's VR-001) keep the owner-only manifest listing.
+
 ### 4.7 `Collara.Financing` (F). Terms exist only here
 
 **`CollateralAssessment`**. S lender (borrower is a reference only). Fields: `lender, borrower, assessmentRef, caseRef, namespace, assetId, snapshot : ReviewSnapshot, valuation : Optional {value : Money, source, valuationDate : Date, limitations}, policyRef, status, version, lastActorRef`. Status: `SUBMITTED → IN_REVIEW → (NEEDS_INFORMATION ↔ IN_REVIEW) → PENDING_APPROVAL → ELIGIBLE | REJECTED`. Internal notes and the risk view stay off-ledger.
@@ -261,6 +279,7 @@ Two kinds of evidence back these rows: **[TESTED]** means active-contract visibi
 | `VR_*` choices (verifier/owner) | owner, verifier; registrar (config fetch) and governance-party hosts (accreditation fetch) as informees of the fetch only [INFERRED] | request and attestation contents (owner, verifier). Fetch metadata (registrar, governance) |
 | `Att_DiscloseTo` (owner) | owner, verifier, recipient | the attestation copy. The verifier learns *that* the owner disclosed to the recipient |
 | Share proposal / consent / owner share | owner, dealer (its own documents only [TESTED]), recipient | doc refs and hashes in scope |
+| Verification grant (owner `PackageShare`, purpose `VERIFICATION`) | owner, assigned verifier; for a dealer document also that dealer (proposal and `Consent_Grant`) | refs, versions and hashes of the selected documents only. Never terms; the lender, Lender B and the auditor are not informed |
 | `Control_ShareWithLender` (owner) | owner, registrar, lender | minimal control fields |
 | Assessment / notice / proposal / accept / authorize | lender (+ borrower for notice, proposal, agreement, authorization) | terms, valuation and decisions are never visible to the verifier, dealer, registrar, Lender B, auditor or governance [TESTED at every step] |
 | `Control_Activate` (lender) | registrar, owner, lender | control, authorization (no terms), lock, config/mirror fetch. The registrar learns "asset X locked to lender Y for case Z" [INFERRED]. Lender B and the verifier, though observers of config/mirror, are not informees of a fetch [INFERRED] |
@@ -306,6 +325,8 @@ Every step has a single `actAs` party. Governance steps add `readAs` the governa
 | B8 | registrar | exercise `Config_PublishVerifierStatus` on configCid | `accreditationCid, sourceRef="GP-000"` | mirrorCid |
 
 **Main fixture ("main" seed): registered, ATT-001, PKG-001 v2 shared with Lender A, review SUBMITTED**
+
+The seed follows this table exactly and therefore creates **no** verification grant for VR-001 (it is attested in the fixture). The API adds the grant after M7 and after M11 (§4.6, "Verification evidence grants").
 
 | # | actAs | Command | Arguments | → |
 |---|---|---|---|---|

@@ -16,7 +16,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { useCollara } from "@/lib/collara-client";
 import { formatRelative, formatUtcDate, formatUtcDateTime, withSeparator } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import { noPayload } from "../action-dialog";
 import { TrackedActionDialog as ActionDialog } from "../audit/page-command";
 import { useAssetEvidence } from "../assets/queries";
 import { openDownload } from "../audit/download";
@@ -25,8 +24,15 @@ import { actingParty } from "../case/case-context";
 import { assetHref, caseTabHref } from "../case/links";
 import { AttestationDetails } from "./attestation-details";
 import { IssueAttestationDialog } from "./issue-attestation-dialog";
+import { SubmitEvidenceDialog } from "./submit-evidence-dialog";
 import { useVerification } from "./queries";
 import { PageCommands, PageCommandStatus } from "../audit/page-command";
+
+/** The exact versions granted for the current evidence version (when recorded), else the document refs. */
+function assignedDocuments(vr: VerificationRequest): string {
+  const listed = vr.assignedVersions ? vr.assignedVersions.map((v) => `${v.documentId} v${v.version}`) : vr.documentIds;
+  return listed.join(", ") || "None";
+}
 
 function AssignedEvidence({ vr }: { vr: VerificationRequest }) {
   const { client } = useCollara();
@@ -125,18 +131,7 @@ function Actions({ vr, me }: { vr: VerificationRequest; me: Me }) {
               perform={(reason, options) => client.verifications.reject(vr.ref, { reason }, options)}
             />
           ) : null}
-          {can("verification.submitEvidence") ? (
-            <ActionDialog
-              label="Submit new evidence"
-              variant="primary"
-              title={`Submit new evidence · ${vr.ref}`}
-              description={`Resubmits the current evidence package of ${vr.assetRef} to ${vr.verifier.name} after the requested changes. Add the new document versions on the passport first.`}
-              facts={{ actingParty: party, record: vr.ref, effect: "CHANGES_REQUESTED → IN_REVIEW" }}
-              confirmLabel="Submit evidence"
-              prepare={noPayload}
-              perform={(_body, options) => client.verifications.submitEvidence(vr.ref, options)}
-            />
-          ) : null}
+          {can("verification.submitEvidence") ? <SubmitEvidenceDialog vr={vr} me={me} /> : null}
         </div>
       ) : (
         <p className="text-[13px] text-fg-muted">No verification action is available to your organization at this stage.</p>
@@ -220,7 +215,7 @@ export function VerificationWorkspace({ verificationRef }: { verificationRef: st
                 },
                 { term: "Checklist scope", description: vr.scope.join(", ") },
                 { term: "Evidence package", description: <span className="font-mono">{`${vr.evidencePackage.ref} v${vr.evidencePackage.version}`}</span> },
-                { term: "Assigned documents", description: <span className="font-mono">{vr.documentIds.join(", ")}</span> },
+                { term: "Assigned documents", description: <span className="font-mono">{assignedDocuments(vr)}</span> },
                 { term: "Due", description: vr.dueAt ? <span className="font-mono">{formatUtcDate(vr.dueAt)}</span> : "Not agreed" },
                 { term: "Requested", description: <span className="font-mono">{formatUtcDateTime(vr.requestedAt)}</span> },
                 { term: "Last activity", description: formatRelative(vr.updatedAt) },

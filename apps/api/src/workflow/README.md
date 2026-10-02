@@ -14,9 +14,28 @@ How endpoint builders write LOCALNET routes. Rules: ADR-0001 §2.6, `docs/archit
 | `governance/` | Tier A governance (DM `GovernanceRules` 2-of-3): `GovernanceService` (propose + auto-confirm, confirm, execute + registrar sync, cancel; always `as: "seat"`), fresh seat reads and GP-refs from the ledger (`ledger.ts`), DM confirmation/staleness rules (`rules.ts`), `GET /verifiers` directory (`read.ts`). Routes: `routes/workflow/governance.ts` |
 | `cases/` | Read side of the case/asset/verification/access routes: `loadViewerWorld` (read world + presenter context; registry refs and verifier status from the registrar's projected directory), `assertCheck`, `commandExists`, `allocateFreshRef` (DB counter, skipping refs already on the ledger), `createdField` |
 | `assets/manifest.ts` | Evidence linkage: the owner's `EvidenceManifest` from the finalized documents (create + `Manifest_Anchor` in one create-and-exercise, or `Manifest_NewVersion`), as the first step of a verification request, evidence resubmission or share |
-| `verification/` | Owner verification request sequence (`requestVerification`), registry verifier resolution (registrar view), verifier ACS inputs |
-| `sharing/` | Owner share sequence and dealer consent (`shareWithLender`, `dealerConsent`), share revocation, share-based evidence access (metadata via the read model, download re-checked on the recipient's fresh ACS), and **`ensureLenderAssessment`**: the M18 trigger (the lender's own CollateralAssessment, created on the selected lender's first `GET /cases/:id`; idempotent, callable from any lender-side route) |
+| `verification/` | Owner verification request sequence (`requestVerification`: manifest → request → grant) and evidence resubmission (`resubmitEvidence`: manifest → submit → grant → revoke the superseded grant); the verifier's evidence grants (`grants.ts`: the selected documents as an owner-signed `PackageShare` with purpose `VERIFICATION` for the assigned verifier only, dealer documents through the dealer's `Consent_Grant`, `dealerVerificationConsent`; daml-model.md §4.6); registry verifier resolution (registrar view), verifier ACS inputs |
+| `sharing/` | Owner share sequence and dealer consent (`shareWithLender`, `dealerConsent`), share revocation, share-based evidence access (metadata via the read model, download re-checked on the recipient's fresh ACS: exact version and SHA-256; a `VERIFICATION` grant also needs the VERIFIER role and its open request on the same evidence version), and **`ensureLenderAssessment`**: the M18 trigger (the lender's own CollateralAssessment, created on the selected lender's first `GET /cases/:id`; idempotent, callable from any lender-side route) |
 | `../ledger/*` | `AcsReader`, `ledgerCommands` (builders), payload schemas, `TEMPLATES`, `CantonLedgerGateway`, `LedgerAccess` |
+
+## Private notes (`packages/db` `notes.ts`)
+
+Free text never goes on the ledger, into logs or into notifications. Review notes (internal notes: the lender org's
+analyst/approver only; shared feedback: lender + borrower) and release notes (request note, servicing reference,
+lender question, borrower response: the lock's owner and designated lender only) are rows of the `notes` table:
+
+- **Write.** Create the note PENDING inside the command that carries it with `putPendingNote` (`commandId` = the
+  record being prepared, `ctx.record.id`, or the sequence parent `seq.parent.id`); it is unique per command and kind,
+  so replays and retries never duplicate it. Where a Daml field exists, put the note id on the ledger
+  (`ReleaseRequest.noteRef`, `questionRef`, `responseNoteRef`). Hash note text into the command payload with
+  `noteDigest` (the command record never stores the text). Check text first with `isValidNoteBody` (400, see
+  `review/notes.ts`). After the outcome call `settleNotes` (committed → ATTACHED, REJECTED → DISCARDED; FAILED,
+  PREPARED, SUBMITTED, UNKNOWN_OUTCOME stay PENDING), also when the runner throws (`settleNotesOfCommand`).
+- **Read.** `loadReadWorld` overlays readable notes onto the viewer's `CaseFacts` (`withNotes`): only notes whose
+  command is COMMITTED/PROJECTED/PROJECTION_DELAYED (LEDGER commands with an update id) and only for the audience of
+  the kind. APPLICATION-only commands (no ledger) would show their notes once COMMITTED; none carries a note today.
+  Auditors read no note text: no audit scope covers lender-internal notes (`lenderInternal.view` is unsupported for
+  AUDITOR) and release notes are the lock parties' only. Presenters still omit fields by role.
 
 ## Adding routes to a module
 

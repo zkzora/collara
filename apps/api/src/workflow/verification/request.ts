@@ -1,10 +1,11 @@
-// Owner verification request (daml-model.md §7 M5–M7, D4) as one sequence under one parent command:
-//   "manifest"  commit the finalized documents (create + anchor, or Manifest_NewVersion) when they changed
-//   "request"   Manifest_RequestVerification on the current manifest → VerificationRequest (REQUESTED)
+// Owner verification request (daml-model.md §7 M5–M7, D4; §4.6 verification evidence grants) as one sequence
+// under one parent command (the parent id is the correlation id):
+//   "manifest"          commit the finalized documents (create + anchor, or Manifest_NewVersion) when they changed
+//   "request"           Manifest_RequestVerification on the current manifest → VerificationRequest (REQUESTED)
+//   "grant", …          the selected documents as a VERIFICATION grant for the assigned verifier (./grants.ts)
 // The verifier party and its accredited scope come from the registry (registrar view), never from the browser.
 import type { Db } from "@collara/db";
 import type { AssetFacts, CreateVerificationRequest } from "@collara/domain";
-import { problems } from "../../errors";
 import { ledgerCommands as L } from "../../ledger/builders";
 import type { WorkflowActor } from "../actors";
 import type { WorkflowServices } from "../context";
@@ -14,6 +15,7 @@ import type { WorkflowOutcome } from "../run";
 import { commitManifestIfChanged, currentManifest } from "../assets/manifest";
 import { allocateFreshRef } from "../cases/read";
 import { createdField } from "../cases/steps";
+import { assertGrantable, issueVerificationGrants, validateSelection, type IssuedGrants } from "./grants";
 import { resolveRegistryVerifier } from "./ledger";
 
 export interface RequestVerificationInput {
@@ -27,14 +29,12 @@ export interface RequestVerificationInput {
   readonly now: Date;
 }
 
-export async function requestVerification(input: RequestVerificationInput): Promise<WorkflowOutcome<{ verificationRef: string }>> {
+export type RequestVerificationResult = { verificationRef: string } & IssuedGrants;
+
+export async function requestVerification(input: RequestVerificationInput): Promise<WorkflowOutcome<RequestVerificationResult>> {
   const { db, workflow, owner, asset, body } = input;
-  for (const id of body.documentIds) {
-    const doc = asset.documents.find((d) => d.ref === id);
-    if (!doc?.versions.some((v) => v.uploadState === "AVAILABLE")) {
-      throw problems.validation([{ path: "body.documentIds", message: `Document ${id} is not available on ${asset.ref}.` }]);
-    }
-  }
+  // Every selected document must be finalized (it is then an entry of the manifest the request points at).
+  await validateSelection(db, { assetRef: asset.ref, ownerOrgId: owner.orgId, selection: body.documentIds });
   return workflow.sequence({
     actor: owner,
     operation: "verification.request",
@@ -51,8 +51,10 @@ export async function requestVerification(input: RequestVerificationInput): Prom
       const verifier = await resolveRegistryVerifier(workflow.acs(registrar), { verifierRef: body.verifierRegistryRef, namespace, now: input.now });
       const active = await ownerAcs.list("VerificationRequest", (r) => r.namespace === namespace);
       const requestRef = await allocateFreshRef(db, "verification", active.map((r) => r.payload.requestRef));
+      // Something must reach the verifier: an owner document, or a dealer document its dealer consented to.
+      await assertGrantable(db, ownerAcs, { assetRef: asset.ref, ownerOrgId: owner.orgId, ownerParty, caseRef: input.caseRef, selection: body.documentIds });
       await commitManifestIfChanged(seq, { db, ownerAcs, namespace, assetRef: asset.ref, ownerOrgId: owner.orgId, ownerParty });
-      return seq.step<{ verificationRef: string }>("request", {
+      const { verificationRef } = await seq.step<{ verificationRef: string }>("request", {
         payload: { verifierRegistryRef: verifier.verifierRef },
         prepare: async (ctx) => {
           const manifest = must(await currentManifest(ctx.acs, { assetRef: asset.ref, ownerParty, namespace: ctx.namespace }));
@@ -77,6 +79,17 @@ export async function requestVerification(input: RequestVerificationInput): Prom
         },
         result: (s) => ({ verificationRef: createdField(s, "VerificationRequest", "requestRef", requestRef) }),
       });
+      const grants = await issueVerificationGrants(seq, {
+        ownerAcs,
+        namespace,
+        ownerParty,
+        assetRef: asset.ref,
+        requestRef: verificationRef,
+        caseRef: input.caseRef,
+        selection: body.documentIds,
+        now: input.now,
+      });
+      return { verificationRef, ...grants };
     },
   });
 }

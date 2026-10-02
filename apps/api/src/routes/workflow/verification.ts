@@ -2,21 +2,32 @@
 // /change-requests, /evidence-submissions, /attestations, /rejection; GET /attestations/:id
 // (API_ENDPOINTS "verifications.*", "attestations.get"). The verifier acts through VR_* choices with the config
 // and its own live accreditation read fresh from its ledger view (the ledger re-checks the registry at commit);
-// the owner resubmits evidence through a new manifest version (Manifest_SubmitToVerification).
+// the owner resubmits evidence through a new manifest version (Manifest_SubmitToVerification) and grants the
+// selected documents at that version to the assigned verifier (workflow/verification/grants.ts).
+// POST /cases/:id/verification-consent (API only, not in API_ENDPOINTS): the invited dealer's consent to the
+// owner's VERIFICATION grant requests for its own documents (Consent_Grant).
 import {
   AssignmentDecisionRequestSchema,
   AttestationRefSchema,
   AttestationSchema,
+  can,
+  CaseRefSchema,
+  caseContext,
   checkVerificationAction,
   IssueAttestationRequestSchema,
+  isRelated,
   MessageRequestSchema,
   pageSchema,
   PageQuerySchema,
   paginate,
   presentAttestation,
   presentCaseDetail,
+  presentCaseSummary,
   presentVerification,
   ReasonRequestSchema,
+  SubmitEvidenceRequestSchema,
+  VERIFICATION_GRANT_PURPOSE,
+  verificationGrantRequestRef,
   VerificationRefSchema,
   VerificationRequestSchema,
   type VerificationAction,
@@ -27,18 +38,17 @@ import { z } from "zod";
 import { problems } from "../../errors";
 import { ledgerCommands as L } from "../../ledger/builders";
 import type { ResolvedActor } from "../../plugins/actor";
-import { IdempotencyHeadersSchema, must, replyWithOutcome, workflowProblems, workflowResponseSchemas, type LedgerWorkflowInput } from "../../workflow";
-import { commitManifestIfChanged, currentManifest } from "../../workflow/assets/manifest";
-import { allocateFreshRef, assertCheck, commandExists, findVerification, loadViewerWorld } from "../../workflow/cases/read";
+import { IdempotencyHeadersSchema, must, replyWithOutcome, sameAnchor, workflowProblems, workflowResponseSchemas, type LedgerWorkflowInput } from "../../workflow";
+import { allocateFreshRef, assertCheck, commandExists, findCase, findVerification, loadViewerWorld } from "../../workflow/cases/read";
 import { createdField } from "../../workflow/cases/steps";
+import { dealerVerificationConsent, GRANT_COPY } from "../../workflow/verification/grants";
 import { activeRequest, verifierInputs } from "../../workflow/verification/ledger";
+import { resubmitEvidence } from "../../workflow/verification/resubmit";
 import type { WorkflowRouteOptions } from "./types";
 
 const VerificationParams = z.object({ id: VerificationRefSchema });
 /** INFERRED copy, same string as the UI_MOCK client. */
 const VALIDITY_ORDER = "The validity period must end after the inspection and in the future.";
-/** INFERRED copy: VR_SubmitNewEvidence needs a newer version of the package. */
-const NO_NEW_EVIDENCE = "Add a new document version before resubmitting the evidence.";
 
 export const verificationRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = async (app, { services, workflow, mode }) => {
   const db = services.db.db;
@@ -214,6 +224,19 @@ export const verificationRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = a
             const verifier = await verifierOf(member);
             const vr = await activeRequest(ctx.acs, { ref, namespace: ctx.namespace });
             if (vr.payload.status !== "IN_REVIEW") throw workflowProblems.stateChanged();
+            // The attestation binds the request's evidence anchor (VR_IssueAttestation copies it); the verifier must
+            // hold a live VERIFICATION grant of this request for exactly that version (what it reviewed).
+            const grants = await ctx.acs.list(
+              "PackageShare",
+              (s) =>
+                s.purpose === VERIFICATION_GRANT_PURPOSE &&
+                s.recipient === verifier &&
+                s.owner === vr.payload.owner &&
+                verificationGrantRequestRef(s.shareRef) === vr.payload.requestRef &&
+                sameAnchor(s.evidence, vr.payload.evidence) &&
+                Date.parse(s.expiresAt) > ctx.now.getTime(),
+            );
+            if (grants.length === 0) throw problems.stateConflict(GRANT_COPY.NO_GRANTED_EVIDENCE);
             const { config, accreditation } = await verifierInputs(ctx.acs, { verifierParty: verifier, namespace: ctx.namespace });
             const issued = await ctx.acs.list("VerificationAttestation", (a) => a.namespace === ctx.namespace);
             const previous = issued.filter((a) => a.payload.assetId === vr.payload.assetId && a.payload.verifier === verifier).sort((a, b) => a.offset - b.offset).at(-1);
@@ -247,7 +270,14 @@ export const verificationRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = a
   app.post(
     "/verifications/:id/evidence-submissions",
     {
-      schema: { tags: ["verifications"], summary: "Resubmit a new evidence version after a change request (owner)", headers: IdempotencyHeadersSchema, params: VerificationParams, response: workflowResponseSchemas() },
+      schema: {
+        tags: ["verifications"],
+        summary: "Resubmit a new evidence version after a change request (owner); grants the selected documents at that version to the assigned verifier",
+        headers: IdempotencyHeadersSchema,
+        params: VerificationParams,
+        body: SubmitEvidenceRequestSchema.optional(),
+        response: workflowResponseSchemas(),
+      },
     },
     async (request, reply) => {
       const member = await request.requireActor();
@@ -261,32 +291,43 @@ export const verificationRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = a
         replay: await commandExists(db, member, "verification.submitEvidence", key),
       });
       const owner = await workflow.actorFor(member);
-      const assetRef = found.asset.ref;
-      const outcome = await workflow.sequence({
-        actor: owner,
-        operation: "verification.submitEvidence",
+      const outcome = await resubmitEvidence({
+        db,
+        workflow,
+        owner,
+        asset: found.asset,
+        verificationRef: ref,
+        documentIds: request.body?.documentIds,
         idempotencyKey: key,
-        payload: { ref },
-        resourceRef: ref,
-        steps: async (seq) => {
-          const namespace = must(workflow.namespace, workflowProblems.ledgerUnavailable);
-          const ownerParty = must(owner.business, workflowProblems.ledgerUnavailable).party;
-          const ownerAcs = workflow.acs(owner);
-          const vr = await activeRequest(ownerAcs, { ref, namespace });
-          const committed = await commitManifestIfChanged(seq, { db, ownerAcs, namespace, assetRef, ownerOrgId: owner.orgId, ownerParty });
-          const manifest = must(await currentManifest(ownerAcs, { assetRef, ownerParty, namespace }));
-          if (!committed && manifest.payload.version <= vr.payload.evidence.manifestVersion) throw problems.stateConflict(NO_NEW_EVIDENCE);
-          await seq.step("submit", {
-            prepare: async (ctx) => {
-              const live = await activeRequest(ctx.acs, { ref, namespace: ctx.namespace });
-              if (live.payload.status !== "CHANGES_REQUESTED") throw workflowProblems.stateChanged();
-              const latest = must(await currentManifest(ctx.acs, { assetRef, ownerParty, namespace: ctx.namespace }));
-              return { commands: [L.manifestSubmitToVerification(latest.contractId, { requestCid: live.contractId, actorRef: ctx.actorRef })] };
-            },
-          });
-          return null;
-        },
+        now: at,
       });
+      return replyWithOutcome(reply, outcome);
+    },
+  );
+
+  app.post(
+    "/cases/:id/verification-consent",
+    {
+      schema: {
+        tags: ["verifications"],
+        summary: "Consent to the owner's verification grant requests for the dealer's own documents (invited dealer)",
+        headers: IdempotencyHeadersSchema,
+        params: z.object({ id: CaseRefSchema }),
+        body: z.object({}).optional(),
+        response: workflowResponseSchemas(z.object({ grantIds: z.array(z.string()) })),
+      },
+    },
+    async (request, reply) => {
+      const member = await request.requireActor();
+      const at = now();
+      const { world, pctx } = await loadViewerWorld(db, member, mode, at);
+      const facts = findCase(world, request.params.id);
+      if (!facts || !presentCaseSummary(facts, member, pctx)) throw problems.unavailable();
+      const ctx = caseContext(facts, at, pctx);
+      const isDealer = member.roles.includes("DEALER") && facts.dealerOrgId === member.orgId && facts.borrowerOrgId !== member.orgId;
+      if (!isDealer || !can(member, "sharing.approve", ctx)) throw isRelated(member, ctx) ? problems.forbidden() : problems.unavailable();
+      const dealer = await workflow.actorFor(member);
+      const outcome = await dealerVerificationConsent({ workflow, dealer, caseRef: facts.ref, idempotencyKey: request.headers["idempotency-key"] });
       return replyWithOutcome(reply, outcome);
     },
   );

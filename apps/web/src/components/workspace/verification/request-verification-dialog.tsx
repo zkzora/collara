@@ -20,7 +20,24 @@ export const VERIFICATION_SCOPE_ITEMS = [
   "Ownership / lien",
 ] as const;
 
-function Checklist({
+/** Checkbox label of a document the verifier may be granted; dealer documents need the dealer's own consent. */
+export function grantOptionLabel(doc: EvidenceDocument, ownerOrgId: string): string {
+  const base = `${doc.title} · ${doc.id} v${doc.version}`;
+  return doc.source.id === ownerOrgId ? base : `${base} · ${doc.source.name} (shared after the dealer's consent)`;
+}
+
+/** Checked when the dialog is submitted (an event), never during render. */
+const isFuture = (at: number) => !Number.isNaN(at) && at > Date.now();
+
+/**
+ * The documents error of a grant selection, or undefined. The API also refuses a selection that holds neither an
+ * owner document nor a dealer document its dealer consented to share for verification (it knows the consents).
+ */
+export function selectionError(available: readonly EvidenceDocument[], selected: readonly string[]): string | undefined {
+  return available.some((doc) => selected.includes(doc.id)) ? undefined : "Select at least one available document.";
+}
+
+export function Checklist({
   legend,
   options,
   selected,
@@ -86,14 +103,16 @@ export function RequestVerificationDialog({
   const [due, setDue] = useState("");
   const [errors, setErrors] = useState<{ verifier?: string; scope?: string; docs?: string; due?: string }>({});
   const chosen = verifierRef || active[0]?.ref || "";
+  const ownerOrgId = detail.owner?.id ?? me.org.id;
 
   function prepare(): CreateVerificationRequest | null {
     const next: typeof errors = {};
     if (!chosen) next.verifier = "No active verifier is available in the registry.";
     if (scope.length === 0) next.scope = "Select at least one checklist item.";
-    if (docIds.length === 0) next.docs = "Select at least one available document.";
+    const docsError = selectionError(available, docIds);
+    if (docsError) next.docs = docsError;
     const dueAt = due ? Date.parse(`${due}T23:59:59Z`) : null;
-    if (dueAt !== null && (Number.isNaN(dueAt) || dueAt <= Date.now())) next.due = "Choose a future date, or leave it empty.";
+    if (dueAt !== null && !isFuture(dueAt)) next.due = "Choose a future date, or leave it empty.";
     setErrors(next);
     if (Object.keys(next).length > 0) return null;
     return {
@@ -112,7 +131,7 @@ export function RequestVerificationDialog({
       title={`Request verification · ${detail.ref}`}
       description={`Asks the selected registry verifier to inspect ${joinParts([detail.equipmentClass, detail.model]) || detail.ref}. The verifier sees only the documents you select, never loan terms.`}
       facts={{ actingParty: actingParty(me), record: `${detail.ref} · new verification request`, effect: "— → REQUESTED" }}
-      caveat="The verifier's registry status is re-checked when the request is committed and again when an attestation is submitted."
+      caveat="The verifier's registry status is re-checked when the request is committed and again when an attestation is submitted. The selected document versions are granted to this verifier only, for this request."
       confirmLabel="Request verification"
       onOpen={() => {
         setVerifierRef("");
@@ -144,7 +163,7 @@ export function RequestVerificationDialog({
       />
       <Checklist
         legend="Documents shared with the verifier"
-        options={available.map((doc) => ({ value: doc.id, label: `${doc.title} · ${doc.id} v${doc.version}` }))}
+        options={available.map((doc) => ({ value: doc.id, label: grantOptionLabel(doc, ownerOrgId) }))}
         selected={docIds}
         onChange={setDocIds}
         error={errors.docs}
