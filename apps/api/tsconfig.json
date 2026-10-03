@@ -10,6 +10,7 @@
     "scripts",
     "test",
     "vitest.config.ts",
-    "vitest.localnet.config.ts"
+    "vitest.localnet.config.ts",
+    "vitest.privacy.config.ts"
   ]
 }

@@ -24,21 +24,21 @@ Authority is derived on the server for every request. The browser never supplies
 
 ### Ledger users per organization (LocalNet)
 
-From `scripts/localnet/localnet.config.json`. Party ids are allocated by Canton and change on every sandbox start; they are never hard-coded. `participant` applies only in 3-participant mode.
+From `scripts/localnet/localnet.config.json`. Party ids are allocated by Canton and change on every sandbox start; they are never hard-coded. `participant` applies only in 3-participant mode; `placements["5"]` in 5-participant mode (the privacy topology, [`privacy-verification.md`](privacy-verification.md)).
 
-| Party hint | Organization / purpose | Ledger user | Rights | 3-participant placement |
-|---|---|---|---|---|
-| `CollaraRegistrar` | Collara Registry (demo) (business party) | `registrar-svc` | CanActAs + CanReadAs own party | sandbox |
-| `CollaraGovernance` | Governance party (Tier A: a local party) | `governance-svc` | CanActAs + CanReadAs own party | sandbox |
-| `DemoManufacturer` | Demo Manufacturer (business party) | `borrower-svc` | CanActAs + CanReadAs own party | participant2 |
-| `DemoCNCDealer` | Demo CNC Dealer (business party) | `dealer-svc` | CanActAs + CanReadAs own party | participant2 |
-| `DemoVerifier` | Demo Verifier (business party) | `verifier-svc` | CanActAs + CanReadAs own party | sandbox |
-| `DemoLenderA` | Demo Lender A (business party) | `lender-a-svc` | CanActAs + CanReadAs own party | participant3 |
-| `DemoLenderB` | Demo Lender B (business party) | `lender-b-svc` | CanActAs + CanReadAs own party | sandbox |
-| `DemoAuditor` | Demo Auditor (business party) | `auditor-svc` | CanActAs + CanReadAs own party | sandbox |
-| `GovSeat1` | Governance seat 1, held by Demo Lender A | `gov-seat-1-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | participant3 |
-| `GovSeat2` | Governance seat 2, held by Demo Lender B | `gov-seat-2-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | sandbox |
-| `GovSeat3` | Governance seat 3, held by Demo Auditor | `gov-seat-3-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | sandbox |
+| Party hint | Organization / purpose | Ledger user | Rights | 3-participant placement | 5-participant placement |
+|---|---|---|---|---|---|
+| `CollaraRegistrar` | Collara Registry (demo) (business party) | `registrar-svc` | CanActAs + CanReadAs own party | sandbox | sandbox |
+| `CollaraGovernance` | Governance party (Tier A: a local party) | `governance-svc` | CanActAs + CanReadAs own party | sandbox | sandbox |
+| `DemoManufacturer` | Demo Manufacturer (business party) | `borrower-svc` | CanActAs + CanReadAs own party | participant2 | participant2 |
+| `DemoCNCDealer` | Demo CNC Dealer (business party) | `dealer-svc` | CanActAs + CanReadAs own party | participant2 | participant5 |
+| `DemoVerifier` | Demo Verifier (business party) | `verifier-svc` | CanActAs + CanReadAs own party | sandbox | participant5 |
+| `DemoLenderA` | Demo Lender A (business party) | `lender-a-svc` | CanActAs + CanReadAs own party | participant3 | participant3 |
+| `DemoLenderB` | Demo Lender B (business party) | `lender-b-svc` | CanActAs + CanReadAs own party | sandbox | participant4 |
+| `DemoAuditor` | Demo Auditor (business party) | `auditor-svc` | CanActAs + CanReadAs own party | sandbox | participant5 |
+| `GovSeat1` | Governance seat 1, held by Demo Lender A | `gov-seat-1-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | participant3 | sandbox |
+| `GovSeat2` | Governance seat 2, held by Demo Lender B | `gov-seat-2-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | sandbox | sandbox |
+| `GovSeat3` | Governance seat 3, held by Demo Auditor | `gov-seat-3-svc` | CanActAs + CanReadAs own party; CanReadAs CollaraGovernance | sandbox | sandbox |
 
 Service users: `projector-svc` (worker projection; `CanReadAs` every party hosted on its participant, a privileged read-only operator credential) and `collara-admin` (`ParticipantAdmin`, setup scripts only).
 

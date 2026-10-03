@@ -15,7 +15,8 @@
     "db:bind-localnet": "tsx --env-file-if-exists=../../.env scripts/db.ts bind-localnet",
     "openapi:export": "tsx scripts/export-openapi.ts",
     "seed:localnet": "tsx --env-file-if-exists=../../.env src/seed/cli.ts",
-    "test:localnet": "vitest run --config vitest.localnet.config.ts"
+    "test:localnet": "vitest run --config vitest.localnet.config.ts",
+    "test:privacy": "vitest run --config vitest.privacy.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

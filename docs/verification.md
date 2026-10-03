@@ -86,8 +86,10 @@ export generation fail until space is freed.** Reads, the ledger and the databas
 
 ## Not verified
 
-- **Witness-level privacy on 3 participants.** Only the 1-participant sandbox was used. The read model filters by
-  stakeholder, and the equipment disclosure is an application-level read. Neither proves ledger-level isolation.
+- **Witness-level privacy across participants** (as of this record). Since checked once on five participants run by
+  one operator: see [`privacy-verification.md`](privacy-verification.md) for what it shows and what it does not. The
+  read model filters by stakeholder, and the equipment disclosure is an application-level read. Neither proves
+  ledger-level isolation.
 - **Tier B governance.** Real Decentralization Manager nodes were not attempted. Governance is Tier A on one
   participant.
 - **Docker Compose and the Dockerfiles.** Never run (no Docker on the authoring machine).

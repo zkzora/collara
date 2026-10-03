@@ -162,3 +162,5 @@ What the harness does:
   - `h.seedCommand("M18")` and `h.command(id)` read command records.
   - `h.party(role)` and `h.acs(role)` give party ids and ACS readers.
   - `h.workflow`, `h.access`, `h.db` and `h.app` are also available.
+
+Witness-level privacy test (`test/localnet/privacy/`, opt-in `PRIVACY_IT=1`, config `vitest.privacy.config.ts`, script `test:privacy`): it needs the 5-participant sandbox (`node scripts/localnet/up.mjs --participants=5`), reuses this harness, and reads raw per-party and per-participant update streams. See [`docs/privacy-verification.md`](../../../../docs/privacy-verification.md).

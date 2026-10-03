@@ -1,6 +1,6 @@
 # Collara Daml model
 
-- Status: implemented and tested on the Daml Script IDE ledger (2026-10-02). **Not yet run against a Canton node**, and not witness-tested across participants (see §10).
+- Status: implemented and tested on the Daml Script IDE ledger (2026-10-02). Run on a Canton 3.5.19 sandbox with one participant, and witness-tested on five participants (2026-10-03, [`docs/privacy-verification.md`](../privacy-verification.md)); see §10.
 - Design source: `docs/_research/synthesis.md` §5 (this document records where the code deviates and why, §3).
 - Code: `daml/collara/` (multi-package). Tests: `daml/collara/tests/`. Seeds: `daml/collara/scripts/`.
 
@@ -269,26 +269,40 @@ DM's `GovernanceRules` (threshold 2 of seats 1–3, `actionConfirmationTimeout` 
 
 ## 5. Disclosure: who is informed of what
 
-Two kinds of evidence back these rows: **[TESTED]** means active-contract visibility checked per party on the IDE ledger (`Collara.Tests.Privacy`), and **[INFERRED]** means Daml ledger-model informee rules. Under those rules, create informs stakeholders; a consuming exercise informs stakeholders + actors; a non-consuming exercise or a fetch informs signatories + actors; consequences go to the informees of the parent. The [INFERRED] rows still need a 3-participant witness test.
+Three kinds of evidence back these rows:
+
+- **[TESTED]**: active-contract visibility per party on the IDE ledger (`Collara.Tests.Privacy`).
+- **[OBSERVED]**: per-party and per-participant `TRANSACTION_SHAPE_LEDGER_EFFECTS` update streams on a Canton 3.5.19 sandbox with five participants (registrar, governance and seats; borrower; Lender A; Lender B; verifier, dealer and auditor), 2026-10-03. Details in [`docs/privacy-verification.md`](../privacy-verification.md).
+- **[INFERRED]**: Daml ledger-model informee rules, not observed. Under those rules, create informs stakeholders; a consuming exercise informs stakeholders + actors; a non-consuming exercise or a fetch informs signatories + actors; consequences go to the informees of the parent.
+
+"Sees" means events in the party's Ledger API stream. A fetch produces no event: a party informed only through a fetch sees nothing in its stream, but its participant takes part in the transaction (§5 notes).
 
 | Transaction (submitter) | Informed parties | What they learn |
 |---|---|---|
-| `Registry_Reserve` (registrar, top-level) | registrar | registry set (the owner never sees it [TESTED]) |
-| `Request_Accept` (registrar) | owner, registrar | ticket, control v1, passport v1 |
-| Manifest create/anchor/new version (owner) | owner; registrar and shared lender via the control | owner: entries. Registrar and lender: the anchor only (package ref, version, hash) |
-| `VR_*` choices (verifier/owner) | owner, verifier; registrar (config fetch) and governance-party hosts (accreditation fetch) as informees of the fetch only [INFERRED] | request and attestation contents (owner, verifier). Fetch metadata (registrar, governance) |
-| `Att_DiscloseTo` (owner) | owner, verifier, recipient | the attestation copy. The verifier learns *that* the owner disclosed to the recipient |
-| Share proposal / consent / owner share | owner, dealer (its own documents only [TESTED]), recipient | doc refs and hashes in scope |
-| Verification grant (owner `PackageShare`, purpose `VERIFICATION`) | owner, assigned verifier; for a dealer document also that dealer (proposal and `Consent_Grant`) | refs, versions and hashes of the selected documents only. Never terms; the lender, Lender B and the auditor are not informed |
-| `Control_ShareWithLender` (owner) | owner, registrar, lender | minimal control fields |
-| Assessment / notice / proposal / accept / authorize | lender (+ borrower for notice, proposal, agreement, authorization) | terms, valuation and decisions are never visible to the verifier, dealer, registrar, Lender B, auditor or governance [TESTED at every step] |
-| `Control_Activate` (lender) | registrar, owner, lender | control, authorization (no terms), lock, config/mirror fetch. The registrar learns "asset X locked to lender Y for case Z" [INFERRED]. Lender B and the verifier, though observers of config/mirror, are not informees of a fetch [INFERRED] |
-| `Release_Reject` / request / information round | owner, lender | decision. The registrar is not informed and never sees requests or decisions [TESTED] |
-| `Release_Authorize` (lender) | owner, lender, registrar (lock signatory) | release, recreated control, released record |
-| Governance propose/confirm/execute | seats, governance party (+ operator for the registry and accreditation) | verifier registry changes. No case data |
-| `AuditGrant` | grantor, auditor | grant scope. The auditor reads nothing before a grant and only grants afterwards [TESTED] |
+| `Registry_Reserve` (registrar, top-level) | registrar; the owner only through the created `IssuanceTicket` | registry set: registrar only [TESTED] [OBSERVED: the owner's participant receives only the ticket] |
+| `Request_Accept` (registrar) | owner, registrar | request, consumed ticket, control v1 and passport v1: both parties see all four, including the owner-only passport, which the registrar witnesses as a consequence of its own choice [OBSERVED] |
+| Manifest create/anchor/new version (owner) | owner; registrar via `Control_AnchorEvidence` | owner: entries. Registrar: the `Control_AnchorEvidence` exercise and the new control, i.e. the anchor only (package ref, version, hash), never the `Manifest_*` root or entries [OBSERVED] |
+| `VR_*` choices (verifier/owner) | owner, verifier (events); registrar (config fetch) and governance (accreditation fetch) as fetch informees only | request and attestation contents: owner and verifier only [OBSERVED]. Registrar and governance: no event in any stream; their participant takes part in the transaction (it assigns ledger offsets that no Ledger API user can read) [OBSERVED, `VR_AcceptAssignment` and `VR_IssueAttestation`]. Lender A and Lender B, observers of the config, are not informed [OBSERVED] |
+| `Att_DiscloseTo` (owner) | owner, verifier, recipient | the attestation copy. The verifier sees the exercise (recipient, purpose, case ref); the recipient only the created disclosure [OBSERVED] |
+| `AttDisc_Revoke` (owner) | owner, verifier, recipient | that the disclosure was revoked [OBSERVED in the race worlds] |
+| Share proposal / consent / owner share | owner, dealer (its own documents only [TESTED]), recipient | doc refs and hashes in scope. Dealer consent reaches the recipient only as the created `PackageShare` [OBSERVED] |
+| Verification grant (owner `PackageShare`, purpose `VERIFICATION`) | owner, assigned verifier; for a dealer document also that dealer (proposal and `Consent_Grant`) | refs, versions and hashes of the selected documents only. Never terms; the lender, Lender B and the auditor are not informed [INFERRED; not in the 5-participant run] |
+| `Control_ShareWithLender` (owner) | owner, registrar (exercise and new control); lender (new control only) | minimal control fields [OBSERVED] |
+| Assessment / notice / proposal / accept / authorize | assessment: lender only; notice, proposal, agreement, authorization: lender + borrower | terms, valuation and decisions never reach the verifier, dealer, registrar, Lender B, auditor or governance [TESTED at every step] [OBSERVED: no principal, term text or legal ref in any of their streams, nor on the participants that host only them]. The valuation stays with the lender (not the borrower) [OBSERVED] |
+| `Control_Activate` (lender) | registrar, owner, lender | exercise argument (lender, authorization/config/mirror cids, lockRef), **the `Archive` of the `PledgeActivationAuthorization`** (template, contract id, acting lender + borrower, empty argument, no terms), and the created lock (refs, no terms). The registrar learns "asset X locked to lender Y for case Z" [OBSERVED]. Lender B and the verifier, though observers of config/mirror, are not informed and their participants take no part [OBSERVED] |
+| `Release_Reject` / request / information round | owner, lender | decision. The registrar is not informed [TESTED] [OBSERVED for request and reject: its participant takes no part] |
+| `Release_Authorize` (lender) | owner, lender (whole tree); registrar (lock signatory) the `Lock_Release` subtree only | owner, lender: root, `Lock_Release`, control v5, released record, `ReleaseDecision`. Registrar: `Lock_Release`, control v5 and the released record; not the root or the decision [OBSERVED] |
+| Governance propose/confirm/execute | seats that act, governance party (+ operator for the registry and accreditation, verifier for its accreditation) | verifier registry changes. No case data. A seat that does not act sees nothing (seats read through `readAs` the governance party) [OBSERVED, bootstrap only] |
+| `CollaraConfig` / `VerifierStatusMirror` (registrar) | registrar and every `directory` member (verifier, Lender A, Lender B) | directory party list, governance party, suspension policy, verifier status. Lender B receives exactly these two contracts and nothing about CL-001 [OBSERVED] |
+| `AuditGrant` | grantor, auditor | grant scope. The auditor reads nothing before a grant and only grants afterwards [TESTED] [OBSERVED: its stream holds only the two `AuditGrant` creates; exports are off-ledger] |
 
-A single-participant sandbox is not a privacy boundary: its operator sees everything. Claims about privacy between organisations need the 3-participant mode.
+Notes from the 5-participant run:
+
+- **Mismatch with the earlier text:** the `Control_Activate` row did not list the registrar's view of the authorization's `Archive`. It carries no terms (refs only), but it is an event of `PledgeActivationAuthorization` in the registrar's stream.
+- **Operator view.** A participant user with `CanReadAsAnyParty` sees, per event, every informee's party id, including parties hosted on other participants (a per-party reader sees only its own party). For a created contract these are the stakeholders already named in the payload.
+- **Participation without events.** Per transaction, a participant hosting a signatory or actor assigned 3 ledger offsets and one hosting only observers 2; only one of them, if any, is readable. A participant whose parties are not informees assigned none.
+
+A single-participant sandbox is not a privacy boundary: its operator sees everything. The 5-participant run is one operator's five nodes in one JVM, not independent infrastructure (§10).
 
 ## 6. Invariants: enforcement and proof
 
@@ -375,12 +389,12 @@ JSON Ledger API v2 encoding of these arguments follows standard Daml-LF JSON, **
 ## 8. Trust assumptions (documented, not hidden)
 
 1. **Registrar.** It is the sole signatory of `AssetRegistry`, `IssuanceTicket`, `CollaraConfig` and `VerifierStatusMirror`, so its credential could mint a ticket outside `Registry_Reserve`, create a second registry, repin the governance party or policy, or publish a stale or duplicate mirror. Registrar + owner collusion (or credential theft) could mint a second control. Mitigation: the registrar credential is used only by the registry service, through `Registry_Reserve` + `Request_Accept` and the mirror sync. The registrar learns asset ids, declared equipment identity, evidence anchors, lock and release existence (lender, lock/case/agreement/attestation refs) and fetch metadata of verification. It never learns terms, valuation or decisions.
-2. **Lender-asserted attestation facts.** The `ReviewSnapshot` is copied by the lender from its verifier-signed `AttestationDisclosure` and accepted by the borrower (agreement). The ledger cross-checks the evidence anchor against the registrar+owner-signed control. It does not re-check the attestation itself, because that would inform the verifier. **Revocation of an attestation is enforced off-ledger:** before `Control_Activate`, the API must confirm that the lender still holds an active disclosure of `snapshot.attestationRef`. Revocation and supersession withdraw that disclosure.
+2. **Lender-asserted attestation facts.** The `ReviewSnapshot` is copied by the lender from its verifier-signed `AttestationDisclosure` and accepted by the borrower (agreement). The ledger cross-checks the evidence anchor against the registrar+owner-signed control. It does not re-check the attestation itself, because that would inform the verifier. **Revocation of an attestation is enforced off-ledger:** before `Control_Activate`, the API must confirm that the lender still holds an active disclosure of `snapshot.attestationRef`. Revocation and supersession withdraw that disclosure. **Observed race (5 participants, 2026-10-03):** the check is not atomic with the activation. When the owner's `AttDisc_Revoke` committed after the API's precheck had passed and before `Control_Activate` was submitted, the ledger committed the activation and the lock (lender's participant: revocation at offset 202, activation at 204). Submitting the activation route and the revocation concurrently, once, gave the same result (both committed, revocation first). A direct ledger submission that skips the API is not checked at all. Closing this on-ledger needs a model change (for example fetching the disclosure in `Control_Activate`, which would inform the verifier of the pledge); not done. See [`docs/privacy-verification.md`](../privacy-verification.md#revocation-race-daml-modelmd-82).
 3. **Mirror latency.** Activation trusts the registrar's mirror, which may lag a governed suspension. Issuance always checks the real accreditation.
 4. **Tier A governance.** The governance party is a local party; whoever holds its credential can sign registry contracts without quorum. Tier B (DM decentralized party) removes this.
 5. **Mandates are off-ledger** (analyst vs approver). The ledger sees the organisation party and records `actorRef`.
 6. **Ledger time.** Expiries use ledger time, with skew bounds. The UI computes `EXPIRED` from wall time.
-7. **Single participant.** Not a privacy boundary between organisations; the participant operator sees all. The projection worker's read-all credential is a privileged operator credential.
+7. **Single participant.** Not a privacy boundary between organisations; the participant operator sees all. The projection worker's read-all credential is a privileged operator credential. With one participant per organisation (the 5-participant run), each node stores only what its parties witness, but its operator still sees the informee party ids of those events and that (and when) transactions it confirms happened, including fetch-only ones (§5 notes).
 
 ## 9. Template ids for downstream code
 
@@ -430,8 +444,10 @@ Fixture hashes (synthetic): documents are SHA-256 of `synthetic:<docRef>:<slug>:
 
 Run since this document was first written (Canton 3.5.19 `dpm sandbox`, **one participant**; details in [`docs/verification.md`](../verification.md)): DAR upload through `POST /v2/dars`; the §7 bootstrap and main sequence submitted through the API's workflow runner (seed, 24 steps, idempotent replay); JSON encodings of these arguments; parallel `Control_Activate` contention (5 rounds, exactly one lock each, the loser rejected by the ledger with `CONTRACT_NOT_FOUND`); `DUPLICATE_COMMAND` replay returning the original command; release request and rejection leaving the lock active; stale proposal version rejected on the ledger; Tier A governance 2-of-3 through the API and on the ledger.
 
+Run on five participants (2026-10-03, [`docs/privacy-verification.md`](../privacy-verification.md)): the §7 bootstrap, main fixture and walkthrough, each command through the submitting organisation's own participant, with per-party and per-participant `TRANSACTION_SHAPE_LEDGER_EFFECTS` streams; informees of `Control_Activate`, `VR_AcceptAssignment`, `VR_IssueAttestation`, `Release_Reject`, `Release_Authorize`, `Proposal_Accept` and `Agreement_AuthorizeActivation` (§5); cross-participant input availability (every input contract was on the submitter's participant through observers; no explicit disclosure needed); the revocation race (§8.2).
+
 Still not verified:
 
-- Witness-level privacy (who receives which transaction tree) is untested. It needs the 3-participant sandbox and per-party `TRANSACTION_SHAPE_LEDGER_EFFECTS` update streams, in particular for `Control_Activate` (Lender B, verifier), `VR_IssueAttestation` (registrar, governance) and `Release_Reject` (registrar).
-- Cross-participant input availability (the lender's participant must hold config, mirror and control) follows from observers. It is untested across participants.
+- Witness-level privacy of the paths the 5-participant run did not take: share revocation, consent withdrawal, verification grants created by the API, supersession and revocation of attestations, governed add/suspend verifier and `Mirror_Sync`, declines and withdrawals, audit grant revocation.
+- Independent operators: the five participants, the sequencer and the mediator ran in one JVM controlled by one person; what the sequencer and mediator learn was not examined, nor the participants' internal stores.
 - Tier B (DM decentralized party) is not attempted. The Collara proposal templates are the same in both tiers.

@@ -1,0 +1,2703 @@
+{
+  "run": {
+    "run": "2026-10-02T18-39-30-685Z",
+    "prefix": "pv-b4vwv6ea7",
+    "namespace": "collara-localnet-pv-b4vwv6ea7",
+    "seedSteps": 24,
+    "seedMs": 23408,
+    "walkthroughSteps": [
+      "W1-W2 save assessment (Assessment_StartReview + Assessment_Save)",
+      "W3 submit for approval (Assessment_SubmitForApproval)",
+      "W4 approve (Assessment_Approve)",
+      "W5 issue proposal (Assessment_IssueProposal)",
+      "W6 accept (Proposal_Accept)",
+      "W7 authorize activation (Agreement_AuthorizeActivation)",
+      "W8 activate (Control_Activate)",
+      "W9 release request RR-001 (create ReleaseRequest)",
+      "W10 reject RR-001 (Release_Reject)",
+      "W11 release request RR-002 (create ReleaseRequest)",
+      "W12 authorize RR-002 (Release_Authorize)",
+      "W13 audit grant AG-001 (owner) (create AuditGrant)",
+      "W14 audit grant AG-002 (lender) (create AuditGrant)",
+      "X1 request verification VR-002 (Manifest_RequestVerification)",
+      "X2 accept assignment VR-002 (VR_AcceptAssignment)",
+      "X3 issue attestation ATT-002 (VR_IssueAttestation)"
+    ],
+    "ledgerCommands": 43
+  },
+  "generatedBy": "apps/api/test/localnet/privacy/witness.privacy.test.ts",
+  "topology": {
+    "sandbox": "sandbox-5-participants",
+    "cantonVersion": "3.5.19",
+    "participants": {
+      "sandbox": {
+        "jsonApiUrl": "http://127.0.0.1:7575",
+        "parties": [
+          "CollaraRegistrar",
+          "CollaraGovernance",
+          "GovSeat1",
+          "GovSeat2",
+          "GovSeat3"
+        ]
+      },
+      "participant2": {
+        "jsonApiUrl": "http://127.0.0.1:7576",
+        "parties": [
+          "DemoManufacturer"
+        ]
+      },
+      "participant3": {
+        "jsonApiUrl": "http://127.0.0.1:7577",
+        "parties": [
+          "DemoLenderA"
+        ]
+      },
+      "participant4": {
+        "jsonApiUrl": "http://127.0.0.1:7578",
+        "parties": [
+          "DemoLenderB"
+        ]
+      },
+      "participant5": {
+        "jsonApiUrl": "http://127.0.0.1:7579",
+        "parties": [
+          "DemoCNCDealer",
+          "DemoVerifier",
+          "DemoAuditor"
+        ]
+      }
+    },
+    "readers": {
+      "perParty": "CanReadAs <party> only, on the party's participant",
+      "perNode": "CanReadAsAnyParty (filtersForAnyParty)"
+    }
+  },
+  "routing": {
+    "CollaraRegistrar": {
+      "participant": "sandbox",
+      "commands": 5,
+      "committed": 5
+    },
+    "CollaraGovernance": {
+      "participant": "sandbox",
+      "commands": 1,
+      "committed": 1
+    },
+    "GovSeat1": {
+      "participant": "sandbox",
+      "commands": 2,
+      "committed": 2
+    },
+    "GovSeat2": {
+      "participant": "sandbox",
+      "commands": 2,
+      "committed": 2
+    },
+    "DemoLenderA": {
+      "participant": "participant3",
+      "commands": 10,
+      "committed": 10
+    },
+    "DemoManufacturer": {
+      "participant": "participant2",
+      "commands": 16,
+      "committed": 16
+    },
+    "DemoCNCDealer": {
+      "participant": "participant5",
+      "commands": 2,
+      "committed": 2
+    },
+    "DemoVerifier": {
+      "participant": "participant5",
+      "commands": 5,
+      "committed": 5
+    }
+  },
+  "perParty": {
+    "CollaraRegistrar": {
+      "participant": "sandbox",
+      "transactions": 12,
+      "events": {
+        "created": 16,
+        "exercised": 10,
+        "archived": 0
+      },
+      "templates": {
+        "AssetRegistry": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Registry_Reserve": 1
+          }
+        },
+        "VerifierRegistry": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Config_PublishVerifierStatus": 1
+          }
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AssetRegistrationRequest": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Request_Accept": 1
+          }
+        },
+        "IssuanceTicket": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "AssetControl": {
+          "created": 5,
+          "exercised": 4,
+          "archived": 0,
+          "choices": {
+            "Control_AnchorEvidence": 2,
+            "Control_ShareWithLender": 1,
+            "Control_Activate": 1
+          }
+        },
+        "AssetPassport": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "PledgeActivationAuthorization": {
+          "created": 0,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": [
+        {
+          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "template": "PledgeActivationAuthorization",
+          "kind": "exercised",
+          "choice": "Archive",
+          "markers": []
+        }
+      ]
+    },
+    "CollaraGovernance": {
+      "participant": "sandbox",
+      "transactions": 5,
+      "events": {
+        "created": 7,
+        "exercised": 6,
+        "archived": 0
+      },
+      "templates": {
+        "GovernanceRules": {
+          "created": 1,
+          "exercised": 3,
+          "archived": 0,
+          "choices": {
+            "GovernanceRules_ConfirmAction": 2,
+            "GovernanceRules_ExecuteConfirmedAction": 1
+          }
+        },
+        "BootstrapVerifierRegistryProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernableAction_Execute": 1
+          }
+        },
+        "GovernanceConfirmation": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "GovernanceConfirmation_Consume": 2
+          }
+        },
+        "VerifierRegistry": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "GovernanceExecutionResult": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "DemoManufacturer": {
+      "participant": "participant2",
+      "transactions": 30,
+      "events": {
+        "created": 34,
+        "exercised": 25,
+        "archived": 0
+      },
+      "templates": {
+        "AssetRegistrationRequest": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Request_Accept": 1
+          }
+        },
+        "IssuanceTicket": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "AssetControl": {
+          "created": 5,
+          "exercised": 4,
+          "archived": 0,
+          "choices": {
+            "Control_AnchorEvidence": 2,
+            "Control_ShareWithLender": 1,
+            "Control_Activate": 1
+          }
+        },
+        "AssetPassport": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "DealerContribution": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "EvidenceManifest": {
+          "created": 2,
+          "exercised": 5,
+          "archived": 0,
+          "choices": {
+            "Manifest_Anchor": 1,
+            "Manifest_RequestVerification": 2,
+            "Manifest_NewVersion": 1,
+            "Manifest_SubmitToVerification": 1
+          }
+        },
+        "VerificationRequest": {
+          "created": 6,
+          "exercised": 6,
+          "archived": 0,
+          "choices": {
+            "VR_AcceptAssignment": 2,
+            "VR_RequestChanges": 1,
+            "VR_SubmitNewEvidence": 1,
+            "VR_IssueAttestation": 2
+          }
+        },
+        "VerificationAttestation": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Att_DiscloseTo": 1
+          }
+        },
+        "PackageShareProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Consent_Grant": 1
+          }
+        },
+        "PackageShare": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "LenderDecisionNotice": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "FinancingProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Proposal_Accept": 1
+          }
+        },
+        "FinancingAgreement": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Agreement_AuthorizeActivation": 1
+          }
+        },
+        "PledgeActivationAuthorization": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "ReleaseRequest": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "Release_Reject": 1,
+            "Release_Authorize": 1
+          }
+        },
+        "ReleaseDecision": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AuditGrant": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 2,
+        "termMetadata": 2,
+        "externalLegalRef": 2,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": [
+        {
+          "updateId": "1220372cff56e8b2b7ea10d6535ea31aebd4f36bf9717e8fbd6ab5ac5dc811509068",
+          "template": "FinancingProposal",
+          "kind": "created",
+          "markers": [
+            "principal",
+            "termMetadata",
+            "externalLegalRef"
+          ]
+        },
+        {
+          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "template": "FinancingProposal",
+          "kind": "exercised",
+          "choice": "Proposal_Accept",
+          "markers": []
+        },
+        {
+          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "template": "FinancingAgreement",
+          "kind": "created",
+          "markers": [
+            "principal",
+            "termMetadata",
+            "externalLegalRef"
+          ]
+        },
+        {
+          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "template": "FinancingAgreement",
+          "kind": "exercised",
+          "choice": "Agreement_AuthorizeActivation",
+          "markers": []
+        },
+        {
+          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "template": "PledgeActivationAuthorization",
+          "kind": "created",
+          "markers": []
+        },
+        {
+          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "template": "PledgeActivationAuthorization",
+          "kind": "exercised",
+          "choice": "Archive",
+          "markers": []
+        }
+      ]
+    },
+    "DemoCNCDealer": {
+      "participant": "participant5",
+      "transactions": 3,
+      "events": {
+        "created": 3,
+        "exercised": 1,
+        "archived": 0
+      },
+      "templates": {
+        "DealerContribution": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "PackageShareProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Consent_Grant": 1
+          }
+        },
+        "PackageShare": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "DemoVerifier": {
+      "participant": "participant5",
+      "transactions": 12,
+      "events": {
+        "created": 12,
+        "exercised": 7,
+        "archived": 0
+      },
+      "templates": {
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerificationRequest": {
+          "created": 6,
+          "exercised": 6,
+          "archived": 0,
+          "choices": {
+            "VR_AcceptAssignment": 2,
+            "VR_RequestChanges": 1,
+            "VR_SubmitNewEvidence": 1,
+            "VR_IssueAttestation": 2
+          }
+        },
+        "VerificationAttestation": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Att_DiscloseTo": 1
+          }
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "DemoLenderA": {
+      "participant": "participant3",
+      "transactions": 20,
+      "events": {
+        "created": 23,
+        "exercised": 12,
+        "archived": 0
+      },
+      "templates": {
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "PackageShare": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AssetControl": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Control_Activate": 1
+          }
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralAssessment": {
+          "created": 5,
+          "exercised": 5,
+          "archived": 0,
+          "choices": {
+            "Assessment_StartReview": 1,
+            "Assessment_Save": 1,
+            "Assessment_SubmitForApproval": 1,
+            "Assessment_Approve": 1,
+            "Assessment_IssueProposal": 1
+          }
+        },
+        "LenderDecisionNotice": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "FinancingProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Proposal_Accept": 1
+          }
+        },
+        "FinancingAgreement": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Agreement_AuthorizeActivation": 1
+          }
+        },
+        "PledgeActivationAuthorization": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "ReleaseRequest": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "Release_Reject": 1,
+            "Release_Authorize": 1
+          }
+        },
+        "ReleaseDecision": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AuditGrant": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 3,
+        "termMetadata": 3,
+        "externalLegalRef": 3,
+        "valuation": 4
+      },
+      "sensitiveTemplateEvents": [
+        {
+          "updateId": "1220372cff56e8b2b7ea10d6535ea31aebd4f36bf9717e8fbd6ab5ac5dc811509068",
+          "template": "FinancingProposal",
+          "kind": "created",
+          "markers": [
+            "principal",
+            "termMetadata",
+            "externalLegalRef"
+          ]
+        },
+        {
+          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "template": "FinancingProposal",
+          "kind": "exercised",
+          "choice": "Proposal_Accept",
+          "markers": []
+        },
+        {
+          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "template": "FinancingAgreement",
+          "kind": "created",
+          "markers": [
+            "principal",
+            "termMetadata",
+            "externalLegalRef"
+          ]
+        },
+        {
+          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "template": "FinancingAgreement",
+          "kind": "exercised",
+          "choice": "Agreement_AuthorizeActivation",
+          "markers": []
+        },
+        {
+          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "template": "PledgeActivationAuthorization",
+          "kind": "created",
+          "markers": []
+        },
+        {
+          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "template": "PledgeActivationAuthorization",
+          "kind": "exercised",
+          "choice": "Archive",
+          "markers": []
+        }
+      ]
+    },
+    "DemoLenderB": {
+      "participant": "participant4",
+      "transactions": 2,
+      "events": {
+        "created": 2,
+        "exercised": 0,
+        "archived": 0
+      },
+      "templates": {
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "DemoAuditor": {
+      "participant": "participant5",
+      "transactions": 2,
+      "events": {
+        "created": 2,
+        "exercised": 0,
+        "archived": 0
+      },
+      "templates": {
+        "AuditGrant": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "GovSeat1": {
+      "participant": "sandbox",
+      "transactions": 3,
+      "events": {
+        "created": 4,
+        "exercised": 3,
+        "archived": 0
+      },
+      "templates": {
+        "BootstrapVerifierRegistryProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernableAction_Execute": 1
+          }
+        },
+        "GovernanceRules": {
+          "created": 0,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernanceRules_ConfirmAction": 1
+          }
+        },
+        "GovernanceConfirmation": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernanceConfirmation_Consume": 1
+          }
+        },
+        "VerifierRegistry": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "GovSeat2": {
+      "participant": "sandbox",
+      "transactions": 2,
+      "events": {
+        "created": 4,
+        "exercised": 5,
+        "archived": 0
+      },
+      "templates": {
+        "GovernanceRules": {
+          "created": 0,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "GovernanceRules_ConfirmAction": 1,
+            "GovernanceRules_ExecuteConfirmedAction": 1
+          }
+        },
+        "GovernanceConfirmation": {
+          "created": 1,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "GovernanceConfirmation_Consume": 2
+          }
+        },
+        "BootstrapVerifierRegistryProposal": {
+          "created": 0,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernableAction_Execute": 1
+          }
+        },
+        "VerifierRegistry": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "GovernanceExecutionResult": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "GovSeat3": {
+      "participant": "sandbox",
+      "transactions": 0,
+      "events": {
+        "created": 0,
+        "exercised": 0,
+        "archived": 0
+      },
+      "templates": {},
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    }
+  },
+  "lenderBReceived": [
+    {
+      "kind": "created",
+      "template": "CollaraConfig",
+      "mentionsCase": false,
+      "mentionsAsset": false
+    },
+    {
+      "kind": "created",
+      "template": "VerifierStatusMirror",
+      "mentionsCase": false,
+      "mentionsAsset": false
+    }
+  ],
+  "auditorReceived": [
+    {
+      "grantRef": "AG-001",
+      "scopes": [
+        "EVIDENCE_MANIFEST",
+        "ATTESTATION"
+      ]
+    },
+    {
+      "grantRef": "AG-002",
+      "scopes": [
+        "DECISION_OUTCOME",
+        "PLEDGE_RELEASE_EVENTS"
+      ]
+    }
+  ],
+  "perNode": {
+    "sandbox": {
+      "hosted": [
+        "CollaraRegistrar",
+        "CollaraGovernance",
+        "GovSeat1",
+        "GovSeat2",
+        "GovSeat3"
+      ],
+      "witnesses": [
+        "CollaraGovernance",
+        "CollaraRegistrar",
+        "DemoLenderA",
+        "DemoLenderB",
+        "DemoManufacturer",
+        "DemoVerifier",
+        "GovSeat1",
+        "GovSeat2"
+      ],
+      "transactions": 16,
+      "events": {
+        "created": 21,
+        "exercised": 16,
+        "archived": 0
+      },
+      "templates": {
+        "AssetRegistry": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Registry_Reserve": 1
+          }
+        },
+        "GovernanceRules": {
+          "created": 1,
+          "exercised": 3,
+          "archived": 0,
+          "choices": {
+            "GovernanceRules_ConfirmAction": 2,
+            "GovernanceRules_ExecuteConfirmedAction": 1
+          }
+        },
+        "BootstrapVerifierRegistryProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "GovernableAction_Execute": 1
+          }
+        },
+        "GovernanceConfirmation": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "GovernanceConfirmation_Consume": 2
+          }
+        },
+        "VerifierRegistry": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "GovernanceExecutionResult": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Config_PublishVerifierStatus": 1
+          }
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AssetRegistrationRequest": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Request_Accept": 1
+          }
+        },
+        "IssuanceTicket": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "AssetControl": {
+          "created": 5,
+          "exercised": 4,
+          "archived": 0,
+          "choices": {
+            "Control_AnchorEvidence": 2,
+            "Control_ShareWithLender": 1,
+            "Control_Activate": 1
+          }
+        },
+        "AssetPassport": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "PledgeActivationAuthorization": {
+          "created": 0,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": [
+        "exercised PledgeActivationAuthorization Archive"
+      ]
+    },
+    "participant2": {
+      "hosted": [
+        "DemoManufacturer"
+      ],
+      "witnesses": [
+        "CollaraRegistrar",
+        "DemoAuditor",
+        "DemoCNCDealer",
+        "DemoLenderA",
+        "DemoManufacturer",
+        "DemoVerifier"
+      ],
+      "transactions": 30,
+      "events": {
+        "created": 34,
+        "exercised": 25,
+        "archived": 0
+      },
+      "templates": {
+        "AssetRegistrationRequest": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Request_Accept": 1
+          }
+        },
+        "IssuanceTicket": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "AssetControl": {
+          "created": 5,
+          "exercised": 4,
+          "archived": 0,
+          "choices": {
+            "Control_AnchorEvidence": 2,
+            "Control_ShareWithLender": 1,
+            "Control_Activate": 1
+          }
+        },
+        "AssetPassport": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "DealerContribution": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "EvidenceManifest": {
+          "created": 2,
+          "exercised": 5,
+          "archived": 0,
+          "choices": {
+            "Manifest_Anchor": 1,
+            "Manifest_RequestVerification": 2,
+            "Manifest_NewVersion": 1,
+            "Manifest_SubmitToVerification": 1
+          }
+        },
+        "VerificationRequest": {
+          "created": 6,
+          "exercised": 6,
+          "archived": 0,
+          "choices": {
+            "VR_AcceptAssignment": 2,
+            "VR_RequestChanges": 1,
+            "VR_SubmitNewEvidence": 1,
+            "VR_IssueAttestation": 2
+          }
+        },
+        "VerificationAttestation": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Att_DiscloseTo": 1
+          }
+        },
+        "PackageShareProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Consent_Grant": 1
+          }
+        },
+        "PackageShare": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "LenderDecisionNotice": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "FinancingProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Proposal_Accept": 1
+          }
+        },
+        "FinancingAgreement": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Agreement_AuthorizeActivation": 1
+          }
+        },
+        "PledgeActivationAuthorization": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "ReleaseRequest": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "Release_Reject": 1,
+            "Release_Authorize": 1
+          }
+        },
+        "ReleaseDecision": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AuditGrant": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 2,
+        "termMetadata": 2,
+        "externalLegalRef": 2,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": [
+        "created FinancingProposal",
+        "exercised FinancingProposal Proposal_Accept",
+        "created FinancingAgreement",
+        "exercised FinancingAgreement Agreement_AuthorizeActivation",
+        "created PledgeActivationAuthorization",
+        "exercised PledgeActivationAuthorization Archive"
+      ]
+    },
+    "participant3": {
+      "hosted": [
+        "DemoLenderA"
+      ],
+      "witnesses": [
+        "CollaraRegistrar",
+        "DemoAuditor",
+        "DemoCNCDealer",
+        "DemoLenderA",
+        "DemoLenderB",
+        "DemoManufacturer",
+        "DemoVerifier"
+      ],
+      "transactions": 20,
+      "events": {
+        "created": 23,
+        "exercised": 12,
+        "archived": 0
+      },
+      "templates": {
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "PackageShare": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AssetControl": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Control_Activate": 1
+          }
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralAssessment": {
+          "created": 5,
+          "exercised": 5,
+          "archived": 0,
+          "choices": {
+            "Assessment_StartReview": 1,
+            "Assessment_Save": 1,
+            "Assessment_SubmitForApproval": 1,
+            "Assessment_Approve": 1,
+            "Assessment_IssueProposal": 1
+          }
+        },
+        "LenderDecisionNotice": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "FinancingProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Proposal_Accept": 1
+          }
+        },
+        "FinancingAgreement": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Agreement_AuthorizeActivation": 1
+          }
+        },
+        "PledgeActivationAuthorization": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Archive": 1
+          }
+        },
+        "CollateralLock": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Lock_Release": 1
+          }
+        },
+        "ReleaseRequest": {
+          "created": 2,
+          "exercised": 2,
+          "archived": 0,
+          "choices": {
+            "Release_Reject": 1,
+            "Release_Authorize": 1
+          }
+        },
+        "ReleaseDecision": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollateralLockReleased": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AuditGrant": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 3,
+        "termMetadata": 3,
+        "externalLegalRef": 3,
+        "valuation": 4
+      },
+      "sensitiveTemplateEvents": [
+        "created FinancingProposal",
+        "exercised FinancingProposal Proposal_Accept",
+        "created FinancingAgreement",
+        "exercised FinancingAgreement Agreement_AuthorizeActivation",
+        "created PledgeActivationAuthorization",
+        "exercised PledgeActivationAuthorization Archive"
+      ]
+    },
+    "participant4": {
+      "hosted": [
+        "DemoLenderB"
+      ],
+      "witnesses": [
+        "CollaraRegistrar",
+        "DemoLenderA",
+        "DemoLenderB",
+        "DemoVerifier"
+      ],
+      "transactions": 2,
+      "events": {
+        "created": 2,
+        "exercised": 0,
+        "archived": 0
+      },
+      "templates": {
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    },
+    "participant5": {
+      "hosted": [
+        "DemoCNCDealer",
+        "DemoVerifier",
+        "DemoAuditor"
+      ],
+      "witnesses": [
+        "CollaraGovernance",
+        "CollaraRegistrar",
+        "DemoAuditor",
+        "DemoCNCDealer",
+        "DemoLenderA",
+        "DemoLenderB",
+        "DemoManufacturer",
+        "DemoVerifier"
+      ],
+      "transactions": 17,
+      "events": {
+        "created": 17,
+        "exercised": 8,
+        "archived": 0
+      },
+      "templates": {
+        "VerifierAccreditation": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "CollaraConfig": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerifierStatusMirror": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "DealerContribution": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "VerificationRequest": {
+          "created": 6,
+          "exercised": 6,
+          "archived": 0,
+          "choices": {
+            "VR_AcceptAssignment": 2,
+            "VR_RequestChanges": 1,
+            "VR_SubmitNewEvidence": 1,
+            "VR_IssueAttestation": 2
+          }
+        },
+        "VerificationAttestation": {
+          "created": 2,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Att_DiscloseTo": 1
+          }
+        },
+        "PackageShareProposal": {
+          "created": 1,
+          "exercised": 1,
+          "archived": 0,
+          "choices": {
+            "Consent_Grant": 1
+          }
+        },
+        "PackageShare": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AttestationDisclosure": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "AuditGrant": {
+          "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        }
+      },
+      "markerHits": {
+        "principal": 0,
+        "termMetadata": 0,
+        "externalLegalRef": 0,
+        "valuation": 0
+      },
+      "sensitiveTemplateEvents": []
+    }
+  },
+  "operatorViewWitnessesHostedElsewhere": {
+    "sandbox": [
+      "DemoLenderA",
+      "DemoLenderB",
+      "DemoManufacturer",
+      "DemoVerifier"
+    ],
+    "participant2": [
+      "CollaraRegistrar",
+      "DemoAuditor",
+      "DemoCNCDealer",
+      "DemoLenderA",
+      "DemoVerifier"
+    ],
+    "participant3": [
+      "CollaraRegistrar",
+      "DemoAuditor",
+      "DemoCNCDealer",
+      "DemoLenderB",
+      "DemoManufacturer",
+      "DemoVerifier"
+    ],
+    "participant4": [
+      "CollaraRegistrar",
+      "DemoLenderA",
+      "DemoVerifier"
+    ],
+    "participant5": [
+      "CollaraGovernance",
+      "CollaraRegistrar",
+      "DemoLenderA",
+      "DemoLenderB",
+      "DemoManufacturer"
+    ]
+  },
+  "ledgerEndDeltas": {
+    "seed (B1-B8, M1-M18)": {
+      "sandbox": {
+        "delta": 47,
+        "visibleUpdates": 14
+      },
+      "participant2": {
+        "delta": 49,
+        "visibleUpdates": 17
+      },
+      "participant3": {
+        "delta": 15,
+        "visibleUpdates": 7
+      },
+      "participant4": {
+        "delta": 4,
+        "visibleUpdates": 2
+      },
+      "participant5": {
+        "delta": 30,
+        "visibleUpdates": 12
+      }
+    },
+    "W1-W2 save assessment": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant3": {
+        "delta": 6,
+        "visibleUpdates": 2
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W3 submit for approval": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W4 approve": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 2,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W5 issue proposal": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 2,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W6 accept": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W7 authorize activation": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W8 activate": {
+      "sandbox": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W9 release request RR-001": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 2,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W10 reject RR-001": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W11 release request RR-002": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 2,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W12 authorize RR-002": {
+      "sandbox": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 0,
+        "visibleUpdates": 0
+      }
+    },
+    "W13 audit grant AG-001 (owner)": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 2,
+        "visibleUpdates": 1
+      }
+    },
+    "W14 audit grant AG-002 (lender)": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant3": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 2,
+        "visibleUpdates": 1
+      }
+    },
+    "X1 request verification VR-002": {
+      "sandbox": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 2,
+        "visibleUpdates": 1
+      }
+    },
+    "X2 accept assignment VR-002": {
+      "sandbox": {
+        "delta": 3,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 3,
+        "visibleUpdates": 1
+      }
+    },
+    "X3 issue attestation ATT-002": {
+      "sandbox": {
+        "delta": 3,
+        "visibleUpdates": 0
+      },
+      "participant2": {
+        "delta": 3,
+        "visibleUpdates": 1
+      },
+      "participant3": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant4": {
+        "delta": 0,
+        "visibleUpdates": 0
+      },
+      "participant5": {
+        "delta": 3,
+        "visibleUpdates": 1
+      }
+    }
+  },
+  "transactions": [
+    "seed.B1 | created AssetRegistry | sandbox | informees CollaraRegistrar",
+    "seed.B2 | created GovernanceRules | sandbox | informees CollaraGovernance",
+    "seed.B3 | created BootstrapVerifierRegistryProposal | sandbox | informees CollaraGovernance,GovSeat1",
+    "seed.B4 | exercised GovernanceRules GovernanceRules_ConfirmAction | sandbox | informees CollaraGovernance,GovSeat1",
+    "seed.B5 | exercised GovernanceRules GovernanceRules_ConfirmAction | sandbox | informees CollaraGovernance,GovSeat2",
+    "seed.B6 | exercised GovernanceRules GovernanceRules_ExecuteConfirmedAction | participant5,sandbox | informees CollaraGovernance,CollaraRegistrar,DemoVerifier,GovSeat1,GovSeat2",
+    "seed.B7 | created CollaraConfig | participant3,participant4,participant5,sandbox | informees CollaraRegistrar,DemoLenderA,DemoLenderB,DemoVerifier",
+    "registrar.publishVerifierStatus | exercised CollaraConfig Config_PublishVerifierStatus | participant3,participant4,participant5,sandbox | informees CollaraRegistrar,DemoLenderA,DemoLenderB,DemoVerifier",
+    "seed.M1-M3/request | created AssetRegistrationRequest | participant2,sandbox | informees CollaraRegistrar,DemoManufacturer",
+    "seed.M1-M3/reserve | exercised AssetRegistry Registry_Reserve | participant2,sandbox | informees CollaraRegistrar,DemoManufacturer",
+    "seed.M1-M3/accept | exercised AssetRegistrationRequest Request_Accept | participant2,sandbox | informees CollaraRegistrar,DemoManufacturer",
+    "seed.M4 | created DealerContribution | participant2,participant5 | informees DemoCNCDealer,DemoManufacturer",
+    "seed.M5 | created EvidenceManifest | participant2 | informees DemoManufacturer",
+    "seed.M6 | exercised EvidenceManifest Manifest_Anchor | participant2,sandbox | informees CollaraRegistrar,DemoManufacturer",
+    "seed.M7 | exercised EvidenceManifest Manifest_RequestVerification | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "seed.M8 | exercised VerificationRequest VR_AcceptAssignment | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "seed.M9 | exercised VerificationRequest VR_RequestChanges | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "seed.M10 | exercised EvidenceManifest Manifest_NewVersion | participant2,sandbox | informees CollaraRegistrar,DemoManufacturer",
+    "seed.M11 | exercised EvidenceManifest Manifest_SubmitToVerification | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "seed.M12 | exercised VerificationRequest VR_IssueAttestation | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "seed.M13 | created PackageShareProposal | participant2,participant5 | informees DemoCNCDealer,DemoManufacturer",
+    "seed.M14 | exercised PackageShareProposal Consent_Grant | participant2,participant3,participant5 | informees DemoCNCDealer,DemoLenderA,DemoManufacturer",
+    "seed.M15 | created PackageShare | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "seed.M16 | exercised AssetControl Control_ShareWithLender | participant2,participant3,sandbox | informees CollaraRegistrar,DemoLenderA,DemoManufacturer",
+    "seed.M17 | exercised VerificationAttestation Att_DiscloseTo | participant2,participant3,participant5 | informees DemoLenderA,DemoManufacturer,DemoVerifier",
+    "seed.M18 | created CollateralAssessment | participant3 | informees DemoLenderA",
+    "review.saveAssessment/start | exercised CollateralAssessment Assessment_StartReview | participant3 | informees DemoLenderA",
+    "review.saveAssessment/save | exercised CollateralAssessment Assessment_Save | participant3 | informees DemoLenderA",
+    "review.submitForApproval | exercised CollateralAssessment Assessment_SubmitForApproval | participant3 | informees DemoLenderA",
+    "review.decide/approve | exercised CollateralAssessment Assessment_Approve | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "proposal.issue | exercised CollateralAssessment Assessment_IssueProposal | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "proposal.accept | exercised FinancingProposal Proposal_Accept | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "activation.authorize | exercised FinancingAgreement Agreement_AuthorizeActivation | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "pledge.activate | exercised AssetControl Control_Activate | participant2,participant3,sandbox | informees CollaraRegistrar,DemoLenderA,DemoManufacturer",
+    "release.request | created ReleaseRequest | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "release.decide | exercised ReleaseRequest Release_Reject | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "release.request | created ReleaseRequest | participant2,participant3 | informees DemoLenderA,DemoManufacturer",
+    "release.decide | exercised ReleaseRequest Release_Authorize | participant2,participant3,sandbox | informees CollaraRegistrar,DemoLenderA,DemoManufacturer",
+    "auditGrant.create | created AuditGrant | participant2,participant5 | informees DemoAuditor,DemoManufacturer",
+    "auditGrant.create | created AuditGrant | participant3,participant5 | informees DemoAuditor,DemoLenderA",
+    "it.privacy.X1 | exercised EvidenceManifest Manifest_RequestVerification | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "it.privacy.X2 | exercised VerificationRequest VR_AcceptAssignment | participant2,participant5 | informees DemoManufacturer,DemoVerifier",
+    "it.privacy.X3 | exercised VerificationRequest VR_IssueAttestation | participant2,participant5 | informees DemoManufacturer,DemoVerifier"
+  ],
+  "nonVisibleOffsets": {
+    "probed": 65,
+    "readable": 0,
+    "perStep": {
+      "W1-W2 save assessment": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 4,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W3 submit for approval": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W4 approve": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W5 issue proposal": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W6 accept": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W7 authorize activation": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W8 activate": {
+        "sandbox": 2,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W9 release request RR-001": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W10 reject RR-001": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W11 release request RR-002": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W12 authorize RR-002": {
+        "sandbox": 2,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "W13 audit grant AG-001 (owner)": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "W14 audit grant AG-002 (lender)": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "X1 request verification VR-002": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "X2 accept assignment VR-002": {
+        "sandbox": 3,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 2
+      },
+      "X3 issue attestation ATT-002": {
+        "sandbox": 3,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 2
+      }
+    }
+  },
+  "registrarControlToLock": {
+    "Control_Activate": [
+      {
+        "kind": "exercised",
+        "template": "AssetControl",
+        "choice": "Control_Activate",
+        "consuming": true,
+        "fields": [
+          "actorRef",
+          "authorizationCid",
+          "configCid",
+          "lender",
+          "lockRef",
+          "verifierStatusCid"
+        ],
+        "markers": []
+      },
+      {
+        "kind": "exercised",
+        "template": "PledgeActivationAuthorization",
+        "choice": "Archive",
+        "consuming": true,
+        "fields": [],
+        "markers": []
+      },
+      {
+        "kind": "created",
+        "template": "CollateralLock",
+        "fields": [
+          "activatedAt",
+          "activatedByRef",
+          "agreementRef",
+          "assetId",
+          "attestationRef",
+          "authorizationRef",
+          "caseRef",
+          "controlVersion",
+          "evidence",
+          "lender",
+          "lockRef",
+          "namespace",
+          "owner",
+          "registrar"
+        ],
+        "markers": []
+      }
+    ],
+    "Release_Authorize": [
+      {
+        "kind": "exercised",
+        "template": "CollateralLock",
+        "choice": "Lock_Release",
+        "consuming": true,
+        "fields": [
+          "actorRef",
+          "releaseRequestRef"
+        ],
+        "markers": []
+      },
+      {
+        "kind": "created",
+        "template": "AssetControl",
+        "fields": [
+          "assetId",
+          "controlVersion",
+          "evidence",
+          "namespace",
+          "owner",
+          "registrar"
+        ],
+        "markers": []
+      },
+      {
+        "kind": "created",
+        "template": "CollateralLockReleased",
+        "fields": [
+          "activatedAt",
+          "assetId",
+          "caseRef",
+          "lender",
+          "lockControlVersion",
+          "lockRef",
+          "namespace",
+          "owner",
+          "registrar",
+          "releaseRequestRef",
+          "releasedAt",
+          "releasedByRef",
+          "releasedControlVersion"
+        ],
+        "markers": []
+      }
+    ]
+  },
+  "checks": {
+    "total": 80,
+    "passed": 80,
+    "failed": []
+  },
+  "race": {
+    "deterministic": {
+      "prefix": "pvr-b69j08114",
+      "revocationCommitted": true,
+      "lenderDisclosuresWhenActivationWasSubmitted": 0,
+      "activation": {
+        "httpStatus": 200,
+        "state": "COMMITTED",
+        "pledgeRef": "PL-001"
+      },
+      "activeLocksAfter": 1,
+      "lenderDisclosuresAfter": 0,
+      "orderOnLenderParticipant": {
+        "revocation": 202,
+        "activation": 204
+      },
+      "informees": {
+        "revocation": {
+          "sandbox": "not received",
+          "participant2": [
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+          ],
+          "participant3": [
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+          ],
+          "participant4": "not received",
+          "participant5": [
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+          ]
+        },
+        "activation": {
+          "sandbox": [
+            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+          ],
+          "participant2": [
+            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+          ],
+          "participant3": [
+            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+          ],
+          "participant4": "not received",
+          "participant5": "not received"
+        }
+      }
+    },
+    "concurrent": {
+      "prefix": "pvc-b6ra7bb92",
+      "activation": {
+        "httpStatus": 200,
+        "state": "COMMITTED",
+        "detail": null
+      },
+      "revocation": {
+        "state": "COMMITTED"
+      },
+      "activeLocksAfter": 1,
+      "lenderDisclosuresAfter": 0,
+      "orderOnLenderParticipant": {
+        "revocation": 278,
+        "activation": 279
+      },
+      "outcome": "both committed; the revocation was committed first, so the lock was created without an active disclosure"
+    }
+  },
+  "informees": {
+    "M12 VR_IssueAttestation": {
+      "receivedBy": [
+        "participant2",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 2
+      },
+      "widestView": [
+        "exercised VerificationRequest VR_IssueAttestation [DemoManufacturer,DemoVerifier]",
+        "created VerificationAttestation [DemoManufacturer,DemoVerifier]"
+      ]
+    },
+    "M16 Control_ShareWithLender": {
+      "receivedBy": [
+        "sandbox",
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 2,
+        "participant2": 2,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised AssetControl Control_ShareWithLender [CollaraRegistrar,DemoManufacturer]",
+        "created AssetControl [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "M17 Att_DiscloseTo": {
+      "receivedBy": [
+        "participant2",
+        "participant3",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 2
+      },
+      "widestView": [
+        "exercised VerificationAttestation Att_DiscloseTo [DemoManufacturer,DemoVerifier]",
+        "created AttestationDisclosure [DemoLenderA,DemoManufacturer,DemoVerifier]"
+      ]
+    },
+    "W1-W2 Assessment_StartReview + Assessment_Save": {
+      "receivedBy": [
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised CollateralAssessment Assessment_Save [DemoLenderA] markers: valuation",
+        "created CollateralAssessment [DemoLenderA] markers: valuation"
+      ]
+    },
+    "W3 Assessment_SubmitForApproval": {
+      "receivedBy": [
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised CollateralAssessment Assessment_SubmitForApproval [DemoLenderA]",
+        "created CollateralAssessment [DemoLenderA] markers: valuation"
+      ]
+    },
+    "W4 Assessment_Approve": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 3,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised CollateralAssessment Assessment_Approve [DemoLenderA]",
+        "created CollateralAssessment [DemoLenderA] markers: valuation",
+        "created LenderDecisionNotice [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W5 Assessment_IssueProposal": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised CollateralAssessment Assessment_IssueProposal [DemoLenderA] markers: principal,termMetadata,externalLegalRef",
+        "created FinancingProposal [DemoLenderA,DemoManufacturer] markers: principal,termMetadata,externalLegalRef"
+      ]
+    },
+    "W6 Proposal_Accept": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised FinancingProposal Proposal_Accept [DemoLenderA,DemoManufacturer]",
+        "created FinancingAgreement [DemoLenderA,DemoManufacturer] markers: principal,termMetadata,externalLegalRef"
+      ]
+    },
+    "W7 Agreement_AuthorizeActivation": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised FinancingAgreement Agreement_AuthorizeActivation [DemoLenderA,DemoManufacturer]",
+        "created PledgeActivationAuthorization [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W8 Control_Activate": {
+      "receivedBy": [
+        "sandbox",
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 3,
+        "participant2": 3,
+        "participant3": 3,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+        "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+        "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W9 create ReleaseRequest": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "created ReleaseRequest [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W10 Release_Reject": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 2,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised ReleaseRequest Release_Reject [DemoLenderA,DemoManufacturer]",
+        "created ReleaseDecision [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W11 create ReleaseRequest": {
+      "receivedBy": [
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "created ReleaseRequest [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W12 Release_Authorize": {
+      "receivedBy": [
+        "sandbox",
+        "participant2",
+        "participant3"
+      ],
+      "eventsPerNode": {
+        "sandbox": 3,
+        "participant2": 5,
+        "participant3": 5,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "widestView": [
+        "exercised ReleaseRequest Release_Authorize [DemoLenderA,DemoManufacturer]",
+        "exercised CollateralLock Lock_Release [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+        "created AssetControl [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+        "created CollateralLockReleased [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
+        "created ReleaseDecision [DemoLenderA,DemoManufacturer]"
+      ]
+    },
+    "W13 create AuditGrant": {
+      "receivedBy": [
+        "participant2",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 1,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "widestView": [
+        "created AuditGrant [DemoAuditor,DemoManufacturer]"
+      ]
+    },
+    "W14 create AuditGrant": {
+      "receivedBy": [
+        "participant3",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 1,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "widestView": [
+        "created AuditGrant [DemoAuditor,DemoLenderA]"
+      ]
+    },
+    "X1 Manifest_RequestVerification": {
+      "receivedBy": [
+        "participant2",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 1
+      },
+      "widestView": [
+        "exercised EvidenceManifest Manifest_RequestVerification [DemoManufacturer]",
+        "created VerificationRequest [DemoManufacturer,DemoVerifier]"
+      ]
+    },
+    "X2 VR_AcceptAssignment": {
+      "receivedBy": [
+        "participant2",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 2
+      },
+      "widestView": [
+        "exercised VerificationRequest VR_AcceptAssignment [DemoManufacturer,DemoVerifier]",
+        "created VerificationRequest [DemoManufacturer,DemoVerifier]"
+      ]
+    },
+    "X3 VR_IssueAttestation": {
+      "receivedBy": [
+        "participant2",
+        "participant5"
+      ],
+      "eventsPerNode": {
+        "sandbox": 0,
+        "participant2": 2,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 2
+      },
+      "widestView": [
+        "exercised VerificationRequest VR_IssueAttestation [DemoManufacturer,DemoVerifier]",
+        "created VerificationAttestation [DemoManufacturer,DemoVerifier]"
+      ]
+    }
+  }
+}
