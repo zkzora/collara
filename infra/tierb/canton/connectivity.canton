@@ -1,0 +1,16 @@
+// Disconnects or reconnects participants from the "global" synchronizer through their Admin APIs. Used to take
+// member participants offline for the topology-threshold check without stopping the shared Canton JVM.
+//   ACTION=disconnect|reconnect TARGETS=p2,p3
+val action = sys.env("ACTION")
+val targets = sys.env("TARGETS").split(",").map(_.trim).toSet
+participants.remote.filter(p => targets.contains(p.name)).foreach { p =>
+  action match {
+    case "disconnect" => p.synchronizers.disconnect("global")
+    case "reconnect" =>
+      p.synchronizers.reconnect("global")
+      utils.retry_until_true(p.synchronizers.active("global"))
+    case other => throw new IllegalArgumentException(s"unknown ACTION $other")
+  }
+  val connected = p.synchronizers.list_connected().nonEmpty
+  println(s"TIERB_JSON {\"participant\":\"${p.name}\",\"action\":\"$action\",\"connected\":$connected}")
+}

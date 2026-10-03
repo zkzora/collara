@@ -31,7 +31,16 @@
     "localnet:status": "node scripts/localnet/status.mjs",
     "localnet:bootstrap": "node scripts/localnet/bootstrap.mjs",
     "localnet:seed": "node scripts/localnet/seed.mjs",
-    "daml:check": "node daml/collara/check.mjs"
+    "daml:check": "node daml/collara/check.mjs",
+    "tierb:install": "node scripts/tierb/install.mjs",
+    "tierb:up": "node scripts/tierb/up.mjs",
+    "tierb:onboard": "node scripts/tierb/onboard.mjs",
+    "tierb:scenario": "node scripts/tierb/scenario.mjs",
+    "tierb:topology": "node scripts/tierb/topology.mjs --dns-threshold",
+    "tierb:signing": "node scripts/tierb/signing-threshold.mjs",
+    "tierb:summary": "node scripts/tierb/summary.mjs",
+    "tierb:status": "node scripts/tierb/status.mjs",
+    "tierb:down": "node scripts/tierb/down.mjs"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

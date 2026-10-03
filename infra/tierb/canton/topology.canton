@@ -1,0 +1,29 @@
+// Prints the decentralized party's topology as seen by each participant: the PartyToParticipant mapping
+// (hosting participants, permissions, confirmation threshold, party signing keys + threshold) and the
+// DecentralizedNamespaceDefinition (owners + namespace threshold). One `TIERB_JSON {...}` line per fact.
+import com.digitalasset.canton.topology.PartyId
+
+val dec = PartyId.tryFromProtoPrimitive(sys.env("DEC_PARTY"))
+def q(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+participants.remote.foreach { p =>
+  val sync = p.synchronizers.list_connected().map(_.physicalSynchronizerId)
+  val connected = sync.nonEmpty
+  println(s"TIERB_JSON {\"kind\":\"connection\",\"participant\":${q(p.name)},\"connected\":$connected}")
+  sync.headOption.foreach { psid =>
+    val p2p = p.topology.party_to_participant_mappings.list(psid.logical, filterParty = dec.filterString)
+    p2p.foreach { r =>
+      val m = r.item
+      val hosts = m.participants.map(h => s"{\"participant\":${q(h.participantId.uid.toProtoPrimitive)},\"permission\":${q(h.permission.toString)}}").mkString(",")
+      val keys = m.partySigningKeysWithThreshold.map { ks =>
+        s"{\"threshold\":${ks.threshold.value},\"keys\":[${ks.keys.map(k => q(k.fingerprint.unwrap)).toList.mkString(",")}]}"
+      }.getOrElse("null")
+      println(s"TIERB_JSON {\"kind\":\"party_to_participant\",\"seenBy\":${q(p.name)},\"party\":${q(m.partyId.toProtoPrimitive)},\"threshold\":${m.threshold.value},\"participants\":[$hosts],\"partySigningKeys\":$keys,\"serial\":${r.context.serial.value},\"validFrom\":${q(r.context.validFrom.toString)}}")
+    }
+    val dns = p.topology.decentralized_namespaces.list(psid.logical, filterNamespace = dec.uid.namespace.filterString)
+    dns.foreach { r =>
+      val d = r.item
+      println(s"TIERB_JSON {\"kind\":\"decentralized_namespace\",\"seenBy\":${q(p.name)},\"namespace\":${q(d.namespace.filterString)},\"threshold\":${d.threshold.value},\"owners\":[${d.owners.toSeq.map(o => q(o.filterString)).mkString(",")}],\"serial\":${r.context.serial.value}}")
+    }
+  }
+}

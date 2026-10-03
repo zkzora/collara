@@ -1,0 +1,27 @@
+// Collara Tier B bootstrap: one synchronizer (alias "global", the DM default DECPM_CANTON_SYNCHRONIZER) with
+// sequencer1 + mediator1, and all three participants connected to it.
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.version.ProtocolVersion
+
+nodes.local.start()
+
+val synchronizerId = bootstrap.synchronizer(
+  synchronizerName = "global",
+  sequencers = Seq(sequencer1),
+  mediators = Seq(mediator1),
+  synchronizerOwners = Seq(sequencer1),
+  synchronizerThreshold = PositiveInt.one,
+  staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.latest),
+)
+
+participants.local.foreach(_.synchronizers.connect_local(sequencer1, alias = "global"))
+
+utils.retry_until_true {
+  participants.local.forall(_.synchronizers.active("global"))
+}
+
+p1.health.ping(p2)
+p1.health.ping(p3)
+
+println(s"TIERB_READY synchronizer=$synchronizerId protocol=${ProtocolVersion.latest}")
+participants.local.foreach(p => println(s"TIERB_PARTICIPANT ${p.name} ${p.id.toProtoPrimitive}"))
