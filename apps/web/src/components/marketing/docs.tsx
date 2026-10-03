@@ -120,7 +120,7 @@ const E = EVIDENCE;
 
 const RUN = [
   `${E.damlTests.passed} Daml Script tests of the contract model: invariants, attack attempts and contract visibility`,
-  `LocalNet integration tests through the API on the sandbox with one participant: ${passCount(E.localnetIntegration)} in ${E.localnetIntegration.files} files, including an adversarial sweep over ${E.localnetIntegration.adversarialRoutes} routes`,
+  `LocalNet integration tests through the API on the sandbox with one participant: ${passCount(E.localnetIntegration)} in ${E.localnetIntegration.files} files, including an adversarial sweep over ${E.localnetIntegration.adversarialRoutes} routes, before the contract change that closed the revocation race; after it, the activation tests pass ${passCount(E.localnetIntegration.afterContracts020.activationSuites)} and the full suite has not yet been re-run with document storage`,
   `A LocalNet browser walkthrough of CL-001 from a clean start: ${passCount(E.cleanStartBrowser)} tests`,
   `Witness-level privacy on ${E.privacy.participants} participants: ${passCount(E.privacy.tests)} tests and ${passCount(E.privacy.checks)} checks, in ${E.privacy.runs} runs. All participants ran on one machine under one operator, so this does not show isolation between independent operators.`,
   `Tier B governance with ${E.tierB.nodes} Decentralization Manager nodes and a decentralized governance party, run by scripts on a separate local topology under one operator: ${passCount(E.tierB.scriptedChecks)} checks. The workspace does not use it.`,

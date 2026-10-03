@@ -7,30 +7,31 @@
 export const EVIDENCE = {
   unitTests: {
     // Every package's Vitest suite in one run. Source: the "Typecheck, lint, unit tests, build" job of CI run
-    // 37103384764 on d1af714 (2026-10-03); a reviewer's full local run on d1af714 reported the same counts.
-    total: 381,
-    byPackage: { canton: 50, domain: 68, "api-client": 32, db: 62, web: 50, api: 112, worker: 7 },
-    commit: "d1af714",
+    // 37108297524 on 4eff547 (2026-10-03). api also skips 4 opt-in PostgreSQL concurrency tests.
+    total: 410,
+    byPackage: { canton: 50, domain: 72, "api-client": 32, db: 66, web: 55, api: 128, worker: 7 },
+    commit: "4eff547",
     date: "2026-10-03",
-    record: "GitHub Actions CI run 37103384764; reviewer's full run on d1af714",
+    record: "GitHub Actions CI run 37108297524",
   },
   ci: {
     // GitHub Actions workflow `CI` on main (.github/workflows/ci.yml). The LocalNet IT workflow is manual and has
     // never run on GitHub.
     passed: true,
-    runId: "37103384764",
-    commit: "d1af714",
+    runId: "37108297524",
+    commit: "4eff547",
     date: "2026-10-03",
     jobs: ["Typecheck, lint, unit tests, build", "Playwright e2e (UI_MOCK)", "Daml build and tests (SDK 3.5.12)"],
-    playwrightUiMock: { passed: 70, skipped: 42 },
-    record: "GitHub Actions run 37103384764",
+    playwrightUiMock: { passed: 79, skipped: 47 },
+    record: "GitHub Actions run 37108297524",
   },
   damlTests: {
-    passed: 60,
-    total: 60,
+    // collara-contracts 0.2.0 (activation depends on a live disclosure; 8 revocation tests added).
+    passed: 68,
+    total: 68,
     scripts: 4,
     date: "2026-10-03",
-    record: "CI run 37103384764 (Daml job); docs/verification.md",
+    record: "CI run 37108297524 (Daml job); docs/verification.md",
   },
   localnetIntegration: {
     // Through the API against a Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet), S3 storage.
@@ -40,6 +41,10 @@ export const EVIDENCE = {
     adversarialRoutes: 44,
     participants: 1,
     date: "2026-10-03",
+    // That full run predates collara-contracts 0.2.0. After 0.2.0 the activation suites (pledge, concurrency) pass
+    // 10/10; the full suite ran only with in-memory evidence storage (68/73: the 5 failures need S3-backed
+    // download links) because the authoring machine lacked disk space for SeaweedFS. Not yet re-run with S3.
+    afterContracts020: { activationSuites: { passed: 10, total: 10 }, fullSuiteWithS3: false },
     record: "docs/verification.md",
   },
   cleanStartBrowser: {
@@ -54,8 +59,9 @@ export const EVIDENCE = {
     // Witness-level privacy on five participants of one sandbox: one machine, one JVM, one operator. It shows what
     // each participant's ledger holds, not isolation between independent operators.
     participants: 5,
-    tests: { passed: 7, total: 7 },
-    checks: { passed: 80, total: 80 },
+    // Re-run with collara-contracts 0.2.0, including the owner and verifier revocation races (now rejected).
+    tests: { passed: 8, total: 8 },
+    checks: { passed: 87, total: 87 },
     runs: 2,
     operators: 1,
     date: "2026-10-03",
