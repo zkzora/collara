@@ -3,7 +3,7 @@
 // requester's own visible facts (auditors: only the scopes every record owner granted), cut at the projection
 // checkpoint, stores it privately and records the SHA-256 checksum. Access is checked at request, again at
 // generation, and again at every download (grants revoked or expired since then block the link).
-import { allocateRef, exportJobs, type ExportJobRow } from "@collara/db";
+import { allocateRef, exportJobs, type CommandRow, type ExportJobRow } from "@collara/db";
 import {
   AUDIT_SCOPES,
   canDownloadReport,
@@ -97,23 +97,27 @@ export async function createReport(
     target: "APPLICATION",
     resourceRef: input.caseId,
   });
-  if (record.status !== "PREPARED") {
-    const stored = ReportSchema.safeParse(record.result);
-    if (stored.success) return { command: service.toStatus(record), result: stored.data, created: false };
-  }
+  const stored = (settled: CommandRow) => {
+    const result = ReportSchema.safeParse(settled.result);
+    if (!result.success) throw problems.stateConflict();
+    return result.data;
+  };
+  if (record.status !== "PREPARED") return { command: service.toStatus(record), result: stored(record), created: false };
   guardCase(scope, member, "report.export");
 
-  // Replay-safe: a job inserted by this command before a crash is reused (scope.commandId).
-  const [existing] = await deps.db
-    .select()
-    .from(exportJobs)
-    .where(and(eq(exportJobs.orgId, member.orgId), sql`${exportJobs.scope}->>'commandId' = ${record.id}`))
-    .limit(1);
-  const row =
-    existing ??
-    (await deps.db.transaction(async (tx) => {
+  // The export job and the command's COMMITTED result commit in one transaction with the command row locked: a
+  // concurrent request with the same key waits and then replays the stored report instead of queueing a second job.
+  const outcome = await service.runApplicationCommand(record, async (tx, locked) => {
+    // A job inserted by this command before job and completion were atomic is reused (scope.commandId).
+    const [existing] = await tx
+      .select()
+      .from(exportJobs)
+      .where(and(eq(exportJobs.orgId, member.orgId), sql`${exportJobs.scope}->>'commandId' = ${locked.id}`))
+      .limit(1);
+    let row = existing;
+    if (!row) {
       const reportRef = await allocateRef(tx, "report");
-      const [inserted] = await tx
+      [row] = await tx
         .insert(exportJobs)
         .values({
           reportRef,
@@ -122,7 +126,7 @@ export async function createReport(
           orgId: member.orgId,
           format: input.format,
           scope: {
-            commandId: record.id,
+            commandId: locked.id,
             auditScopes: exportAuditScopes(scope.facts, member, scope.now, scope.pctx),
             requestedRole: primaryRole(member),
             scopeLabel: exportScopeLabel(member),
@@ -132,14 +136,17 @@ export async function createReport(
           requestedAt: scope.now,
         })
         .returning();
-      if (!inserted) throw new Error("export job insert returned no row");
-      return inserted;
-    }));
-  const report = presentReport(exportFactsOf(row), member, scope.pctx);
-  if (!report) throw problems.unavailable();
-  const committed = await service.completeApplicationCommand(record, report, row.reportRef);
-  await recordAudit(deps.db, { actor: member, action: "report.request", resourceType: "report", resourceRef: row.reportRef, outcome: "SUCCEEDED", requestId: request.id, detail: { caseRef: input.caseId, format: input.format } }, request.log);
-  return { command: service.toStatus(committed), result: report, created };
+      if (!row) throw new Error("export job insert returned no row");
+    }
+    const report = presentReport(exportFactsOf(row), member, scope.pctx);
+    if (!report) throw problems.unavailable();
+    return { kind: "commit", result: report, resourceRef: row.reportRef };
+  });
+  const report = stored(outcome.record);
+  if (outcome.wrote) {
+    await recordAudit(deps.db, { actor: member, action: "report.request", resourceType: "report", resourceRef: report.ref, outcome: "SUCCEEDED", requestId: request.id, detail: { caseRef: input.caseId, format: input.format } }, request.log);
+  }
+  return { command: service.toStatus(outcome.record), result: report, created };
 }
 
 // --- GET /reports ------------------------------------------------------------------------------------------

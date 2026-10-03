@@ -74,16 +74,12 @@ export async function createProposal(
   if (input.intent === "DRAFT") {
     // Drafts are lender-internal working copies: recorded as an application command, never on the ledger.
     const operation = "proposal.draft";
-    if (!(await isReplay(deps.db, member, operation, idempotencyKey))) guardCase(scope, member, "proposal.draft");
     const service = deps.workflow.runner.commands;
-    const { record } = await service.createOrGetCommand({
-      actor: member,
-      operation,
-      idempotencyKey,
-      payload: { caseId: caseRef, input },
-      target: "APPLICATION",
-      resourceRef: caseRef,
-    });
+    const command = { actor: member, operation, idempotencyKey, payload: { caseId: caseRef, input }, target: "APPLICATION", resourceRef: caseRef } as const;
+    // Only a settled command replays without the precondition; an unfinished one is checked like a new request.
+    const prior = await service.findCommand(command);
+    if (!prior || prior.status === "PREPARED") guardCase(scope, member, "proposal.draft");
+    const { record } = await service.createOrGetCommand(command);
     const result: ProposalRefResult = {
       proposalRef: latest?.ref ?? nextFreeRef("proposal", scope.facts.proposals.map((p) => p.ref)),
       version: (latest?.version ?? 0) + 1,

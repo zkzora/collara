@@ -22,6 +22,13 @@
       "when": 1790958958260,
       "tag": "0002_private_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791010651830,
+      "tag": "0003_case_create_atomic",
+      "breakpoints": true
     }
   ]
 }

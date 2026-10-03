@@ -4,7 +4,7 @@
 // Reads: projections → read model (stakeholder-filtered) → domain presenters. Unrelated or unknown → 404-shaped.
 // Writes: policy + preconditions on the viewer's facts, then the ledger runner (fresh ACS reads in prepare).
 // Case creation is an application record (cases table); it never claims a ledger confirmation.
-import { allocateRef, cases as casesTable } from "@collara/db";
+import type { CommandRow } from "@collara/db";
 import {
   caseContext,
   CASE_CREATE_COPY,
@@ -30,7 +30,6 @@ import {
   presentCaseSummary,
   ShareCaseRequestSchema,
 } from "@collara/domain";
-import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { problems } from "../../errors";
 import { inDirectory } from "../directory";
@@ -42,6 +41,7 @@ import {
   workflowProblems,
   workflowResponseSchemas,
 } from "../../workflow";
+import { caseOfCommand, createCaseForAsset } from "../../workflow/cases/create";
 import { assertCheck, commandExists, findAsset, findCase, loadViewerWorld } from "../../workflow/cases/read";
 import { dealerConsent, DEFAULT_SHARE_DAYS, ensureLenderAssessment, shareWithLender } from "../../workflow/sharing";
 import { requestVerification } from "../../workflow/verification/request";
@@ -51,6 +51,7 @@ import type { WorkflowRouteOptions } from "./types";
 const CaseParams = z.object({ id: CaseRefSchema });
 /** INFERRED copy, same strings as the UI_MOCK client. */
 const ACTIVE_CASE = CASE_CREATE_COPY.ACTIVE_CASE;
+const CREATE_REFUSALS: readonly string[] = Object.values(CASE_CREATE_COPY);
 const DAY = 86_400_000;
 
 export const caseRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = async (app, { services, workflow, mode }) => {
@@ -118,67 +119,78 @@ export const caseRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = async (ap
     async (request, reply) => {
       const member = await request.requireActor();
       const input = request.body;
-      const key = request.headers["idempotency-key"];
-      const replay = await commandExists(db, member, "case.create", key);
-      // Cases of this asset that no longer block a new one (released pledge or rejected review).
-      const finished = new Set<string>();
-      if (!replay) {
-        const { world, pctx } = await loadViewerWorld(db, member, mode, now());
-        const asset = findAsset(world, input.assetRef);
-        if (!asset || !presentAssetSummary(asset, world.cases, member, pctx)) throw problems.unavailable();
-        // Owner organization + borrower mandate (S §9.3), registered, no case holding the asset: the same domain
-        // check as the passport's allowed actions and the UI_MOCK client. Policy first (403), state after validation.
-        const check = checkAssetAction(asset, world.cases, member, "case.create", pctx.now, pctx);
-        if (!check.ok && check.reason !== "CONFLICT") assertCheck(check);
-        // Counterparties come from the onboarded directory (GET /api/directory/*), never from a static list.
-        const issues: { path: string; message: string }[] = [];
-        if (!(await inDirectory(db, "LENDER", input.selectedLenderOrgId))) issues.push({ path: "body.selectedLenderOrgId", message: "Select a lender organization." });
-        if (input.dealerOrgId !== undefined && !(await inDirectory(db, "DEALER", input.dealerOrgId))) {
-          issues.push({ path: "body.dealerOrgId", message: "Select a dealer organization." });
-        }
-        if (issues.length > 0) throw problems.validation(issues);
-        assertCheck(check);
-        for (const c of world.cases) if (c.asset.ref === asset.ref && !caseHoldsAsset(c)) finished.add(c.ref);
-      }
+      const commandInput = { actor: member, operation: "case.create", idempotencyKey: request.headers["idempotency-key"], payload: input, target: "APPLICATION" } as const;
+      /** A settled command answers what it stored: the same case, or the same refusal. Never a second case. */
+      const stored = (record: CommandRow) => {
+        if (record.status === "REJECTED") throw problems.stateConflict(record.errorMessage && CREATE_REFUSALS.includes(record.errorMessage) ? record.errorMessage : undefined);
+        const result = CaseCreated.safeParse(record.result);
+        if (!result.success) throw problems.stateConflict();
+        return { command: services.commands.toStatus(record), result: result.data };
+      };
 
-      const { record, created } = await services.commands.createOrGetCommand({ actor: member, operation: "case.create", idempotencyKey: key, payload: input, target: "APPLICATION" });
-      if (record.status !== "PREPARED") {
-        const stored = CaseCreated.safeParse(record.result);
-        if (!stored.success) throw problems.stateConflict();
-        return reply.code(200).send({ command: services.commands.toStatus(record), result: stored.data });
+      // Same key, already settled: the stored outcome (409 idempotency conflict for another payload).
+      const prior = await services.commands.findCommand(commandInput);
+      if (prior && prior.status !== "PREPARED") return reply.code(200).send(stored(prior));
+
+      // A new or unfinished command always runs the full checks; an existing command never skips them.
+      const { world, pctx } = await loadViewerWorld(db, member, mode, now());
+      const asset = findAsset(world, input.assetRef);
+      if (!asset || !presentAssetSummary(asset, world.cases, member, pctx)) throw problems.unavailable();
+      // Owner organization + borrower mandate (S §9.3), registered, no case holding the asset: the same domain
+      // check as the passport's allowed actions and the UI_MOCK client. Policy first (403), state after validation.
+      const check = checkAssetAction(asset, world.cases, member, "case.create", pctx.now, pctx);
+      if (!check.ok && check.reason !== "CONFLICT") assertCheck(check);
+      // Counterparties come from the onboarded directory (GET /api/directory/*), never from a static list.
+      const issues: { path: string; message: string }[] = [];
+      if (!(await inDirectory(db, "LENDER", input.selectedLenderOrgId))) issues.push({ path: "body.selectedLenderOrgId", message: "Select a lender organization." });
+      if (input.dealerOrgId !== undefined && !(await inDirectory(db, "DEALER", input.dealerOrgId))) {
+        issues.push({ path: "body.dealerOrgId", message: "Select a dealer organization." });
       }
-      const caseId = await db.transaction(async (tx) => {
-        // One active case per asset: concurrent creations for the same asset are serialised.
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`case:${input.assetRef}`}))`);
-        const open = await tx
-          .select({ caseRef: casesTable.caseRef })
-          .from(casesTable)
-          .where(and(eq(casesTable.assetRef, input.assetRef), eq(casesTable.borrowerOrgId, member.orgId), isNull(casesTable.cancelledAt), isNull(casesTable.closedAt)));
-        if (!replay && open.some((row) => !finished.has(row.caseRef))) return null;
-        const caseRef = await allocateRef(tx, "case");
-        await tx.insert(casesTable).values({
-          caseRef,
-          title: input.title,
-          purpose: input.purpose ?? null,
-          assetRef: input.assetRef,
-          borrowerOrgId: member.orgId,
-          dealerOrgId: input.dealerOrgId ?? null,
-          selectedLenderOrgId: input.selectedLenderOrgId,
-          requestedPrincipal: input.requestedPrincipal?.amount ?? null,
-          requestedCurrency: input.requestedPrincipal?.currency ?? null,
-          policyRef: CREDIT_POLICY_REF,
-          createdByUserId: member.userId,
-        });
-        return caseRef;
+      if (issues.length > 0) throw problems.validation(issues);
+      // The asset is held (or not registered). Without a command record the request is refused as is; with one (a
+      // retry, or a concurrent request with the same key) the command's transaction below decides: its stored or
+      // already-inserted case wins, otherwise the refusal is recorded.
+      const conflict = check.ok ? null : check.message;
+      if (conflict !== null && !(await services.commands.findCommand(commandInput))) throw problems.stateConflict(conflict);
+      // Cases of this asset that no longer hold it (released pledge or rejected review, per the viewer's ledger facts).
+      const finished = new Set(world.cases.filter((c) => c.asset.ref === asset.ref && !caseHoldsAsset(c)).map((c) => c.ref));
+
+      const { record } = await services.commands.createOrGetCommand(commandInput);
+      let inserted = false;
+      // The case row and the command's COMMITTED result commit in one transaction, with the command row locked.
+      const outcome = await services.commands.runApplicationCommand(record, async (tx, locked) => {
+        const refuse = (message: string) => ({ kind: "reject", error: { kind: "PRECONDITION", message } }) as const;
+        // A case this command inserted earlier (rows from before this transaction was atomic) completes the command.
+        const linked = await caseOfCommand(tx, locked.id);
+        if (linked) return { kind: "commit", result: { caseId: linked }, resourceRef: linked };
+        if (conflict !== null) return refuse(conflict);
+        const caseId = await createCaseForAsset(
+          tx,
+          {
+            title: input.title,
+            purpose: input.purpose ?? null,
+            assetRef: input.assetRef,
+            borrowerOrgId: member.orgId,
+            dealerOrgId: input.dealerOrgId ?? null,
+            selectedLenderOrgId: input.selectedLenderOrgId,
+            requestedPrincipal: input.requestedPrincipal?.amount ?? null,
+            requestedCurrency: input.requestedPrincipal?.currency ?? null,
+            policyRef: CREDIT_POLICY_REF,
+            createdByUserId: member.userId,
+            createCommandId: locked.id,
+          },
+          finished,
+          now(),
+        );
+        if (!caseId) return refuse(ACTIVE_CASE);
+        inserted = true;
+        return { kind: "commit", result: { caseId }, resourceRef: caseId };
       });
-      if (!caseId) {
-        // Recorded, so a retry with the same key answers the same conflict instead of creating a case.
-        await services.commands.transition(record.id, "REJECTED", { error: { kind: "PRECONDITION", message: ACTIVE_CASE } });
-        throw problems.stateConflict(ACTIVE_CASE);
+      const body = stored(outcome.record);
+      if (outcome.wrote) {
+        await recordAudit(db, { actor: member, action: "case.create", resourceType: "case", resourceRef: body.result.caseId, outcome: "SUCCEEDED", requestId: request.id }, request.log);
       }
-      const committed = await services.commands.completeApplicationCommand(record, { caseId }, caseId);
-      await recordAudit(db, { actor: member, action: "case.create", resourceType: "case", resourceRef: caseId, outcome: "SUCCEEDED", requestId: request.id }, request.log);
-      return reply.code(created ? 201 : 200).send({ command: services.commands.toStatus(committed), result: { caseId } });
+      return reply.code(inserted ? 201 : 200).send(body);
     },
   );
 

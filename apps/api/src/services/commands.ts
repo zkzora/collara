@@ -2,7 +2,7 @@
 // PREPARED → SUBMITTED → COMMITTED → PROJECTED, plus REJECTED, FAILED (pre-commit infrastructure),
 // UNKNOWN_OUTCOME (timeout/5xx: reconcile, never report as failure) and PROJECTION_DELAYED.
 import { createHash, randomUUID } from "node:crypto";
-import { commands, type CommandRow, type Db } from "@collara/db";
+import { commands, type CommandRow, type Db, type DbOrTx } from "@collara/db";
 import {
   COMMAND_COPY,
   ERROR_COPY,
@@ -136,6 +136,21 @@ export interface TransitionPatch {
   readonly incrementAttempts?: boolean;
 }
 
+/** A transaction handle (the callback argument of `db.transaction`). */
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** What an APPLICATION command's domain write decided, inside the command's transaction. */
+export type ApplicationWrite =
+  | { readonly kind: "commit"; readonly result: unknown; readonly resourceRef?: string }
+  | { readonly kind: "reject"; readonly error: { readonly kind: string; readonly code?: string; readonly message: string } };
+
+export interface ApplicationOutcome {
+  /** The command after the transaction: settled by this call, or as another request with the same key settled it. */
+  readonly record: CommandRow;
+  /** True when this call ran the domain write; false when the command was already settled (idempotent replay). */
+  readonly wrote: boolean;
+}
+
 export class CommandService {
   constructor(
     private readonly db: Db,
@@ -176,6 +191,16 @@ export class CommandService {
       .returning();
     if (inserted) return { record: inserted, created: true };
 
+    const existing = await this.findCommand(input);
+    if (!existing) throw new Error("command insert conflicted but no existing row was found");
+    return { record: existing, created: false };
+  }
+
+  /**
+   * The command already recorded for (actor, org, operation, idempotency key), or null. The same key with a
+   * different payload is a 409 idempotency conflict. Read-only: it never creates a command.
+   */
+  async findCommand(input: Omit<CreateCommandInput, "target" | "resourceRef">): Promise<CommandRow | null> {
     const [existing] = await this.db
       .select()
       .from(commands)
@@ -188,9 +213,9 @@ export class CommandService {
         ),
       )
       .limit(1);
-    if (!existing) throw new Error("command insert conflicted but no existing row was found");
-    if (existing.payloadHash !== hash) throw problems.idempotencyConflict();
-    return { record: existing, created: false };
+    if (!existing) return null;
+    if (existing.payloadHash !== payloadHash(input.operation, input.payload)) throw problems.idempotencyConflict();
+    return existing;
   }
 
   async get(id: string): Promise<CommandRow | null> {
@@ -208,10 +233,13 @@ export class CommandService {
     return row ?? null;
   }
 
-  /** Atomic, guarded state change: succeeds only from an allowed predecessor state. */
-  async transition(id: string, to: CommandState, patch: TransitionPatch = {}): Promise<CommandRow> {
+  /**
+   * Atomic, guarded state change: succeeds only from an allowed predecessor state. `executor` is the caller's
+   * transaction when the change must commit together with a domain write.
+   */
+  async transition(id: string, to: CommandState, patch: TransitionPatch = {}, executor: DbOrTx = this.db): Promise<CommandRow> {
     const now = this.clock();
-    const [row] = await this.db
+    const [row] = await executor
       .update(commands)
       .set({
         status: to,
@@ -232,14 +260,40 @@ export class CommandService {
       .where(and(eq(commands.id, id), inArray(commands.status, [...COMMAND_TRANSITIONS[to]])))
       .returning();
     if (row) return row;
-    const current = await this.get(id);
+    const [current] = await executor.select({ status: commands.status }).from(commands).where(eq(commands.id, id)).limit(1);
     throw new IllegalCommandTransitionError(id, current?.status ?? "missing", to);
   }
 
-  /** Records an application-only command as committed (no ledger transaction; never claims one). */
+  /**
+   * Runs an APPLICATION command's domain write and the command's completion in ONE transaction. The command row is
+   * locked (SELECT … FOR UPDATE) and re-read first: a concurrent or retried request with the same key waits, then
+   * finds the settled command and returns its stored outcome without writing again. Anything thrown (including by
+   * `write`) rolls back the domain write and the completion together and leaves the command PREPARED for a retry.
+   * `write` must use the transaction it is given for every query.
+   */
+  async runApplicationCommand(record: CommandRow, write: (tx: DbTx, locked: CommandRow) => Promise<ApplicationWrite>): Promise<ApplicationOutcome> {
+    if (record.target !== "APPLICATION") throw new Error(`command ${record.id} is not an application command`);
+    return this.db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(commands).where(eq(commands.id, record.id)).for("update");
+      if (!locked) throw new Error(`command ${record.id} not found`);
+      if (locked.status !== "PREPARED") return { record: locked, wrote: false };
+      const decision = await write(tx, locked);
+      const settled =
+        decision.kind === "commit"
+          ? await this.transition(locked.id, "COMMITTED", { result: decision.result, ...(decision.resourceRef ? { resourceRef: decision.resourceRef } : {}) }, tx)
+          : await this.transition(locked.id, "REJECTED", { error: decision.error }, tx);
+      return { record: settled, wrote: true };
+    });
+  }
+
+  /**
+   * Records an application-only command as committed (no ledger transaction; never claims one). For a command
+   * without a domain write; one with a write uses runApplicationCommand so both commit together.
+   */
   async completeApplicationCommand(record: CommandRow, result: unknown, resourceRef?: string): Promise<CommandRow> {
     if (record.status !== "PREPARED") return record;
-    return this.transition(record.id, "COMMITTED", { result, ...(resourceRef ? { resourceRef } : {}) });
+    const outcome = await this.runApplicationCommand(record, async () => ({ kind: "commit", result, ...(resourceRef ? { resourceRef } : {}) }));
+    return outcome.record;
   }
 
   /**

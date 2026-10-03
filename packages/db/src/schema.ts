@@ -287,11 +287,23 @@ export const cases = pgTable(
       .references(() => users.id),
     cancelledAt: tsz("cancelled_at"),
     closedAt: tsz("closed_at"),
+    /** The case.create command whose transaction inserted this row: a retry of that command finds this case. */
+    createCommandId: uuid("create_command_id"),
+    /**
+     * Set by the transaction that creates the asset's next case, after the ledger showed this case finished
+     * (pledge released or review rejected). Display-neutral: the case stage is still derived from the ledger.
+     */
+    supersededAt: tsz("superseded_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("cases_ref_key").on(t.caseRef),
+    uniqueIndex("cases_create_command_key").on(t.createCommandId),
+    // One active case per asset, also in the database (backstop of the API's domain check, which runs first).
+    uniqueIndex("cases_active_asset_key")
+      .on(t.assetRef)
+      .where(sql`${t.cancelledAt} is null and ${t.closedAt} is null and ${t.supersededAt} is null`),
     index("cases_asset_idx").on(t.assetRef),
     index("cases_borrower_idx").on(t.borrowerOrgId),
     index("cases_lender_idx").on(t.selectedLenderOrgId),

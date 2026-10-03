@@ -6,7 +6,7 @@
 //                              (metadata) and a fresh ledger check of an active share at every download
 // Each mutation is an APPLICATION command (Idempotency-Key required); none claims a ledger confirmation.
 import { randomUUID } from "node:crypto";
-import { allocateRef, cases, evidenceDocuments, users, type CommandRow, type Db, type EvidenceDocumentRow } from "@collara/db";
+import { allocateRef, cases, evidenceDocuments, users, type CommandRow, type Db, type DbOrTx, type EvidenceDocumentRow } from "@collara/db";
 import {
   commandResultSchema,
   DocumentRefSchema,
@@ -25,7 +25,7 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { problems, type ProblemError } from "../errors";
+import { isProblemError, problems, type ProblemError } from "../errors";
 import { assertPermitted, type ResolvedActor } from "../plugins/actor";
 import { presentEvidenceRows } from "../presenters";
 import { recordAudit } from "../services/audit";
@@ -59,8 +59,8 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     return storage;
   }
 
-  async function versionsOf(docRef: string): Promise<EvidenceDocumentRow[]> {
-    return db.select().from(evidenceDocuments).where(eq(evidenceDocuments.docRef, docRef)).orderBy(asc(evidenceDocuments.version));
+  async function versionsOf(docRef: string, executor: DbOrTx = db): Promise<EvidenceDocumentRow[]> {
+    return executor.select().from(evidenceDocuments).where(eq(evidenceDocuments.docRef, docRef)).orderBy(asc(evidenceDocuments.version));
   }
 
   /** Owner (borrower) or the contributing organization; everyone else is unrelated (404). */
@@ -92,12 +92,18 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     return problems.validation([{ path: "body", message: record.errorMessage ?? EVIDENCE_ERRORS.TYPE_MISMATCH }], record.errorMessage ?? undefined);
   }
 
+  /**
+   * Rejects the version (only from the state this request validated) and the command in one transaction, so a retry
+   * replays the same refusal. A command another request with the same key settled meanwhile is left as it is.
+   */
   async function reject(row: EvidenceDocumentRow, record: CommandRow, kind: "VALIDATION" | "TOO_LARGE" | "HASH_MISMATCH", message: string) {
-    await db
-      .update(evidenceDocuments)
-      .set({ status: kind === "HASH_MISMATCH" ? "HASH_MISMATCH" : "REJECTED", rejectionReason: message, updatedAt: clock() })
-      .where(eq(evidenceDocuments.id, row.id));
-    await commands.transition(record.id, "REJECTED", { error: { kind, message } });
+    await commands.runApplicationCommand(record, async (tx) => {
+      await tx
+        .update(evidenceDocuments)
+        .set({ status: kind === "HASH_MISMATCH" ? "HASH_MISMATCH" : "REJECTED", rejectionReason: message, updatedAt: clock() })
+        .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, row.status)));
+      return { kind: "reject", error: { kind, message } };
+    });
   }
 
   // --- POST /upload-intents ------------------------------------------------------------------------
@@ -139,23 +145,23 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
       const respond = (row: CommandRow, intent: UploadIntent) => reply.code(created ? 201 : 200).send({ command: commands.toStatus(row), result: intent });
       if (record.status !== "PREPARED") return respond(record, UploadIntentSchema.parse(record.result));
 
-      // Replay-safe: a version row created by this command before a crash is reused.
-      const [existing] = await db.select().from(evidenceDocuments).where(eq(evidenceDocuments.intentCommandId, record.id)).limit(1);
-      let previous: EvidenceDocumentRow | undefined;
-      if (!existing && body.replacesDocumentId) {
-        previous = (await versionsOf(body.replacesDocumentId)).at(-1);
-        if (!previous || previous.assetRef !== body.assetRef || (previous.contributorOrgId !== actor.orgId && previous.ownerOrgId !== actor.orgId)) {
-          throw problems.unavailable();
-        }
-        if (previous.status === "UPLOAD_PENDING" || previous.status === "QUARANTINED") throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
-      }
-
       const now = clock();
-      const row =
-        existing ??
-        (await db.transaction(async (tx) => {
+      // The version row and the command's COMMITTED result commit together, with the command row locked: a retry or
+      // a concurrent request with the same key gets the stored intent, never a second version.
+      const outcome = await commands.runApplicationCommand(record, async (tx, locked) => {
+        // A version row this command inserted before row and completion were atomic is reused.
+        let [row] = await tx.select().from(evidenceDocuments).where(eq(evidenceDocuments.intentCommandId, locked.id)).limit(1);
+        if (!row) {
+          let previous: EvidenceDocumentRow | undefined;
+          if (body.replacesDocumentId) {
+            previous = (await versionsOf(body.replacesDocumentId, tx)).at(-1);
+            if (!previous || previous.assetRef !== body.assetRef || (previous.contributorOrgId !== actor.orgId && previous.ownerOrgId !== actor.orgId)) {
+              throw problems.unavailable();
+            }
+            if (previous.status === "UPLOAD_PENDING" || previous.status === "QUARANTINED") throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
+          }
           const docRef = previous?.docRef ?? (await allocateRef(tx, "document"));
-          const [inserted] = await tx
+          [row] = await tx
             .insert(evidenceDocuments)
             .values({
               docRef,
@@ -171,22 +177,25 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
               contentType: body.contentType,
               declaredSizeBytes: body.sizeBytes,
               intentExpiresAt: new Date(now.getTime() + INTENT_TTL_MS),
-              intentCommandId: record.id,
+              intentCommandId: locked.id,
             })
             .returning();
-          if (!inserted) throw new Error("evidence version insert returned no row");
-          return inserted;
-        }));
-      const intent: UploadIntent = {
-        evidenceId: row.docRef,
-        version: row.version,
-        uploadPath: `/api/evidence/${row.docRef}/content`,
-        maxBytes: EVIDENCE_MAX_BYTES,
-        expiresAt: row.intentExpiresAt.toISOString(),
-      };
-      const committed = await commands.completeApplicationCommand(record, intent, row.docRef);
-      await recordAudit(db, { actor, action: "evidence.upload_intent", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version } }, request.log);
-      return respond(committed, intent);
+          if (!row) throw new Error("evidence version insert returned no row");
+        }
+        const intent: UploadIntent = {
+          evidenceId: row.docRef,
+          version: row.version,
+          uploadPath: `/api/evidence/${row.docRef}/content`,
+          maxBytes: EVIDENCE_MAX_BYTES,
+          expiresAt: row.intentExpiresAt.toISOString(),
+        };
+        return { kind: "commit", result: intent, resourceRef: row.docRef };
+      });
+      const intent = UploadIntentSchema.parse(outcome.record.result);
+      if (outcome.wrote) {
+        await recordAudit(db, { actor, action: "evidence.upload_intent", resourceType: "evidence", resourceRef: intent.evidenceId, outcome: "SUCCEEDED", requestId: request.id, detail: { version: intent.version } }, request.log);
+      }
+      return respond(outcome.record, intent);
     },
   );
 
@@ -242,18 +251,30 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
 
       const key = `quarantine/${row.docRef}/v${row.version}/${randomUUID()}`;
       await store.putObject(key, read.bytes, row.contentType);
-      const [updated] = await db
-        .update(evidenceDocuments)
-        .set({ status: "QUARANTINED", uploadSha256: read.sha256, sizeBytes: read.size, storageKey: key, uploadedAt: clock(), updatedAt: clock() })
-        .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, "UPLOAD_PENDING")))
-        .returning();
-      if (!updated) {
+      // QUARANTINED and the command's COMMITTED result commit together (a retry never finds one without the other).
+      const outcome = await commands
+        .runApplicationCommand(record, async (tx) => {
+          const [updated] = await tx
+            .update(evidenceDocuments)
+            .set({ status: "QUARANTINED", uploadSha256: read.sha256, sizeBytes: read.size, storageKey: key, uploadedAt: clock(), updatedAt: clock() })
+            .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, "UPLOAD_PENDING")))
+            .returning();
+          if (!updated) throw problems.stateConflict(EVIDENCE_ERRORS.ALREADY_UPLOADED);
+          return { kind: "commit", result: { evidenceId: row.docRef, version: row.version } };
+        })
+        .catch(async (error: unknown) => {
+          // Refused (nothing recorded): the new object is not referenced. Other errors keep it (outcome not proven).
+          if (isProblemError(error)) await store.deleteObject(key).catch(() => undefined);
+          throw error;
+        });
+      if (outcome.wrote) {
+        await recordAudit(db, { actor, action: "evidence.upload_content", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version, sizeBytes: read.size } }, request.log);
+      } else {
+        // Settled meanwhile by a request with the same key: its bytes were recorded, not these.
         await store.deleteObject(key).catch(() => undefined);
-        throw problems.stateConflict(EVIDENCE_ERRORS.ALREADY_UPLOADED);
+        if (outcome.record.status === "REJECTED") throw replayedRejection(outcome.record);
       }
-      const committed = await commands.completeApplicationCommand(record, { evidenceId: row.docRef, version: row.version });
-      await recordAudit(db, { actor, action: "evidence.upload_content", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version, sizeBytes: read.size } }, request.log);
-      return { command: commands.toStatus(committed), result: await present(await versionsOf(row.docRef), actor) };
+      return { command: commands.toStatus(outcome.record), result: await present(await versionsOf(row.docRef), actor) };
     },
   );
 
@@ -305,16 +326,24 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
       const evidenceKey = `evidence/${row.docRef}/v${row.version}/${read.sha256}`;
       await store.putObject(evidenceKey, read.bytes, row.contentType);
       const now = clock();
-      const [promoted] = await db
-        .update(evidenceDocuments)
-        .set({ status: "AVAILABLE", scanStatus: "NOT_SCANNED", sha256: read.sha256, sizeBytes: read.size, storageKey: evidenceKey, finalizedAt: now, updatedAt: now })
-        .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, "QUARANTINED")))
-        .returning();
-      if (!promoted) throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
-      await store.deleteObject(row.storageKey).catch((err: unknown) => request.log.warn({ err }, "quarantine object not deleted"));
-      const committed = await commands.completeApplicationCommand(record, { evidenceId: row.docRef, version: row.version });
-      await recordAudit(db, { actor, action: "evidence.finalize", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version, sha256: read.sha256 } }, request.log);
-      return { command: commands.toStatus(committed), result: await present(await versionsOf(row.docRef), actor) };
+      const quarantineKey = row.storageKey;
+      // AVAILABLE and the command's COMMITTED result commit together (a retry never finds one without the other).
+      const outcome = await commands.runApplicationCommand(record, async (tx) => {
+        const [promoted] = await tx
+          .update(evidenceDocuments)
+          .set({ status: "AVAILABLE", scanStatus: "NOT_SCANNED", sha256: read.sha256, sizeBytes: read.size, storageKey: evidenceKey, finalizedAt: now, updatedAt: now })
+          .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, "QUARANTINED")))
+          .returning();
+        if (!promoted) throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
+        return { kind: "commit", result: { evidenceId: row.docRef, version: row.version } };
+      });
+      if (outcome.wrote) {
+        await store.deleteObject(quarantineKey).catch((err: unknown) => request.log.warn({ err }, "quarantine object not deleted"));
+        await recordAudit(db, { actor, action: "evidence.finalize", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version, sha256: read.sha256 } }, request.log);
+      } else if (outcome.record.status === "REJECTED") {
+        throw replayedRejection(outcome.record);
+      }
+      return { command: commands.toStatus(outcome.record), result: await present(await versionsOf(row.docRef), actor) };
     },
   );
 
