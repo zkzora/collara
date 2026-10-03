@@ -4,18 +4,24 @@ What was run to check **witness-level** privacy between organisations on the led
 what this does **not** show. Synthetic data only. Nothing here is a production-readiness or security claim.
 
 - Date: 2026-10-03 (local time; run ids are UTC). Authoring machine: Windows 11, Node 24.16.0, PostgreSQL 16.14 (WSL),
-  SeaweedFS 4.48.
+  SeaweedFS 4.48 (first recorded runs); the re-run with `collara-contracts` 0.2.0 used the API's **in-memory evidence
+  storage** (`COLLARA_S3_ENDPOINT` empty: the disk was below SeaweedFS's free-space threshold). Storage is off-ledger
+  and does not change what the ledger streams contain.
 - Ledger: Canton 3.5.19 `dpm sandbox` with **five participant nodes in one JVM** (one sequencer, one mediator,
   in-memory storage, `unsafe-jwt-hmac-256` auth), started with `LOCALNET_JDK_JAVA_OPTIONS=-Xmx1536m`. Ready in 41 to
   54 s; java.exe working set about 1.6 GB right after start.
-- Code: HEAD `cc7f777` plus the uncommitted changes of this task (5-participant mode, bootstrap placement, the
-  privacy test).
+- Code: first runs HEAD `cc7f777` plus that task's changes (5-participant mode, bootstrap placement, the privacy
+  test). **Re-run (current tables):** HEAD `3879391` plus the uncommitted revocation-dependency change
+  (`collara-contracts` **0.2.0**: `DisclosureValidity`, daml-model.md D15, §4.5).
 - Test: `apps/api/test/localnet/privacy/witness.privacy.test.ts` (helpers in `evidence.ts`), opt-in with
   `PRIVACY_IT=1`, config `apps/api/vitest.privacy.config.ts`.
-- Recorded runs: `2026-10-02T18-35-12-435Z` and `2026-10-02T18-39-30-685Z`, each on a freshly started sandbox:
-  **7/7 tests, 80/80 checks** both times, with identical projections per node (apart from the order of one witness
-  list). The tables below are from the second run. Two earlier runs failed for
-  test-side reasons, fixed before the recorded runs (see [Findings](#findings) F10, and the note under it).
+- Recorded runs with 0.2.0 (current tables): `2026-10-03T07-47-28-745Z` and `2026-10-03T07-50-37-632Z`, each on a
+  freshly started sandbox: **8/8 tests, 87/87 checks** both times (77 walkthrough + 10 race), with identical per-party,
+  per-node, informee and ledger-end projections. The tables below are from the second run; the summary file is from it.
+- Earlier recorded runs with 0.1.0: `2026-10-02T18-35-12-435Z` and `2026-10-02T18-39-30-685Z`: **7/7 tests, 80/80
+  checks** (the race then *committed* the activation). Two runs before those failed for test-side reasons, fixed
+  before the recorded runs (see [Findings](#findings) F10, and the note under it). Differences between the 0.1.0 and
+  0.2.0 runs are listed in [Changes with 0.2.0](#changes-with-020-disclosurevalidity).
 - Evidence: raw JSON in `.local/privacy/<run>/` (git-ignored); compact summary in
   [`docs/evidence/privacy-summary.json`](evidence/privacy-summary.json).
 
@@ -89,8 +95,9 @@ The recorded runs used `npx vitest run --config vitest.privacy.config.ts --repor
    offset that carries no visible transaction.
 4. **Term markers** searched in every created argument, choice argument and exercise result: the principal and the
    valuation as exact decimal values (`100000.00`, `150000.00`), and the `termMetadata` and `externalLegalRef` texts.
-5. **Revocation race** in two more worlds (each: main seed, then review → proposal → accept → authorize through the
-   API; `apps/api/test/localnet/financing-fixture.ts`).
+5. **Revocation race** in three more worlds (each: main seed, then review → proposal → accept → authorize through the
+   API; `apps/api/test/localnet/financing-fixture.ts`): the owner's `AttDisc_Revoke` and the verifier's `Att_Revoke`,
+   each committed between the API's precheck and the submission, and one unsynchronised pair.
 
 ## Results
 
@@ -126,10 +133,10 @@ consuming exercised event.
 | GovSeat1 | sandbox | 3 | 4 | 3 | 0 / 0 / 0 / 0 | 0 |
 | GovSeat2 | sandbox | 2 | 4 | 5 | 0 / 0 / 0 / 0 | 0 |
 | GovSeat3 | sandbox | 0 | 0 | 0 | 0 / 0 / 0 / 0 | 0 |
-| DemoManufacturer (borrower) | participant2 | 30 | 34 | 25 | 2 / 2 / 2 / **0** | 6 |
-| DemoLenderA | participant3 | 20 | 23 | 12 | 3 / 3 / 3 / 4 | 6 |
+| DemoManufacturer (borrower) | participant2 | 30 | 35 | 25 | 2 / 2 / 2 / **0** | 6 |
+| DemoLenderA | participant3 | 20 | 24 | 12 | 3 / 3 / 3 / 4 | 6 |
 | DemoLenderB | participant4 | 2 | 2 | 0 | 0 / 0 / 0 / 0 | 0 |
-| DemoVerifier | participant5 | 12 | 12 | 7 | 0 / 0 / 0 / 0 | 0 |
+| DemoVerifier | participant5 | 12 | 13 | 7 | 0 / 0 / 0 / 0 | 0 |
 | DemoCNCDealer | participant5 | 3 | 3 | 1 | 0 / 0 / 0 / 0 | 0 |
 | DemoAuditor | participant5 | 2 | 2 | 0 | 0 / 0 / 0 / 0 | 0 |
 
@@ -146,17 +153,19 @@ consuming exercised event.
   VerifierStatusMirror, AssetRegistrationRequest, IssuanceTicket, AssetControl, AssetPassport,
   PledgeActivationAuthorization (Archive only), CollateralLock, CollateralLockReleased`; verifier
   `VerifierAccreditation, CollaraConfig, VerifierStatusMirror, VerificationRequest, VerificationAttestation,
-  AttestationDisclosure`; dealer `DealerContribution, PackageShareProposal, PackageShare`.
+  AttestationDisclosure, DisclosureValidity`; dealer `DealerContribution, PackageShareProposal, PackageShare`. The
+  registrar's set has no `DisclosureValidity`: it never receives the marker's create or archive, only its contract id
+  as an argument of `Control_Activate`.
 
 ### b. Per participant (operator view, CanReadAsAnyParty)
 
 | Participant | Hosts | Transactions | Created | Exercised | Term markers | Sensitive events |
 |---|---|---|---|---|---|---|
 | sandbox | registrar, governance, seats | 16 | 21 | 16 | 0 / 0 / 0 / 0 | 1 (the `Archive` above) |
-| participant2 | borrower | 30 | 34 | 25 | 2 / 2 / 2 / 0 | 6 |
-| participant3 | Lender A | 20 | 23 | 12 | 3 / 3 / 3 / 4 | 6 |
+| participant2 | borrower | 30 | 35 | 25 | 2 / 2 / 2 / 0 | 6 |
+| participant3 | Lender A | 20 | 24 | 12 | 3 / 3 / 3 / 4 | 6 |
 | participant4 | Lender B | 2 | 2 | 0 | 0 / 0 / 0 / 0 | 0 |
-| participant5 | verifier, dealer, auditor | 17 | 17 | 8 | 0 / 0 / 0 / 0 | 0 |
+| participant5 | verifier, dealer, auditor | 17 | 18 | 8 | 0 / 0 / 0 / 0 | 0 |
 
 - The participants that host no borrower or selected lender (`sandbox`, `participant4`, `participant5`) store **no
   terms and no valuation** in anything a Ledger API user of the node can read. The valuation is stored on
@@ -181,11 +190,11 @@ Every row matches the Daml ledger-model rules; the **mismatch with the previous 
 | X2 `VR_AcceptAssignment` (verifier) | participant2, participant5 | exercised `VR_AcceptAssignment`, created `VerificationRequest` [owner, verifier] | Same as M12. Ledger-end deltas: sandbox 3 (0 visible), participant3 0, participant4 0 |
 | X3 `VR_IssueAttestation` (verifier) | participant2, participant5 | as M12 | Same deltas as X2 |
 | M16 `Control_ShareWithLender` (owner) | sandbox, participant2, participant3 | exercised [registrar, owner]; created `AssetControl` [registrar, owner, Lender A] | Refines: Lender A sees only the new control, not the exercise |
-| M17 `Att_DiscloseTo` (owner) | participant2, participant3, participant5 | exercised [owner, verifier]; created `AttestationDisclosure` [owner, verifier, Lender A] | Matches (the verifier learns of the disclosure) |
+| M17 `Att_DiscloseTo` (owner) | participant2, participant3, participant5 | exercised [owner, verifier]; created `DisclosureValidity` [owner, verifier, Lender A]; created `AttestationDisclosure` [owner, verifier, Lender A] | Matches (the verifier learns of the disclosure). 0.2.0 adds the marker's create, with the disclosure's stakeholders |
 | W5 `Assessment_IssueProposal` (Lender A) | participant2, participant3 | exercised [Lender A]; created `FinancingProposal` [Lender A, borrower] (terms) | Matches |
 | W6 `Proposal_Accept` (borrower) | participant2, participant3 | exercised [Lender A, borrower]; created `FinancingAgreement` [Lender A, borrower] (terms) | Matches |
 | W7 `Agreement_AuthorizeActivation` (borrower) | participant2, participant3 | exercised [Lender A, borrower]; created `PledgeActivationAuthorization` [Lender A, borrower] | Matches |
-| W8 `Control_Activate` (Lender A) | sandbox, participant2, participant3 | exercised `Control_Activate`; exercised `Archive` on `PledgeActivationAuthorization`; created `CollateralLock`; all [registrar, Lender A, borrower] | **Mismatch, now recorded:** the registrar also witnesses the `Archive` of the authorization (F2). participant4 and participant5 (Lender B and the verifier, observers of the fetched config and mirror) receive nothing and assign no offset |
+| W8 `Control_Activate` (Lender A) | sandbox, participant2, participant3 | exercised `Control_Activate`; exercised `Archive` on `PledgeActivationAuthorization`; created `CollateralLock`; all [registrar, Lender A, borrower] | **Mismatch, now recorded:** the registrar also witnesses the `Archive` of the authorization (F2). participant4 and participant5 (Lender B and the verifier, observers of the fetched config and mirror, and the verifier also of the fetched `DisclosureValidity`) receive nothing and assign no offset. Same nodes, events and deltas as with 0.1.0: the fetch of the marker produces no event |
 | W10 `Release_Reject` (Lender A) | participant2, participant3 | exercised `Release_Reject`; created `ReleaseDecision` [Lender A, borrower] | Matches: the registrar is not informed (sandbox delta 0) |
 | W12 `Release_Authorize` (Lender A) | sandbox, participant2, participant3 | borrower/lender: 5 events (root, `Lock_Release`, `AssetControl`, `CollateralLockReleased`, `ReleaseDecision`). Registrar: 3 events (`Lock_Release`, created `AssetControl`, created `CollateralLockReleased`) | Refines: the registrar sees neither the `Release_Authorize` root nor the `ReleaseDecision` |
 | W13 / W14 `AuditGrant` | participant2 + participant5 / participant3 + participant5 | created `AuditGrant` [grantor, auditor] | Matches |
@@ -224,7 +233,7 @@ From the registrar's own stream (field names only; no terms in any value):
 
 | Transaction | Events the registrar receives |
 |---|---|
-| `Control_Activate` | exercised `AssetControl.Control_Activate` (consuming; argument `actorRef, authorizationCid, configCid, lender, lockRef, verifierStatusCid`); exercised `PledgeActivationAuthorization.Archive` (consuming; empty argument; no create argument of the authorization); created `CollateralLock` (`activatedAt, activatedByRef, agreementRef, assetId, attestationRef, authorizationRef, caseRef, controlVersion, evidence, lender, lockRef, namespace, owner, registrar`) |
+| `Control_Activate` | exercised `AssetControl.Control_Activate` (consuming; argument `actorRef, authorizationCid, configCid, lender, lockRef, validityCid, verifierStatusCid`; `validityCid` is new in 0.2.0); exercised `PledgeActivationAuthorization.Archive` (consuming; empty argument; no create argument of the authorization); created `CollateralLock` (`activatedAt, activatedByRef, agreementRef, assetId, attestationRef, authorizationRef, caseRef, controlVersion, evidence, lender, lockRef, namespace, owner, registrar`) |
 | `Release_Authorize` | exercised `CollateralLock.Lock_Release` (argument `actorRef, releaseRequestRef`); created `AssetControl` (v5, no lender); created `CollateralLockReleased` |
 
 The registrar learns "asset X locked to lender Y for case Z under agreement ref, authorization ref and attestation
@@ -238,20 +247,52 @@ contents are checked by `financing.it.test.ts` (single participant), not by this
 
 ## Revocation race (daml-model.md §8.2)
 
-`Control_Activate` does not read the `AttestationDisclosure`; the API checks it in `prepare()` before submitting.
+With 0.2.0 `Control_Activate` **fetches** the owner-signed `DisclosureValidity` of the lender's disclosure, which
+every choice that ends the disclosure archives (daml-model.md §4.5). The API's `prepare()` still checks the
+disclosure (fast-fail) and passes that disclosure's `validityCid`; the ledger re-checks it at commit.
 
-| Variant | What happened | Result |
+| Variant (world) | What happened (both 0.2.0 runs) | Result |
 |---|---|---|
-| Deterministic interleaving (world `pvr-…`) | The API route `POST /api/cases/CL-001/pledge-activation` ran with the real `prepare()` (including `requireActiveAttestationDisclosure`, which passed). The test wrapped the runner so that, after `prepare()` returned and before submission, the owner's `AttDisc_Revoke` committed (lender's disclosures at submission: 0) | **`Control_Activate` committed** (HTTP 200, `COMMITTED`, PL-001); 1 active lock, 0 disclosures. On Lender A's participant the revocation is at offset 202 and the activation at 204 |
-| Unsynchronised (world `pvc-…`), one attempt | The activation route and the owner's revocation were submitted concurrently (`Promise.all`) | **Both committed; the revocation was sequenced first** (Lender A's participant: 278, then 279); 1 active lock, 0 disclosures |
+| Deterministic, owner (`pvr-…`) | `POST /api/cases/CL-001/pledge-activation` ran the real `prepare()` (`requireActiveAttestationDisclosure` passed and selected the marker). The test wrapped the runner so that, after `prepare()` returned and before submission, the owner's `AttDisc_Revoke` committed on participant2 (Lender A's disclosures and markers at submission: 0) | **`Control_Activate` rejected by the ledger**: HTTP 409 with the approved copy, command `REJECTED`, `CONTRACT_NOT_FOUND` (on one participant `pledge.it.test.ts` asserts that the missing contract is the selected marker); no update, **0 locks**. No participant's ledger end moved during the submission |
+| Deterministic, verifier (`pvv-…`) | Same, with the verifier's `Att_Revoke` of ATT-001 (listing the disclosure) submitted **on participant5** | Revocation committed (the verifier's node archived the owner-signed marker through `AttDisc_Withdraw`, with the owner's authority from the disclosure); **activation rejected** (409, `REJECTED`, `CONTRACT_NOT_FOUND`), 0 locks, no ledger end moved |
+| Unsynchronised (`pvc-…`), one attempt per run | Activation route and owner revocation submitted concurrently (`Promise.all`) | Both runs: the revocation was sequenced first and **the ledger rejected the activation** (409, `REJECTED`, `CONTRACT_NOT_FOUND`), 0 locks. The opposite order (activation first) did not occur here; on one participant it is covered by `pledge.it.test.ts` ("activation committed first": the later revocation commits and the lock stays `ACTIVE`) |
 
-Informees of the race transactions: the revocation reached participant2, participant3 and participant5 (the verifier
-signs the disclosure, so it learns of the revocation); the activation reached sandbox, participant2 and
-participant3 only (the verifier is not informed of the pledge).
+Informees of the race transactions (every node, update-by-id):
 
-So the precheck narrows the window but does not close it: a revocation committed after the API's ACS read and before
-the activation commits does not stop the activation. A direct ledger submission that skips the API is not stopped
-either. The Daml model was not changed (task scope); see daml-model.md §8.2 and `docs/limitations.md`.
+| Transaction | Nodes | Events (informees) |
+|---|---|---|
+| Owner `AttDisc_Revoke` | participant2, participant3, participant5 | exercised `AttDisc_Revoke`; exercised `Archive` on `DisclosureValidity`; both [owner, verifier, Lender A] |
+| Verifier `Att_Revoke` | participant2, participant5 (all four events); participant3 (two) | exercised `Att_Revoke` [owner, verifier]; exercised `AttDisc_Withdraw` [owner, verifier, Lender A]; exercised `Archive` on `DisclosureValidity` [owner, verifier, Lender A]; created `RevokedAttestation` [owner, verifier]. Lender A's node receives only the withdrawal and the marker's archive |
+
+The registrar's and Lender B's participants receive neither revocation. The rejected activations produced no
+transaction on any node.
+
+Earlier result with 0.1.0 (runs of 2026-10-02, kept for the record): the deterministic interleaving **committed**
+`Control_Activate` (HTTP 200, PL-001; 1 lock, 0 disclosures; on Lender A's participant the revocation at offset 202,
+the activation at 204), and the one concurrent attempt committed both, revocation first.
+
+What the ledger still does not enforce is listed in daml-model.md §4.5 (residuals): an owner can mint a marker that
+no disclosure links to (using it needs the lender's cooperation; pinned by the Daml test
+`test_residual_owner_minted_marker_is_accepted`), `Att_Revoke` and supersession withdraw only the listed disclosures,
+a joint verifier+owner `Archive` of a disclosure leaves its marker, and an owner that archives its own marker blocks
+that disclosure's revocation.
+
+### Changes with 0.2.0 (`DisclosureValidity`)
+
+Compared with the 0.1.0 runs, per party, per node, per key transaction and per walkthrough step:
+
+- **New:** M17 `Att_DiscloseTo` creates the marker, witnessed by exactly the disclosure's stakeholders (owner,
+  verifier, Lender A). Created events +1 for the borrower, the verifier and Lender A (and participant2, participant3,
+  participant5). The registrar's `Control_Activate` argument carries `validityCid` (a contract id).
+- **Unchanged:** transactions per party and per node; every other created and exercised count; term and valuation
+  markers (none outside the borrower and Lender A); Lender B (2 directory events) and the auditor (2 `AuditGrant`s);
+  the nodes and events of every key transaction other than M17; every walkthrough and X step's ledger-end deltas,
+  including W8 `Control_Activate` (sandbox 3, participant2 3, participant3 3, participant4 0, participant5 0); the
+  foreign party ids in each operator view; 65 non-visible offsets probed, 0 readable.
+- So **nobody learns anything new about the pledge**: the verifier's participant still takes no part in
+  `Control_Activate`, and the registrar receives no marker event. Inside the view it validates, the registrar's node
+  also processes the fetched marker's fields (attestation ref, verifier, valid-until, anchor, refs), which the
+  authorization it validates already carries [INFERRED; participant internals were not inspected].
 
 ## Findings
 
@@ -277,9 +318,12 @@ either. The Daml model was not changed (task scope); see daml-model.md §8.2 and
   it learns nothing of proposals, activation or release.
 - **F7. GovSeat3 received nothing** in this workflow: seats are not observers of `GovernanceRules` and read it as the
   governance party, which works only because the seat users and the governance party are on the same participant.
-- **F8. Revocation race confirmed on the ledger** (see above).
+- **F8. Revocation race: confirmed with 0.1.0, closed with 0.2.0** (see above). A revocation (owner or verifier)
+  committed before the activation makes the ledger reject it; the verifier's node archives the owner-signed marker
+  without a cross-participant input failure.
 - **F9. No cross-participant input failures.** Every step of the seed, the walkthrough and the races found its input
-  contracts on the submitter's participant. No observer or explicit-disclosure change was needed.
+  contracts on the submitter's participant. No explicit disclosure was needed: Lender A's node holds the marker it
+  fetches (observer), and the verifier's node holds the marker it archives in `Att_Revoke` (observer).
 - **F10. Bootstrap bug, fixed.** `bootstrap.mjs` treated `CANTON_JSON_API_URL` (set in `.env` for the API) as a
   single-participant override, so the IT harness bootstrapped a 5-participant sandbox as one node (all parties on
   `sandbox`). It now uses that variable only when the running sandbox has at most one participant
@@ -302,12 +346,15 @@ event (F3). The checks were corrected to assert what holds and to record the res
   `CanReadAsAnyParty` operator user. A participant's own stores, logs and the views it decrypts while confirming
   (for example the fetched contracts of a transaction it validates) were not inspected.
 - **Not Splice LocalNet, and not DevNet, TestNet or MainNet.** Not deployed to a Canton Network.
-- **One fixed workflow, twice.** Not covered: share revocation, consent withdrawal, verification grants created through
-  the API (`PackageShare` with purpose `VERIFICATION`), supersession and revocation of attestations, governed
-  add/suspend verifier and `Mirror_Sync`, information-request rounds, declines and withdrawals, audit grant revocation.
-  The unsynchronised race ran once.
+- **One fixed workflow, twice per model version.** Not covered: share revocation, consent withdrawal, verification
+  grants created through the API (`PackageShare` with purpose `VERIFICATION`), **supersession** of attestations (the
+  verifier's `Att_Revoke` is covered by the race; supersession uses the same `AttDisc_Withdraw` and is covered by Daml
+  Script only), governed add/suspend verifier and `Mirror_Sync`, information-request rounds, declines and withdrawals,
+  audit grant revocation. The unsynchronised race ran once per run; the activation-first order was not observed on five
+  participants.
 - **ACS snapshots** per party were not compared separately (update streams only).
 - **The API and read model** ran on the 5-participant ledger only as far as this walkthrough needed (projection from
   all five participants into one database). The normal integration suite still runs on one participant.
-- **Not changed:** the Daml model (the race is documented, not fixed), Tier A governance, HMAC ledger auth, in-memory
-  state.
+- **Not changed:** Tier A governance, HMAC ledger auth, in-memory ledger state. The Daml model **did** change for the
+  re-run (`collara-contracts` 0.2.0, uploaded to fresh sandboxes only; not upgrade-compatible with 0.1.0). The Tier B
+  topology (`scripts/tierb/`) was not re-run with 0.2.0.

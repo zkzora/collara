@@ -1,10 +1,10 @@
 {
   "run": {
-    "run": "2026-10-02T18-39-30-685Z",
-    "prefix": "pv-b4vwv6ea7",
-    "namespace": "collara-localnet-pv-b4vwv6ea7",
+    "run": "2026-10-03T07-50-37-632Z",
+    "prefix": "pv-3e9mx82ca",
+    "namespace": "collara-localnet-pv-3e9mx82ca",
     "seedSteps": 24,
-    "seedMs": 23408,
+    "seedMs": 19065,
     "walkthroughSteps": [
       "W1-W2 save assessment (Assessment_StartReview + Assessment_Save)",
       "W3 submit for approval (Assessment_SubmitForApproval)",
@@ -83,6 +83,11 @@
       "commands": 1,
       "committed": 1
     },
+    "DemoLenderA": {
+      "participant": "participant3",
+      "commands": 10,
+      "committed": 10
+    },
     "GovSeat1": {
       "participant": "sandbox",
       "commands": 2,
@@ -93,25 +98,20 @@
       "commands": 2,
       "committed": 2
     },
-    "DemoLenderA": {
-      "participant": "participant3",
-      "commands": 10,
-      "committed": 10
-    },
     "DemoManufacturer": {
       "participant": "participant2",
       "commands": 16,
       "committed": 16
     },
-    "DemoCNCDealer": {
-      "participant": "participant5",
-      "commands": 2,
-      "committed": 2
-    },
     "DemoVerifier": {
       "participant": "participant5",
       "commands": 5,
       "committed": 5
+    },
+    "DemoCNCDealer": {
+      "participant": "participant5",
+      "commands": 2,
+      "committed": 2
     }
   },
   "perParty": {
@@ -221,7 +221,7 @@
       },
       "sensitiveTemplateEvents": [
         {
-          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "updateId": "1220515651b5cb7adf8a608eaa2c32e17ec1b81af03346ed475ad95686b84e058912",
           "template": "PledgeActivationAuthorization",
           "kind": "exercised",
           "choice": "Archive",
@@ -294,7 +294,7 @@
       "participant": "participant2",
       "transactions": 30,
       "events": {
-        "created": 34,
+        "created": 35,
         "exercised": 25,
         "archived": 0
       },
@@ -381,6 +381,12 @@
           "archived": 0,
           "choices": {}
         },
+        "DisclosureValidity": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
         "AttestationDisclosure": {
           "created": 1,
           "exercised": 0,
@@ -461,7 +467,7 @@
       },
       "sensitiveTemplateEvents": [
         {
-          "updateId": "1220372cff56e8b2b7ea10d6535ea31aebd4f36bf9717e8fbd6ab5ac5dc811509068",
+          "updateId": "1220bb3d0d92a6ca2fc373f739d7974a15c62e7a364646e3725231cfaf7ed17198e9",
           "template": "FinancingProposal",
           "kind": "created",
           "markers": [
@@ -471,14 +477,14 @@
           ]
         },
         {
-          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "updateId": "1220377022c3b439aadc94998e83db99e35f68d1acf1dde483a5ea5b4c3b97bfd6d7",
           "template": "FinancingProposal",
           "kind": "exercised",
           "choice": "Proposal_Accept",
           "markers": []
         },
         {
-          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "updateId": "1220377022c3b439aadc94998e83db99e35f68d1acf1dde483a5ea5b4c3b97bfd6d7",
           "template": "FinancingAgreement",
           "kind": "created",
           "markers": [
@@ -488,20 +494,20 @@
           ]
         },
         {
-          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "updateId": "1220242cd40b9b23bbf0c96062e6d2971341c8a900065dbbb218a23a569950709d27",
           "template": "FinancingAgreement",
           "kind": "exercised",
           "choice": "Agreement_AuthorizeActivation",
           "markers": []
         },
         {
-          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "updateId": "1220242cd40b9b23bbf0c96062e6d2971341c8a900065dbbb218a23a569950709d27",
           "template": "PledgeActivationAuthorization",
           "kind": "created",
           "markers": []
         },
         {
-          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "updateId": "1220515651b5cb7adf8a608eaa2c32e17ec1b81af03346ed475ad95686b84e058912",
           "template": "PledgeActivationAuthorization",
           "kind": "exercised",
           "choice": "Archive",
@@ -551,7 +557,7 @@
       "participant": "participant5",
       "transactions": 12,
       "events": {
-        "created": 12,
+        "created": 13,
         "exercised": 7,
         "archived": 0
       },
@@ -593,6 +599,12 @@
             "Att_DiscloseTo": 1
           }
         },
+        "DisclosureValidity": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
         "AttestationDisclosure": {
           "created": 1,
           "exercised": 0,
@@ -612,7 +624,7 @@
       "participant": "participant3",
       "transactions": 20,
       "events": {
-        "created": 23,
+        "created": 24,
         "exercised": 12,
         "archived": 0
       },
@@ -642,6 +654,12 @@
           "choices": {
             "Control_Activate": 1
           }
+        },
+        "DisclosureValidity": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
         },
         "AttestationDisclosure": {
           "created": 1,
@@ -735,7 +753,7 @@
       },
       "sensitiveTemplateEvents": [
         {
-          "updateId": "1220372cff56e8b2b7ea10d6535ea31aebd4f36bf9717e8fbd6ab5ac5dc811509068",
+          "updateId": "1220bb3d0d92a6ca2fc373f739d7974a15c62e7a364646e3725231cfaf7ed17198e9",
           "template": "FinancingProposal",
           "kind": "created",
           "markers": [
@@ -745,14 +763,14 @@
           ]
         },
         {
-          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "updateId": "1220377022c3b439aadc94998e83db99e35f68d1acf1dde483a5ea5b4c3b97bfd6d7",
           "template": "FinancingProposal",
           "kind": "exercised",
           "choice": "Proposal_Accept",
           "markers": []
         },
         {
-          "updateId": "1220d6b97d50966b98cd71d354f523e16adfcff5a503df4430722fe77f6c4e86d2af",
+          "updateId": "1220377022c3b439aadc94998e83db99e35f68d1acf1dde483a5ea5b4c3b97bfd6d7",
           "template": "FinancingAgreement",
           "kind": "created",
           "markers": [
@@ -762,20 +780,20 @@
           ]
         },
         {
-          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "updateId": "1220242cd40b9b23bbf0c96062e6d2971341c8a900065dbbb218a23a569950709d27",
           "template": "FinancingAgreement",
           "kind": "exercised",
           "choice": "Agreement_AuthorizeActivation",
           "markers": []
         },
         {
-          "updateId": "12207cf257dd531e8a0f992bec53bc433a2bc76aacdfa6989044502ad6df6dbac678",
+          "updateId": "1220242cd40b9b23bbf0c96062e6d2971341c8a900065dbbb218a23a569950709d27",
           "template": "PledgeActivationAuthorization",
           "kind": "created",
           "markers": []
         },
         {
-          "updateId": "122019c4ef878cb1e035dae4dc81d7ce4a048a57e87efeb5e321f518b0d6fe657b3f",
+          "updateId": "1220515651b5cb7adf8a608eaa2c32e17ec1b81af03346ed475ad95686b84e058912",
           "template": "PledgeActivationAuthorization",
           "kind": "exercised",
           "choice": "Archive",
@@ -1170,7 +1188,7 @@
       ],
       "transactions": 30,
       "events": {
-        "created": 34,
+        "created": 35,
         "exercised": 25,
         "archived": 0
       },
@@ -1253,6 +1271,12 @@
         },
         "PackageShare": {
           "created": 2,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "DisclosureValidity": {
+          "created": 1,
           "exercised": 0,
           "archived": 0,
           "choices": {}
@@ -1359,7 +1383,7 @@
       ],
       "transactions": 20,
       "events": {
-        "created": 23,
+        "created": 24,
         "exercised": 12,
         "archived": 0
       },
@@ -1389,6 +1413,12 @@
           "choices": {
             "Control_Activate": 1
           }
+        },
+        "DisclosureValidity": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
         },
         "AttestationDisclosure": {
           "created": 1,
@@ -1545,7 +1575,7 @@
       ],
       "transactions": 17,
       "events": {
-        "created": 17,
+        "created": 18,
         "exercised": 8,
         "archived": 0
       },
@@ -1602,6 +1632,12 @@
           }
         },
         "PackageShare": {
+          "created": 1,
+          "exercised": 0,
+          "archived": 0,
+          "choices": {}
+        },
+        "DisclosureValidity": {
           "created": 1,
           "exercised": 0,
           "archived": 0,
@@ -2216,6 +2252,7 @@
           "configCid",
           "lender",
           "lockRef",
+          "validityCid",
           "verifierStatusCid"
         ],
         "markers": []
@@ -2298,78 +2335,128 @@
     ]
   },
   "checks": {
-    "total": 80,
-    "passed": 80,
+    "total": 87,
+    "passed": 87,
     "failed": []
   },
   "race": {
     "deterministic": {
-      "prefix": "pvr-b69j08114",
-      "revocationCommitted": true,
-      "lenderDisclosuresWhenActivationWasSubmitted": 0,
-      "activation": {
-        "httpStatus": 200,
-        "state": "COMMITTED",
-        "pledgeRef": "PL-001"
+      "prefix": "pvr-3fd1ffcc2",
+      "revocation": {
+        "by": "owner AttDisc_Revoke",
+        "committed": true
       },
-      "activeLocksAfter": 1,
-      "lenderDisclosuresAfter": 0,
-      "orderOnLenderParticipant": {
-        "revocation": 202,
-        "activation": 204
+      "lenderDisclosuresWhenActivationWasSubmitted": 0,
+      "lenderMarkersWhenActivationWasSubmitted": 0,
+      "activation": {
+        "httpStatus": 409,
+        "detail": "This action could not complete because the asset workflow state changed.",
+        "ledger": {
+          "state": "REJECTED",
+          "errorKind": "CONTRACT_NOT_FOUND",
+          "errorCode": "CONTRACT_NOT_FOUND",
+          "errorMessage": "CONTRACT_NOT_FOUND: Contract could not be found with id 00e7fb3e178860c9473b9ddabdacc3a4939eeba7b61889ec0098b3d008636bcba3ca121220f3c8993c06398336e08bbdb07c0470aa318106a289f8778415398070b5acdb19"
+        },
+        "updateId": null
+      },
+      "activeLocksAfter": 0,
+      "ledgerEndDeltasDuringSubmission": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 0
       },
       "informees": {
         "revocation": {
           "sandbox": "not received",
           "participant2": [
-            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]"
           ],
           "participant3": [
-            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]"
           ],
           "participant4": "not received",
           "participant5": [
-            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]"
+            "exercised AttestationDisclosure AttDisc_Revoke [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]"
           ]
+        }
+      }
+    },
+    "deterministicVerifier": {
+      "prefix": "pvv-3ftm75fef",
+      "revocation": {
+        "by": "verifier Att_Revoke (withdraws the disclosure, which archives its marker)",
+        "committed": true,
+        "ledgerSource": "participant5"
+      },
+      "lenderDisclosuresWhenActivationWasSubmitted": 0,
+      "lenderMarkersWhenActivationWasSubmitted": 0,
+      "activation": {
+        "httpStatus": 409,
+        "detail": "This action could not complete because the asset workflow state changed.",
+        "ledger": {
+          "state": "REJECTED",
+          "errorKind": "CONTRACT_NOT_FOUND",
+          "errorCode": "CONTRACT_NOT_FOUND",
+          "errorMessage": "CONTRACT_NOT_FOUND: Contract could not be found with id 003b3386ebe09b5b7c481ead33a1be08c7268140ce039aca0115d617664dab3ec8ca121220a6aec15454c90777860c687522c7e7d78da48fe8a7c1515221504fc714ca7c3a"
         },
-        "activation": {
-          "sandbox": [
-            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
-          ],
+        "updateId": null
+      },
+      "activeLocksAfter": 0,
+      "ledgerEndDeltasDuringSubmission": {
+        "sandbox": 0,
+        "participant2": 0,
+        "participant3": 0,
+        "participant4": 0,
+        "participant5": 0
+      },
+      "informees": {
+        "revocation": {
+          "sandbox": "not received",
           "participant2": [
-            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+            "exercised VerificationAttestation Att_Revoke [DemoManufacturer,DemoVerifier]",
+            "exercised AttestationDisclosure AttDisc_Withdraw [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "created RevokedAttestation [DemoManufacturer,DemoVerifier]"
           ],
           "participant3": [
-            "exercised AssetControl Control_Activate [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "exercised PledgeActivationAuthorization Archive [CollaraRegistrar,DemoLenderA,DemoManufacturer]",
-            "created CollateralLock [CollaraRegistrar,DemoLenderA,DemoManufacturer]"
+            "exercised AttestationDisclosure AttDisc_Withdraw [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]"
           ],
           "participant4": "not received",
-          "participant5": "not received"
+          "participant5": [
+            "exercised VerificationAttestation Att_Revoke [DemoManufacturer,DemoVerifier]",
+            "exercised AttestationDisclosure AttDisc_Withdraw [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "exercised DisclosureValidity Archive [DemoLenderA,DemoManufacturer,DemoVerifier]",
+            "created RevokedAttestation [DemoManufacturer,DemoVerifier]"
+          ]
         }
       }
     },
     "concurrent": {
-      "prefix": "pvc-b6ra7bb92",
+      "prefix": "pvc-3g9nq9544",
       "activation": {
-        "httpStatus": 200,
-        "state": "COMMITTED",
-        "detail": null
+        "httpStatus": 409,
+        "state": "REJECTED",
+        "detail": "This action could not complete because the asset workflow state changed.",
+        "errorKind": "CONTRACT_NOT_FOUND",
+        "errorCode": "CONTRACT_NOT_FOUND"
       },
       "revocation": {
         "state": "COMMITTED"
       },
-      "activeLocksAfter": 1,
+      "activeLocksAfter": 0,
       "lenderDisclosuresAfter": 0,
+      "lenderMarkersAfter": 0,
       "orderOnLenderParticipant": {
-        "revocation": 278,
-        "activation": 279
+        "revocation": 346,
+        "activation": null
       },
-      "outcome": "both committed; the revocation was committed first, so the lock was created without an active disclosure"
+      "outcome": "the ledger rejected the activation (the revocation was sequenced first)"
     }
   },
   "informees": {
@@ -2416,13 +2503,14 @@
       ],
       "eventsPerNode": {
         "sandbox": 0,
-        "participant2": 2,
-        "participant3": 1,
+        "participant2": 3,
+        "participant3": 2,
         "participant4": 0,
-        "participant5": 2
+        "participant5": 3
       },
       "widestView": [
         "exercised VerificationAttestation Att_DiscloseTo [DemoManufacturer,DemoVerifier]",
+        "created DisclosureValidity [DemoLenderA,DemoManufacturer,DemoVerifier]",
         "created AttestationDisclosure [DemoLenderA,DemoManufacturer,DemoVerifier]"
       ]
     },
