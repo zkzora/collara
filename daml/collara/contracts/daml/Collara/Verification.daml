@@ -218,6 +218,7 @@ template VerificationAttestation
 
     -- | Owner-controlled sharing of a verifier-signed copy with one recipient. The verifier pre-authorizes this by
     -- signing a template that has the choice; the verifier learns that the owner disclosed to the recipient.
+    -- Also creates the copy's owner-signed `DisclosureValidity`, which `Control_Activate` depends on.
     nonconsuming choice Att_DiscloseTo : ContractId AttestationDisclosure
       with
         recipient : Party
@@ -228,6 +229,16 @@ template VerificationAttestation
       do
         assertMsg "Recipient must be another party" (recipient /= owner && recipient /= verifier)
         now <- getTime
+        validityCid <- create DisclosureValidity with
+          owner
+          verifier
+          recipient
+          namespace
+          assetId
+          caseRef = disclosureCaseRef
+          attestationRef
+          evidence
+          validUntil
         create AttestationDisclosure with
           verifier
           owner
@@ -237,6 +248,7 @@ template VerificationAttestation
           attestationCid = self
           attestation = this
           disclosedAt = now
+          validityCid
 
     choice Att_Revoke : ContractId RevokedAttestation
       with
@@ -265,7 +277,8 @@ withdrawDisclosures attestationCid disclosureCids =
     assertMsg "Disclosure is of another attestation" (disclosure.attestationCid == attestationCid)
     exercise d AttDisc_Withdraw
 
--- | Verifier-signed copy of an attestation, visible to one recipient (e.g. the selected lender).
+-- | Verifier-signed copy of an attestation, visible to one recipient (e.g. the selected lender). Every choice that
+-- ends it also archives its `DisclosureValidity`, so a pledge activation cannot rely on it any more.
 template AttestationDisclosure
   with
     verifier : Party
@@ -276,21 +289,49 @@ template AttestationDisclosure
     attestationCid : ContractId VerificationAttestation
     attestation : VerificationAttestation
     disclosedAt : Time
+    validityCid : ContractId DisclosureValidity
+      -- ^ Created with this copy by `Att_DiscloseTo`.
   where
     signatory verifier, owner
     observer recipient
     ensure attestation.verifier == verifier && attestation.owner == owner
 
-    -- | Limits future visibility only. Previously shared copies may still exist.
+    -- | Limits future visibility (previously shared copies may still exist) and ends the copy's use for activation.
     choice AttDisc_Revoke : ()
       with
         actorRef : Text
       controller owner
-      do pure ()
+      do archive validityCid
 
+    -- | Used by `Att_Revoke` and `Att_Supersede`. The owner's authority (a signatory of this disclosure) archives
+    -- the owner-signed validity marker.
     choice AttDisc_Withdraw : ()
       controller verifier
-      do pure ()
+      do archive validityCid
+
+-- | Owner-signed marker that one `AttestationDisclosure` is live. `Control_Activate` fetches it, so a disclosure
+-- revoked, withdrawn or superseded before the activation commits makes the activation fail on the ledger
+-- (docs/architecture/daml-model.md §4.5, §8.2). A fetch informs the fetched contract's signatories and its
+-- stakeholders among the authorizers (registrar, owner, lender), never its other observers: the verifier, an
+-- observer here, takes no part in the activation. Fields repeat the disclosure's; no terms.
+template DisclosureValidity
+  with
+    owner : Party
+    verifier : Party
+      -- ^ Observer: its `Att_Revoke` and supersession archive the marker, so its participant must hold it.
+    recipient : Party
+      -- ^ Observer: the lender's participant uses it as an input of `Control_Activate`.
+    namespace : Text
+    assetId : Text
+    caseRef : Text
+    attestationRef : Text
+    evidence : EvidenceAnchor
+    validUntil : Time
+  where
+    signatory owner
+    observer recipient, verifier
+    ensure attestationRef /= "" && validAnchor evidence && owner /= verifier
+      && recipient /= owner && recipient /= verifier
 
 template RevokedAttestation
   with

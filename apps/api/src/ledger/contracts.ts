@@ -267,6 +267,21 @@ export const AttestationDisclosureSchema = z.object({
   attestationCid: Cid,
   attestation: VerificationAttestationSchema,
   disclosedAt: Time,
+  /** Its DisclosureValidity (created with it; archived by every choice that ends it). */
+  validityCid: Cid,
+});
+
+/** Owner-signed marker that one AttestationDisclosure is live; Control_Activate fetches it (daml-model.md §4.5). */
+export const DisclosureValiditySchema = z.object({
+  owner: Party,
+  verifier: Party,
+  recipient: Party,
+  namespace: Text,
+  assetId: Text,
+  caseRef: Text,
+  attestationRef: Text,
+  evidence: EvidenceAnchorSchema,
+  validUntil: Time,
 });
 
 export const RevokedAttestationSchema = z.object({
@@ -505,6 +520,7 @@ export const PAYLOAD_SCHEMAS = {
   VerificationRequest: VerificationRequestSchema,
   VerificationAttestation: VerificationAttestationSchema,
   AttestationDisclosure: AttestationDisclosureSchema,
+  DisclosureValidity: DisclosureValiditySchema,
   RevokedAttestation: RevokedAttestationSchema,
   CollateralAssessment: CollateralAssessmentSchema,
   LenderDecisionNotice: LenderDecisionNoticeSchema,
@@ -531,6 +547,7 @@ export type AssetControlPayload = Payload<"AssetControl">;
 export type EvidenceManifestPayload = Payload<"EvidenceManifest">;
 export type VerificationAttestationPayload = Payload<"VerificationAttestation">;
 export type AttestationDisclosurePayload = Payload<"AttestationDisclosure">;
+export type DisclosureValidityPayload = Payload<"DisclosureValidity">;
 export type ReviewSnapshot = z.output<typeof ReviewSnapshotSchema>;
 export type EvidenceAnchor = z.output<typeof EvidenceAnchorSchema>;
 export type ManifestEntry = z.output<typeof ManifestEntrySchema>;

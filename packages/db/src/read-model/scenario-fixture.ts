@@ -351,11 +351,18 @@ export function buildScenario(stage: ScenarioStage = "full", ledger = new FakeLe
     tx.exercise(control, "Control_ShareWithLender", { lender: P.lenderA, actorRef: "mbr:manufacturer-owner" }, { actingParties: [P.owner] });
     control = tx.create(T.AssetControl, controlPayload(3, anchor(2), P.lenderA), { signatories: [P.registrar, P.owner], observers: [P.lenderA] });
   });
+  let validity = "";
   ledger.tx((tx) => {
     tx.exercise(attestation, "Att_DiscloseTo", { recipient: P.lenderA, purpose: "LENDER_REVIEW", disclosureCaseRef: caseRef, actorRef: "mbr:manufacturer-owner" }, { actingParties: [P.owner], consuming: false });
+    // The disclosure's validity marker (collara-contracts 0.2.0; Control_Activate fetches it). Stored, not presented.
+    validity = tx.create(
+      T.DisclosureValidity,
+      { owner: P.owner, verifier: P.verifier, recipient: P.lenderA, namespace: ns, assetId: asset, caseRef, attestationRef: "ATT-001", evidence: anchor(2), validUntil: attestationPayload.validUntil },
+      { signatories: [P.owner], observers: [P.lenderA, P.verifier] },
+    );
     tx.create(
       T.AttestationDisclosure,
-      { verifier: P.verifier, owner: P.owner, recipient: P.lenderA, purpose: "LENDER_REVIEW", caseRef, attestationCid: attestation, attestation: attestationPayload, disclosedAt: ledger.now().toISOString() },
+      { verifier: P.verifier, owner: P.owner, recipient: P.lenderA, purpose: "LENDER_REVIEW", caseRef, attestationCid: attestation, attestation: attestationPayload, disclosedAt: ledger.now().toISOString(), validityCid: validity },
       { signatories: [P.verifier, P.owner], observers: [P.lenderA] },
     );
   });
@@ -437,7 +444,7 @@ export function buildScenario(stage: ScenarioStage = "full", ledger = new FakeLe
   let lock = "";
   const lockPayload = { registrar: P.registrar, owner: P.owner, lender: P.lenderA, namespace: ns, assetId: asset, controlVersion: "4", evidence: anchor(2), lockRef: "PL-001", caseRef, authorizationRef: "AUTH-001", agreementRef: "FP-001", attestationRef: "ATT-001", activatedAt: "", activatedByRef: "mbr:lender-a-approver" };
   ledger.tx((tx) => {
-    tx.exercise(control, "Control_Activate", { lender: P.lenderA, authorizationCid: authorization, configCid: config, lockRef: "PL-001", actorRef: "mbr:lender-a-approver" }, { actingParties: [P.lenderA] });
+    tx.exercise(control, "Control_Activate", { lender: P.lenderA, authorizationCid: authorization, validityCid: validity, configCid: config, lockRef: "PL-001", actorRef: "mbr:lender-a-approver" }, { actingParties: [P.lenderA] });
     tx.exercise(authorization, "Archive", {}, { actingParties: [P.lenderA, P.owner] });
     lock = tx.create(T.CollateralLock, { ...lockPayload, activatedAt: ledger.now().toISOString() }, { signatories: [P.registrar, P.owner, P.lenderA] });
   });

@@ -163,6 +163,7 @@ test_supersede_and_revoke = do
   att1 <- issueAttestation l requestCid "ATT-001" (days 30) l.accreditationCid
   disclosure1 <- submit p.owner $ exerciseCmd att1 Att_DiscloseTo with
     recipient = p.lenderA; purpose = "LENDER_REVIEW"; disclosureCaseRef = fixtureCaseRef; actorRef = ownerActor
+  validity1 <- validityOf p.owner disclosure1
   request2 <- requestFrom l manifestCid p.verifier "VR-002"
   accepted2 <- acceptAssignment l request2
   now <- getTime
@@ -180,6 +181,7 @@ test_supersede_and_revoke = do
     actorRef = verifierActor
   assertArchived "superseded ATT-001" p.owner att1
   assertArchived "disclosure of ATT-001" p.lenderA disclosure1
+  assertArchived "validity marker of the ATT-001 disclosure" p.owner validity1
   corrected <- fetchAs p.owner att2
   assertEq "supersedes" (Some "ATT-001") corrected.supersedesRef
   revokedCid <- submit p.verifier $ exerciseCmd att2 Att_Revoke with
@@ -203,13 +205,13 @@ test_suspension_blocks_new_activation_by_policy = do
   mirrorCid <- submit p.registrar $ exerciseCmd l.mirrorCid Mirror_Sync with
     configCid = l.configCid; accreditationCid = suspendedCid; newSourceRef = "GP-002"
   let synced = l with mirrorCid
-  rOldMirror <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  rOldMirror <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectConsumed rOldMirror
-  rSuspended <- trySubmit p.lenderA $ activateCmd synced p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  rSuspended <- trySubmit p.lenderA $ activateCmd synced p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectFailure "Verifier suspended" rSuspended
   configCid <- submit p.registrar $ exerciseCmd l.configCid Config_Update with
     newGovernanceParty = p.governance
     newSuspensionPolicy = ALLOW_ISSUED_ATTESTATIONS
     newDirectory = [p.verifier, p.lenderA, p.lenderB]
-  _ <- activate (synced with configCid) p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  _ <- activate (synced with configCid) p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   pure ()

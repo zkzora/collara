@@ -22,6 +22,7 @@ export const TEMPLATES = {
   VerificationRequest: contracts("Collara.Verification", "VerificationRequest"),
   VerificationAttestation: contracts("Collara.Verification", "VerificationAttestation"),
   AttestationDisclosure: contracts("Collara.Verification", "AttestationDisclosure"),
+  DisclosureValidity: contracts("Collara.Verification", "DisclosureValidity"),
   RevokedAttestation: contracts("Collara.Verification", "RevokedAttestation"),
   CollateralAssessment: contracts("Collara.Financing", "CollateralAssessment"),
   LenderDecisionNotice: contracts("Collara.Financing", "LenderDecisionNotice"),

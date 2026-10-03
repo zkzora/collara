@@ -394,6 +394,8 @@ data MainFixture = MainFixture
     ownerShareCid : ContractId PackageShare
       -- ^ SHR-002: the owner's documents, for Demo Lender A.
     disclosureCid : ContractId AttestationDisclosure
+    validityCid : ContractId DisclosureValidity
+      -- ^ The disclosure's validity marker (Control_Activate fetches it).
     assessmentCid : ContractId CollateralAssessment
       -- ^ CA-001, SUBMITTED.
   deriving (Eq, Show)
@@ -428,6 +430,7 @@ buildMainFixtureValidFor validity l0 = do
     dealerShareCid = shared.dealerShareCid
     ownerShareCid = shared.ownerShareCid
     disclosureCid = shared.disclosureCid
+    validityCid = shared.validityCid
     ..
 
 data Shared = Shared
@@ -436,12 +439,13 @@ data Shared = Shared
     ownerShareCid : ContractId PackageShare
     controlCid : ContractId AssetControl
     disclosureCid : ContractId AttestationDisclosure
+    validityCid : ContractId DisclosureValidity
   deriving (Eq, Show)
 
 -- | The owner's "share with selected lender" action, in this order (one submitter each):
 -- 1. owner creates `PackageShareProposal` (dealer documents only); 2. dealer `Consent_Grant`;
 -- 3. owner creates the owner-documents `PackageShare`; 4. owner `Control_ShareWithLender`;
--- 5. owner `Att_DiscloseTo`.
+-- 5. owner `Att_DiscloseTo` (also creates the disclosure's `DisclosureValidity`).
 shareWithLender : Ledger -> ContractId EvidenceManifest -> ContractId AssetControl -> ContractId VerificationAttestation
   -> Party -> Text -> Text -> Script Shared
 shareWithLender l manifestCid controlCid attestationCid lender dealerShareRef ownerShareRef = do
@@ -478,7 +482,14 @@ shareWithLender l manifestCid controlCid attestationCid lender dealerShareRef ow
     purpose = "LENDER_REVIEW"
     disclosureCaseRef = fixtureCaseRef
     actorRef = ownerActor
+  validityCid <- validityOf p.owner disclosureCid
   pure Shared with ..
+
+-- | The validity marker of a disclosure, read from the disclosure as `party` (owner, verifier or recipient) sees it.
+validityOf : Party -> ContractId AttestationDisclosure -> Script (ContractId DisclosureValidity)
+validityOf party disclosureCid = do
+  disclosure <- fromSomeNote "disclosure not visible" <$> queryContractId party disclosureCid
+  pure disclosure.validityCid
 
 -- | The lender's intake: the review snapshot is copied from the lender's verifier-signed disclosure.
 snapshotFromDisclosure : Party -> ContractId AttestationDisclosure -> Script ReviewSnapshot
@@ -567,17 +578,19 @@ authorizeActivation l agreementCid controlCid authorizationRef validity = do
     expiresAt = addRelTime now validity
     actorRef = ownerActor
 
-activate : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization -> Text
-  -> Script (ContractId CollateralLock)
-activate l lender controlCid authorizationCid lockRef =
-  submit lender $ activateCmd l lender controlCid authorizationCid lockRef
+-- | `validityCid`: the `DisclosureValidity` of the lender's disclosure of the reviewed attestation.
+activate : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization
+  -> ContractId DisclosureValidity -> Text -> Script (ContractId CollateralLock)
+activate l lender controlCid authorizationCid validityCid lockRef =
+  submit lender $ activateCmd l lender controlCid authorizationCid validityCid lockRef
 
-activateCmd : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization -> Text
-  -> Commands (ContractId CollateralLock)
-activateCmd l lender controlCid authorizationCid lockRef =
+activateCmd : Ledger -> Party -> ContractId AssetControl -> ContractId PledgeActivationAuthorization
+  -> ContractId DisclosureValidity -> Text -> Commands (ContractId CollateralLock)
+activateCmd l lender controlCid authorizationCid validityCid lockRef =
   exerciseCmd controlCid Control_Activate with
     lender
     authorizationCid
+    validityCid
     configCid = l.configCid
     verifierStatusCid = l.mirrorCid
     lockRef
@@ -647,7 +660,7 @@ runHappyPath fixture = do
   let l = fixture.ledger
       p = l.parties
   financed <- financeToAuthorization fixture
-  lockCid <- activate l p.lenderA fixture.controlCid financed.authorizationCid "PL-001"
+  lockCid <- activate l p.lenderA fixture.controlCid financed.authorizationCid fixture.validityCid "PL-001"
   rejectedRequestCid <- requestRelease l lockCid "RR-001"
   rejectionCid <- submit p.lenderA $ exerciseCmd rejectedRequestCid Release_Reject with
     decisionRef = "RD-001"

@@ -1,8 +1,10 @@
 // Pledge activation (daml-model.md §7 W8): the selected lender's approver consumes the shared AssetControl and
 // the borrower's single-use PledgeActivationAuthorization in one Control_Activate, creating the CollateralLock.
-// The ledger enforces one lock per asset (the control is consumed; a parallel activation finds it archived).
-// Before submitting, the API re-reads the lender's ACS and checks what the ledger deliberately does not
-// (daml-model.md §8.2): the lender still holds an active AttestationDisclosure of the reviewed attestation.
+// The ledger enforces one lock per asset (the control is consumed; a parallel activation finds it archived) and
+// that the reviewed attestation is still disclosed to the lender: Control_Activate fetches the DisclosureValidity
+// of the lender's disclosure, which revocation, withdrawal and supersession archive (daml-model.md §4.5, §8.2).
+// Before submitting, the API re-reads the lender's ACS as a fast-fail and takes the marker id from the live
+// disclosure (requireActiveAttestationDisclosure); a revocation that lands after that read fails on the ledger.
 import { STATUS_COPY } from "@collara/domain";
 import { ledgerCommands as L } from "../../ledger/builders";
 import { PAYLOAD_SCHEMAS } from "../../ledger/contracts";
@@ -48,8 +50,8 @@ export async function activatePledge(deps: FinanceDeps, member: ResolvedActor, s
       if (control.payload.controlVersion !== a.expectedControlVersion || !sameAnchor(control.payload.evidence, a.snapshot.evidence)) {
         throw workflowProblems.stateChanged(STATUS_COPY.EVIDENCE_STALE);
       }
-      // daml-model.md §8.2: revocation/supersession withdraws the disclosure; the ledger does not re-check it.
-      await requireActiveAttestationDisclosure(ctx.acs, a.snapshot, { now: ctx.now, owner: a.borrower, caseRef });
+      // daml-model.md §4.5: the marker of the live disclosure; the ledger re-checks it at commit.
+      const disclosure = await requireActiveAttestationDisclosure(ctx.acs, a.snapshot, { now: ctx.now, owner: a.borrower, caseRef });
       const config = must(await ctx.acs.one("CollaraConfig", (c) => c.namespace === ctx.namespace));
       const mirror = must(
         await ctx.acs.latest(
@@ -65,6 +67,7 @@ export async function activatePledge(deps: FinanceDeps, member: ResolvedActor, s
           L.controlActivate(control.contractId, {
             lender,
             authorizationCid: auth.contractId,
+            validityCid: disclosure.payload.validityCid,
             configCid: config.contractId,
             verifierStatusCid: mirror.contractId,
             lockRef,

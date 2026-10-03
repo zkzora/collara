@@ -297,8 +297,12 @@ export const ledgerCommands = {
   controlCorrect(controlCid: Cid, a: { reason: string; actorRef: string }): LedgerCommand {
     return exercise(T.AssetControl, controlCid, "Control_Correct", { ...a });
   },
-  /** W8 (lender approver). Check the lender's AttestationDisclosure off-ledger first (daml-model.md §8.2). */
-  controlActivate(controlCid: Cid, a: { lender: Party; authorizationCid: Cid; configCid: Cid; verifierStatusCid: Cid; lockRef: string; actorRef: string }): LedgerCommand {
+  /**
+   * W8 (lender approver). `validityCid` is the `validityCid` of the lender's live AttestationDisclosure of the
+   * reviewed attestation (never another marker): the ledger fetches it, so a revocation, withdrawal or supersession
+   * committed first makes the activation fail (daml-model.md §4.5, §8.2).
+   */
+  controlActivate(controlCid: Cid, a: { lender: Party; authorizationCid: Cid; validityCid: Cid; configCid: Cid; verifierStatusCid: Cid; lockRef: string; actorRef: string }): LedgerCommand {
     return exercise(T.AssetControl, controlCid, "Control_Activate", { ...a });
   },
 
@@ -346,7 +350,7 @@ export const ledgerCommands = {
   vrCancel(requestCid: Cid, a: { actorRef: string }): LedgerCommand {
     return exercise(T.VerificationRequest, requestCid, "VR_Cancel", { ...a });
   },
-  /** M17 (owner, non-consuming) → disclosure cid */
+  /** M17 (owner, non-consuming) → disclosure cid (the same transaction creates its DisclosureValidity) */
   attDiscloseTo(attestationCid: Cid, a: { recipient: Party; purpose: string; disclosureCaseRef: string; actorRef: string }): LedgerCommand {
     return exercise(T.VerificationAttestation, attestationCid, "Att_DiscloseTo", { ...a });
   },

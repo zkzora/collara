@@ -624,7 +624,8 @@ export async function seedLocalnet(options: SeedLocalnetOptions): Promise<SeedRe
           const attestation = must(await ctx.acs.one("VerificationAttestation", (a) => a.attestationRef === "ATT-001" && a.namespace === ns));
           return { commands: [L.attDiscloseTo(attestation.contractId, { recipient: party.lenderA, purpose: "LENDER_REVIEW", disclosureCaseRef: caseRef, actorRef: ctx.actorRef })] };
         },
-        result: (s) => ({ disclosureCid: s.createdOf("AttestationDisclosure") }),
+        // Att_DiscloseTo also creates the disclosure's DisclosureValidity (Control_Activate fetches it).
+        result: (s) => ({ disclosureCid: s.createdOf("AttestationDisclosure"), validityCid: s.createdOf("DisclosureValidity") }),
       });
 
       await step("M18", analyst, {

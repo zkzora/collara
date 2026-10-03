@@ -47,6 +47,7 @@ export const T = {
   VerificationRequest: "#collara-contracts:Collara.Verification:VerificationRequest",
   VerificationAttestation: "#collara-contracts:Collara.Verification:VerificationAttestation",
   AttestationDisclosure: "#collara-contracts:Collara.Verification:AttestationDisclosure",
+  DisclosureValidity: "#collara-contracts:Collara.Verification:DisclosureValidity",
   RevokedAttestation: "#collara-contracts:Collara.Verification:RevokedAttestation",
   CollateralAssessment: "#collara-contracts:Collara.Financing:CollateralAssessment",
   LenderDecisionNotice: "#collara-contracts:Collara.Financing:LenderDecisionNotice",
@@ -89,6 +90,8 @@ export const TEMPLATE_MAPPINGS: readonly TemplateMapping[] = [
     businessRef: nested("attestation", "attestationRef"),
     assetRef: nested("attestation", "assetId"),
   },
+  // The activation's ledger dependency on a live disclosure (daml-model.md §4.5). Stored, not presented.
+  { templateRef: T.DisclosureValidity, businessRef: field("attestationRef") },
   { templateRef: T.RevokedAttestation, businessRef: field("attestationRef"), caseRef: none },
   { templateRef: T.CollateralAssessment, businessRef: field("assessmentRef") },
   { templateRef: T.LenderDecisionNotice, businessRef: field("noticeRef"), assetRef: none },

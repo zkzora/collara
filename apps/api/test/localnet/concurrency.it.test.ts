@@ -88,6 +88,7 @@ describe.skipIf(!LOCALNET_IT_ENABLED)("LocalNet concurrency: parallel pledge act
       const control = (await h.acsAs("lenderA", "AssetControl", (c) => c.assetId === ASSET))[0]!;
       const config = (await h.acsAs("lenderA", "CollaraConfig", (c) => c.namespace === h.namespace))[0]!;
       const mirror = (await h.acsAs("lenderA", "VerifierStatusMirror", (m) => m.namespace === h.namespace && m.verifierRef === "VER-001"))[0]!;
+      const disclosure = (await h.acsAs("lenderA", "AttestationDisclosure", (d) => d.caseRef === CASE))[0]!;
       const outcomes = await Promise.all(
         auths.map((auth, i) =>
           run(lender, `activate-${i}`, async (ctx) => ({
@@ -95,6 +96,7 @@ describe.skipIf(!LOCALNET_IT_ENABLED)("LocalNet concurrency: parallel pledge act
               L.controlActivate(control.contractId, {
                 lender: h.party("lenderA"),
                 authorizationCid: auth.contractId,
+                validityCid: disclosure.payload.validityCid,
                 configCid: config.contractId,
                 verifierStatusCid: mirror.contractId,
                 lockRef: `PL-90${i + 1}`,

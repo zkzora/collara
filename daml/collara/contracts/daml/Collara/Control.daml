@@ -13,6 +13,7 @@ import Collara.Config
 import Collara.Financing
 import Collara.Governance.Registry (VerifierStatus(..))
 import Collara.Types
+import Collara.Verification (DisclosureValidity(..))
 
 -- | AVAILABLE control of one registered asset. Signed by the registrar and the owner: neither can create a
 -- replacement alone. Carries no valuation, terms or lender notes.
@@ -103,12 +104,17 @@ template AssetControl
     -- | Pledge activation by the designated lender (flexible controller taken from the argument). Safe because it
     -- requires `lender` to be the currently shared lender and consumes a lender+borrower-signed authorization
     -- that pins this exact control version and evidence package.
-    -- Deliberately does not fetch the verifier-signed attestation or the governance-signed accreditation
-    -- (that would inform the verifier or the governance member nodes about the pledge).
+    -- The reviewed attestation must still be disclosed to the lender: it fetches the owner-signed validity marker
+    -- of the lender's disclosure, which revocation, withdrawal and supersession archive. It deliberately does not
+    -- fetch the verifier-signed attestation or disclosure or the governance-signed accreditation (that would inform
+    -- the verifier or the governance member nodes about the pledge). The marker is fetched, not consumed: a later
+    -- revocation must still succeed and leaves the lock untouched.
     choice Control_Activate : ContractId CollateralLock
       with
         lender : Party
         authorizationCid : ContractId PledgeActivationAuthorization
+        validityCid : ContractId DisclosureValidity
+          -- ^ The `validityCid` of the lender's live `AttestationDisclosure` of the reviewed attestation.
         configCid : ContractId CollaraConfig
         verifierStatusCid : ContractId VerifierStatusMirror
         lockRef : Text
@@ -124,6 +130,15 @@ template AssetControl
         now <- getTime
         assertMsg "Activation authorization expired" (now <= auth.expiresAt)
         assertMsg "Attestation is outside its validity period" (now <= auth.snapshot.attestationValidUntil)
+        validity <- fetch validityCid
+        assertMsg "Attestation disclosure is for another lender, owner, asset or case"
+          (validity.recipient == lender && validity.owner == owner && validity.namespace == namespace
+            && validity.assetId == assetId && validity.caseRef == auth.caseRef)
+        assertMsg "Attestation disclosure does not match the reviewed attestation"
+          (validity.attestationRef == auth.snapshot.attestationRef
+            && validity.verifier == auth.snapshot.attestationVerifier
+            && validity.evidence == auth.snapshot.evidence
+            && validity.validUntil == auth.snapshot.attestationValidUntil)
         config <- fetch configCid
         assertMsg "Config of another registrar or namespace"
           (config.registrar == registrar && config.namespace == namespace)

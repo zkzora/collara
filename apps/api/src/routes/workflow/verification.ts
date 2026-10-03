@@ -240,7 +240,14 @@ export const verificationRoutes: FastifyPluginAsyncZod<WorkflowRouteOptions> = a
             const { config, accreditation } = await verifierInputs(ctx.acs, { verifierParty: verifier, namespace: ctx.namespace });
             const issued = await ctx.acs.list("VerificationAttestation", (a) => a.namespace === ctx.namespace);
             const previous = issued.filter((a) => a.payload.assetId === vr.payload.assetId && a.payload.verifier === verifier).sort((a, b) => a.offset - b.offset).at(-1);
-            const disclosures = previous ? await ctx.acs.list("AttestationDisclosure", (d) => d.attestationCid === previous.contractId) : [];
+            // Supersession withdraws every disclosure of the previous attestation, and with it the validity marker
+            // that Control_Activate depends on. A disclosure whose marker the owner already archived cannot be
+            // withdrawn (daml-model.md §4.5, residual 4) and cannot back an activation; it is left out so the
+            // correction still commits.
+            const liveMarkers = previous ? new Set((await ctx.acs.list("DisclosureValidity")).map((v) => v.contractId)) : new Set<string>();
+            const disclosures = previous
+              ? await ctx.acs.list("AttestationDisclosure", (d) => d.attestationCid === previous.contractId && liveMarkers.has(d.validityCid))
+              : [];
             attestationRef = await allocateFreshRef(db, "attestation", issued.map((a) => a.payload.attestationRef));
             return {
               commands: [

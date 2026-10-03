@@ -12,8 +12,10 @@
 //    c. informees of the sensitive transactions on every node (update-by-id) and per-node ledger-end deltas;
 //    d. what the registrar receives from the control → lock transition;
 //    e. the auditor's stream (AuditGrant only); the export is off-ledger (ledger ends unchanged).
-// 3. Revocation race (daml-model.md §8.2) in two more worlds: an AttestationDisclosure revocation committed between
-//    the API's precheck and Control_Activate (deterministic interleaving), and an unsynchronised concurrent pair.
+// 3. Revocation race (daml-model.md §4.5, §8.2) in three more worlds: the owner's AttDisc_Revoke and the verifier's
+//    Att_Revoke, each committed between the API's precheck and Control_Activate (deterministic interleaving; the
+//    ledger must reject the activation), and an unsynchronised concurrent pair (a lock only if the activation was
+//    sequenced first).
 // Raw evidence: .local/privacy/<run>/ (git-ignored). Summary: docs/evidence/privacy-summary.json.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -607,6 +609,17 @@ describe.skipIf(!PRIVACY_IT_ENABLED)("Ledger privacy across five participants (w
     check(S, "Release_Reject reaches participant2 and participant3 only (registrar not informed)", receivedBy("W10 Release_Reject") === "participant2,participant3", view("W10 Release_Reject"));
     check(S, "Release_Authorize reaches sandbox (registrar, lock signatory), participant2 and participant3 only", receivedBy("W12 Release_Authorize") === "participant2,participant3,sandbox", view("W12 Release_Authorize"));
     check(S, "VR_IssueAttestation shows events on participant2 (owner) and participant5 (verifier) only", receivedBy("M12 VR_IssueAttestation") === "participant2,participant5", view("M12 VR_IssueAttestation"));
+    // daml-model.md §4.5: the disclosure's owner-signed validity marker reaches exactly the disclosure's stakeholders.
+    const m17Events = Object.values(view("M17 Att_DiscloseTo")?.nodes ?? {}).flatMap((n) => (n.received ? n.events : []));
+    check(S, "M17 Att_DiscloseTo reaches participant2, participant3 and participant5 only", receivedBy("M17 Att_DiscloseTo") === "participant2,participant3,participant5", view("M17 Att_DiscloseTo"));
+    check(
+      S,
+      "M17 Att_DiscloseTo also creates the DisclosureValidity, witnessed by the owner, the verifier and Lender A only",
+      m17Events.some((e) => e.kind === "created" && e.template === "DisclosureValidity" && e.witnesses.join(",") === "DemoLenderA,DemoManufacturer,DemoVerifier"),
+      m17Events,
+    );
+    // Control_Activate fetches the marker; a fetch produces no event, and the verifier (an observer of it) is not informed.
+    check(S, "W8 Control_Activate: no DisclosureValidity event on any node (fetched, not consumed)", !Object.values(view("W8 Control_Activate")?.nodes ?? {}).some((n) => n.received && n.events.some((e) => e.template === "DisclosureValidity")), view("W8 Control_Activate"));
     for (const [prefix, label] of [["X2", "X2 VR_AcceptAssignment"], ["X3", "X3 VR_IssueAttestation"]] as const) {
       check(S, `${label}: events on participant2 (owner) and participant5 (verifier) only; the registrar and governance (fetch informees) see no event`, receivedBy(label) === "participant2,participant5", view(label));
       const d = deltas[steps.find((s) => s.label.startsWith(prefix))?.label ?? ""] ?? {};
@@ -634,7 +647,7 @@ describe.skipIf(!PRIVACY_IT_ENABLED)("Ledger privacy across five participants (w
   });
 });
 
-describe.skipIf(!PRIVACY_IT_ENABLED)("Revocation race on five participants: AttestationDisclosure revoked vs. Control_Activate (daml-model.md §8.2)", () => {
+describe.skipIf(!PRIVACY_IT_ENABLED)("Revocation race on five participants: disclosure revoked vs. Control_Activate (daml-model.md §4.5, §8.2)", () => {
   const race: Record<string, unknown> = {};
   const raceChecks: Check[] = [];
   const rcheck = (name: string, ok: boolean, detail?: unknown) => raceChecks.push({ section: "race", name, ok, ...(detail === undefined ? {} : { detail }) });
@@ -656,6 +669,8 @@ describe.skipIf(!PRIVACY_IT_ENABLED)("Revocation race on five participants: Atte
   });
 
   const disclosuresOfLender = (w: AuthorizedWorld) => w.h.acsAs("lenderA", "AttestationDisclosure", (d) => d.caseRef === CASE && d.attestation.attestationRef === "ATT-001");
+  const markersOfLender = (w: AuthorizedWorld) => w.h.acsAs("lenderA", "DisclosureValidity", (v) => v.caseRef === CASE && v.attestationRef === "ATT-001");
+  /** The owner's AttDisc_Revoke (submitted on the borrower's participant). */
   const revoke = async (w: AuthorizedWorld, operation: string) => {
     const disclosure = (await w.h.acsAs("borrower", "AttestationDisclosure", (d) => d.recipient === w.h.party("lenderA") && d.caseRef === CASE))[0];
     if (!disclosure) throw new Error("no disclosure to revoke");
@@ -667,71 +682,147 @@ describe.skipIf(!PRIVACY_IT_ENABLED)("Revocation race on five participants: Atte
       prepare: async (ctx) => ({ commands: [L.attDiscRevoke(disclosure.contractId, { actorRef: ctx.actorRef })] }),
     });
   };
+  /** The verifier's Att_Revoke of ATT-001, withdrawing every disclosure it holds (submitted on the verifier's participant). */
+  const verifierRevoke = async (w: AuthorizedWorld, operation: string) => {
+    const attestation = (await w.h.acsAs("verifier", "VerificationAttestation", (a) => a.attestationRef === "ATT-001"))[0];
+    if (!attestation) throw new Error("no attestation to revoke");
+    const disclosures = await w.h.acsAs("verifier", "AttestationDisclosure", (d) => d.attestationCid === attestation.contractId);
+    return w.h.workflow.run({
+      actor: await w.h.actor("verifier-inspector"),
+      operation,
+      idempotencyKey: `${operation}-${randomUUID()}`,
+      payload: {},
+      prepare: async (ctx) => ({
+        commands: [L.attRevoke(attestation.contractId, { reason: "Synthetic revocation", disclosureCids: disclosures.map((d) => d.contractId), actorRef: ctx.actorRef })],
+      }),
+    });
+  };
   const locks = (w: AuthorizedWorld) => w.h.acsAs("lenderA", "CollateralLock", (l) => l.namespace === w.h.namespace && l.assetId === ASSET);
+  type Revocation = Awaited<ReturnType<typeof revoke>>;
+  const receivedBy = (view: Record<string, InformeeView> | null) => uniqueSorted(Object.entries(view ?? {}).filter(([, v]) => v.received).map(([n]) => n)).join(",");
 
-  it("deterministic interleaving: the revocation commits after the API's disclosure precheck and before Control_Activate", async () => {
+  /**
+   * POST /cases/CL-001/pledge-activation with the real prepare() (requireActiveAttestationDisclosure passes and selects
+   * the live disclosure's marker); the runner is wrapped so that `revokeNow` commits after prepare() returned and
+   * before the prepared Control_Activate is submitted.
+   */
+  async function interleaved(w: AuthorizedWorld, readers: WorldReaders, revokeNow: () => Promise<Revocation>) {
+    const runner = w.h.workflow.runner as WorkflowRunner & { run: WorkflowRunner["run"] };
+    const original = runner.run.bind(runner);
+    let revocation: Revocation | null = null;
+    let markersAtSubmit = -1;
+    let disclosuresAtSubmit = -1;
+    let endsBeforeSubmit: Record<string, number> = {};
+    runner.run = ((input: Parameters<WorkflowRunner["run"]>[0]) =>
+      original(
+        input.operation !== "pledge.activate"
+          ? input
+          : {
+              ...input,
+              prepare: async (ctx) => {
+                const plan = await input.prepare(ctx);
+                revocation = await revokeNow();
+                disclosuresAtSubmit = (await disclosuresOfLender(w)).length;
+                markersAtSubmit = (await markersOfLender(w)).length;
+                endsBeforeSubmit = await readers.settledEnds();
+                return plan;
+              },
+            },
+      )) as WorkflowRunner["run"];
+    let response: LightMyRequestResponse;
+    try {
+      response = await w.approver.inject("POST", `/api/cases/${CASE}/pledge-activation`, { body: {} });
+    } finally {
+      delete (runner as { run?: unknown }).run;
+    }
+    const endsAfter = await readers.settledEnds();
+    const r = revocation as Revocation | null;
+    const body = response.json();
+    const record = body.command?.commandId ? await w.h.command(body.command.commandId) : null;
+    const revokeUpdate = r?.record.updateId ?? null;
+    return {
+      response,
+      body,
+      revocation: r,
+      revokeUpdate,
+      disclosuresAtSubmit,
+      markersAtSubmit,
+      deltasDuringSubmission: Object.fromEntries(Object.keys(endsAfter).map((n) => [n, endsAfter[n]! - (endsBeforeSubmit[n] ?? endsAfter[n]!)])) as Record<string, number>,
+      ledger: { state: body.command?.state ?? null, errorKind: record?.errorKind ?? null, errorCode: record?.errorCode ?? null, errorMessage: record?.errorMessage?.slice(0, 400) ?? null },
+      revocationInformees: revokeUpdate ? (await readers.informees(revokeUpdate)).view : null,
+    };
+  }
+
+  it("deterministic interleaving (owner): AttDisc_Revoke commits after the API's precheck and before Control_Activate; the ledger rejects the activation", async () => {
     const w = await authorizedWorld("pvr");
     try {
       const readers = new WorldReaders(w.h);
       if (readers.nodes.length !== 5) throw new Error("needs the 5-participant sandbox");
       await readers.create();
       expect(await disclosuresOfLender(w)).toHaveLength(1);
-      const runner = w.h.workflow.runner as WorkflowRunner & { run: WorkflowRunner["run"] };
-      const original = runner.run.bind(runner);
-      let revocation: Awaited<ReturnType<typeof revoke>> | null = null;
-      let disclosuresAtSubmit = -1;
-      // Wrap the runner: once the activation's prepare() has passed (it includes requireActiveAttestationDisclosure),
-      // the owner revokes the disclosure; then the runner submits the prepared Control_Activate.
-      runner.run = ((input: Parameters<WorkflowRunner["run"]>[0]) =>
-        original(
-          input.operation !== "pledge.activate"
-            ? input
-            : {
-                ...input,
-                prepare: async (ctx) => {
-                  const plan = await input.prepare(ctx);
-                  revocation = await revoke(w, "it.privacy.race.revoke");
-                  disclosuresAtSubmit = (await disclosuresOfLender(w)).length;
-                  return plan;
-                },
-              },
-        )) as WorkflowRunner["run"];
-      let response: LightMyRequestResponse;
-      try {
-        response = await w.approver.inject("POST", `/api/cases/${CASE}/pledge-activation`, { body: {} });
-      } finally {
-        delete (runner as { run?: unknown }).run;
-      }
-      const body = response.json();
-      const activationUpdate: string | null = body.command?.updateId ?? null;
-      const revokeUpdate = (revocation as Awaited<ReturnType<typeof revoke>> | null)?.record.updateId ?? null;
+      expect(await markersOfLender(w)).toHaveLength(1);
+      const x = await interleaved(w, readers, () => revoke(w, "it.privacy.race.revoke"));
       const lockCount = (await locks(w)).length;
-      const informed = {
-        revocation: revokeUpdate ? (await readers.informees(revokeUpdate)).view : null,
-        activation: activationUpdate ? (await readers.informees(activationUpdate)).view : null,
-      };
-      const offsetsOnLender = { revocation: (informed.revocation?.participant3 as { offset?: number } | undefined)?.offset ?? null, activation: (informed.activation?.participant3 as { offset?: number } | undefined)?.offset ?? null };
       race.deterministic = {
         prefix: w.h.prefix,
-        revocationCommitted: (revocation as Awaited<ReturnType<typeof revoke>> | null)?.committed ?? false,
-        lenderDisclosuresWhenActivationWasSubmitted: disclosuresAtSubmit,
-        activation: { httpStatus: response.statusCode, state: body.command?.state ?? null, pledgeRef: body.result?.pledgeRef ?? null },
+        revocation: { by: "owner AttDisc_Revoke", committed: x.revocation?.committed ?? false },
+        lenderDisclosuresWhenActivationWasSubmitted: x.disclosuresAtSubmit,
+        lenderMarkersWhenActivationWasSubmitted: x.markersAtSubmit,
+        activation: { httpStatus: x.response.statusCode, detail: x.body.detail ?? null, ledger: x.ledger, updateId: x.body.command?.updateId ?? null },
         activeLocksAfter: lockCount,
-        lenderDisclosuresAfter: (await disclosuresOfLender(w)).length,
-        orderOnLenderParticipant: offsetsOnLender,
-        informees: { revocation: summarizeInformees(informed.revocation), activation: summarizeInformees(informed.activation) },
+        ledgerEndDeltasDuringSubmission: x.deltasDuringSubmission,
+        informees: { revocation: summarizeInformees(x.revocationInformees) },
       };
-      rcheck("deterministic: the revocation committed before the activation was submitted", disclosuresAtSubmit === 0 && revokeUpdate !== null);
-      rcheck("deterministic: the ledger committed Control_Activate anyway (it does not read the disclosure)", response.statusCode === 200 && body.command?.state === "COMMITTED" && lockCount === 1, race.deterministic);
-      rcheck("deterministic: on the lender's participant the revocation precedes the activation", offsetsOnLender.revocation !== null && offsetsOnLender.activation !== null && offsetsOnLender.revocation < offsetsOnLender.activation, offsetsOnLender);
-      rcheck("deterministic: the verifier's participant receives the revocation (verifier signs the disclosure) but not the activation", (informed.revocation?.participant5 as { received?: boolean } | undefined)?.received === true && (informed.activation?.participant5 as { received?: boolean } | undefined)?.received === false, race.deterministic);
+      rcheck("deterministic (owner): the revocation committed before the activation was submitted", x.disclosuresAtSubmit === 0 && x.markersAtSubmit === 0 && x.revokeUpdate !== null, race.deterministic);
+      rcheck(
+        "deterministic (owner): the ledger rejected Control_Activate (409, REJECTED, no update) and no lock exists",
+        x.response.statusCode === 409 && x.body.command?.state === "REJECTED" && !x.body.command?.updateId && lockCount === 0,
+        race.deterministic,
+      );
+      rcheck("deterministic (owner): the revocation reached the borrower's, Lender A's and the verifier's participants only", receivedBy(x.revocationInformees) === "participant2,participant3,participant5", race.deterministic);
+      rcheck("deterministic (owner): the verifier's and Lender B's participants assign no offset while the activation is submitted", x.deltasDuringSubmission.participant5 === 0 && x.deltasDuringSubmission.participant4 === 0, x.deltasDuringSubmission);
     } finally {
       await w.h.close();
     }
     expect(raceChecks.filter((c) => !c.ok)).toEqual([]);
   });
 
-  it("unsynchronised: activation through the API and revocation submitted concurrently (outcome recorded, not asserted)", async () => {
+  it("deterministic interleaving (verifier): Att_Revoke commits after the API's precheck and before Control_Activate; the ledger rejects the activation", async () => {
+    const w = await authorizedWorld("pvv");
+    try {
+      const readers = new WorldReaders(w.h);
+      await readers.create();
+      expect(await markersOfLender(w)).toHaveLength(1);
+      const x = await interleaved(w, readers, () => verifierRevoke(w, "it.privacy.race.verifier-revoke"));
+      const lockCount = (await locks(w)).length;
+      race.deterministicVerifier = {
+        prefix: w.h.prefix,
+        revocation: { by: "verifier Att_Revoke (withdraws the disclosure, which archives its marker)", committed: x.revocation?.committed ?? false, ledgerSource: x.revocation?.record.ledgerSource ?? null },
+        lenderDisclosuresWhenActivationWasSubmitted: x.disclosuresAtSubmit,
+        lenderMarkersWhenActivationWasSubmitted: x.markersAtSubmit,
+        activation: { httpStatus: x.response.statusCode, detail: x.body.detail ?? null, ledger: x.ledger, updateId: x.body.command?.updateId ?? null },
+        activeLocksAfter: lockCount,
+        ledgerEndDeltasDuringSubmission: x.deltasDuringSubmission,
+        informees: { revocation: summarizeInformees(x.revocationInformees) },
+      };
+      rcheck(
+        "deterministic (verifier): Att_Revoke committed before the activation was submitted",
+        (x.revocation?.committed ?? false) && x.markersAtSubmit === 0 && x.disclosuresAtSubmit === 0,
+        race.deterministicVerifier,
+      );
+      rcheck(
+        "deterministic (verifier): the ledger rejected Control_Activate (409, REJECTED, no update) and no lock exists",
+        x.response.statusCode === 409 && x.body.command?.state === "REJECTED" && !x.body.command?.updateId && lockCount === 0,
+        race.deterministicVerifier,
+      );
+      rcheck("deterministic (verifier): the revocation reached the borrower's, Lender A's and the verifier's participants only", receivedBy(x.revocationInformees) === "participant2,participant3,participant5", race.deterministicVerifier);
+    } finally {
+      await w.h.close();
+    }
+    expect(raceChecks.filter((c) => !c.ok)).toEqual([]);
+  });
+
+  it("unsynchronised: activation through the API and the owner's revocation submitted concurrently (a lock only if the activation was sequenced first)", async () => {
     const w = await authorizedWorld("pvc");
     try {
       const readers = new WorldReaders(w.h);
@@ -740,27 +831,36 @@ describe.skipIf(!PRIVACY_IT_ENABLED)("Revocation race on five participants: Atte
       const body = activation.json();
       const activationUpdate: string | null = body.command?.updateId ?? null;
       const revokeUpdate = revocation.record.updateId ?? null;
+      const record = body.command?.commandId ? await w.h.command(body.command.commandId) : null;
       const lenderOffsets = {
         revocation: revokeUpdate ? ((await readers.informees(revokeUpdate)).view.participant3 as { offset?: number }).offset ?? null : null,
         activation: activationUpdate ? ((await readers.informees(activationUpdate)).view.participant3 as { offset?: number }).offset ?? null : null,
       };
       const lockCount = (await locks(w)).length;
+      const activationCommitted = activation.statusCode === 200 && body.command?.state === "COMMITTED";
       race.concurrent = {
         prefix: w.h.prefix,
-        activation: { httpStatus: activation.statusCode, state: body.command?.state ?? null, detail: body.detail ?? null },
+        activation: { httpStatus: activation.statusCode, state: body.command?.state ?? null, detail: body.detail ?? null, errorKind: record?.errorKind ?? null, errorCode: record?.errorCode ?? null },
         revocation: { state: revocation.command.state },
         activeLocksAfter: lockCount,
         lenderDisclosuresAfter: (await disclosuresOfLender(w)).length,
+        lenderMarkersAfter: (await markersOfLender(w)).length,
         orderOnLenderParticipant: lenderOffsets,
-        outcome:
-          activation.statusCode !== 200
-            ? "API refused the activation (the revocation was visible at the precheck)"
-            : lenderOffsets.revocation !== null && lenderOffsets.activation !== null && lenderOffsets.revocation < lenderOffsets.activation
-              ? "both committed; the revocation was committed first, so the lock was created without an active disclosure"
-              : "both committed; the activation was committed first",
+        outcome: activationCommitted
+          ? lenderOffsets.revocation !== null && lenderOffsets.activation !== null && lenderOffsets.activation < lenderOffsets.revocation
+            ? "both committed; the activation was sequenced first and the later revocation left the lock ACTIVE"
+            : "both committed in an unexpected order"
+          : body.command?.state === "REJECTED"
+            ? "the ledger rejected the activation (the revocation was sequenced first)"
+            : "the API refused the activation (the revocation was visible at the precheck)",
       };
-      rcheck("concurrent: the revocation committed", revocation.committed);
-      rcheck("concurrent: at most one lock, and a lock only when the activation committed", lockCount === (activation.statusCode === 200 ? 1 : 0), race.concurrent);
+      rcheck("concurrent: the revocation committed", revocation.committed, race.concurrent);
+      rcheck("concurrent: a lock exists exactly when the activation committed", lockCount === (activationCommitted ? 1 : 0), race.concurrent);
+      rcheck(
+        "concurrent: a committed activation was sequenced before the revocation on Lender A's participant",
+        !activationCommitted || (lenderOffsets.activation !== null && lenderOffsets.revocation !== null && lenderOffsets.activation < lenderOffsets.revocation),
+        race.concurrent,
+      );
     } finally {
       await w.h.close();
     }

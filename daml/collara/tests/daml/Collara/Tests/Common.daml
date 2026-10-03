@@ -18,7 +18,7 @@ activeLockFrom : Script MainFixture -> Script (MainFixture, Financed, ContractId
 activeLockFrom build = do
   f <- build
   fin <- financeToAuthorization f
-  lockCid <- activate f.ledger f.ledger.parties.lenderA f.controlCid fin.authorizationCid "PL-001"
+  lockCid <- activate f.ledger f.ledger.parties.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   pure (f, fin, lockCid)
 
 -- | One lender's own path on the fixture asset: assessment from its verifier-signed disclosure -> eligible ->

@@ -25,7 +25,7 @@ const DARS = [
   ["governance-action-v1-0.1.0.dar", "daml/collara/vendor-dars/governance-action-v1-0.1.0.dar"],
   ["governance-core-v1-0.1.0.dar", "daml/collara/vendor-dars/governance-core-v1-0.1.0.dar"],
   ["collara-governance-0.1.0.dar", "daml/collara/governance/.daml/dist/collara-governance-0.1.0.dar"],
-  ["collara-contracts-0.1.0.dar", "daml/collara/contracts/.daml/dist/collara-contracts-0.1.0.dar"],
+  ["collara-contracts-0.2.0.dar", "daml/collara/contracts/.daml/dist/collara-contracts-0.2.0.dar"],
 ];
 
 const receipts = [];

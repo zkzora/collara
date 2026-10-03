@@ -75,7 +75,7 @@ test_happy_path = do
   auth <- fetchAs p.lenderA fin.authorizationCid
   assertEq "authorization pins control version" 3 auth.expectedControlVersion
 
-  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   lock <- fetchAs p.registrar lockCid
   assertEq "lock version" 4 lock.controlVersion
   assertEq "lock lender" p.lenderA lock.lender

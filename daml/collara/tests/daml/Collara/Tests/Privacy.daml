@@ -8,6 +8,7 @@ module Collara.Tests.Privacy where
 
 import DA.Action (unless, when)
 import DA.Foldable (forA_)
+import DA.Optional (fromSomeNote)
 import qualified DA.Text as T
 import DA.Time (addRelTime, days)
 import Daml.Script
@@ -54,6 +55,7 @@ visibleContracts party = concat <$> mapA (\q -> q party)
   , rows @VerificationRequest "VerificationRequest"
   , rows @VerificationAttestation "VerificationAttestation"
   , rows @AttestationDisclosure "AttestationDisclosure"
+  , rows @DisclosureValidity "DisclosureValidity"
   , rows @RevokedAttestation "RevokedAttestation"
   , rows @CollateralAssessment "CollateralAssessment"
   , rows @LenderDecisionNotice "LenderDecisionNotice"
@@ -87,21 +89,32 @@ termValues = ["100000.", "Synthetic 36-month equipment financing terms", "LEGAL-
 valuationValues = ["150000.", "Synthetic desktop valuation"]
 caseValues = ["CL-001", "ASSET-DEMO-001", "PKG-001", "ATT-001", "SYNTH-CNC-001"]
 
--- | `party` can read none of `templates` and no payload containing any of `fragments`.
-assertCannotRead : Text -> Text -> Party -> [Text] -> [Text] -> Script ()
-assertCannotRead stage who party templates fragments = do
-  visible <- visibleContracts party
+-- | `visible` (one party's readable contracts) holds none of `templates` and no payload containing any of
+-- `fragments`.
+cannotRead : Text -> Text -> [(Text, Text)] -> [Text] -> [Text] -> Script ()
+cannotRead stage who visible templates fragments =
   forA_ visible $ \(name, payload) -> do
     when (name `elem` templates) $ fail (stage <> ": " <> who <> " can read " <> name)
     forA_ fragments $ \fragment -> when (fragment `T.isInfixOf` payload) $
       fail (stage <> ": " <> who <> " can read '" <> fragment <> "' in " <> name)
 
+-- | `visible` holds only the listed templates.
+readsOnly : Text -> Text -> [(Text, Text)] -> [Text] -> Script ()
+readsOnly stage who visible allowed =
+  forA_ visible $ \(name, _) -> unless (name `elem` allowed) $
+    fail (stage <> ": " <> who <> " can unexpectedly read " <> name)
+
+-- | `party` can read none of `templates` and no payload containing any of `fragments`.
+assertCannotRead : Text -> Text -> Party -> [Text] -> [Text] -> Script ()
+assertCannotRead stage who party templates fragments = do
+  visible <- visibleContracts party
+  cannotRead stage who visible templates fragments
+
 -- | `party` can read only the listed templates.
 assertReadsOnly : Text -> Text -> Party -> [Text] -> Script ()
 assertReadsOnly stage who party allowed = do
   visible <- visibleContracts party
-  forA_ visible $ \(name, _) -> unless (name `elem` allowed) $
-    fail (stage <> ": " <> who <> " can unexpectedly read " <> name)
+  readsOnly stage who visible allowed
 
 -- | `party` can read at least one `template` whose payload contains `fragment` (positive control).
 assertCanRead : Text -> Text -> Party -> Text -> Text -> Script ()
@@ -115,31 +128,36 @@ outsiders p =
   [ ("verifier", p.verifier), ("dealer", p.dealer), ("Lender B", p.lenderB), ("auditor", p.auditor)
   , ("governance party", p.governance), ("seat 1", p.seat1), ("seat 2", p.seat2), ("seat 3", p.seat3) ]
 
--- | The privacy rules that must hold after every step.
+-- | The privacy rules that must hold after every step. Each party's readable contracts are read once per stage
+-- (the Daml Script service overflows its stack on this long walkthrough when every rule re-reads them).
 checkpoint : Text -> Parties -> Bool -> Script ()
 checkpoint stage p auditorGranted = do
+  views <- mapA (\(who, x) -> do visible <- visibleContracts x; pure (who, visible))
+    (("registrar", p.registrar) :: ("borrower", p.owner) :: outsiders p)
+  let seen who = fromSomeNote ("no view of " <> who) (lookup who views)
   -- terms, valuation and lender decisions: never the verifier, dealer, registrar, Lender B, auditor or governance
-  forA_ (("registrar", p.registrar) :: outsiders p) $ \(who, x) ->
-    assertCannotRead stage who x financingTemplates (termValues ++ valuationValues)
+  forA_ (("registrar", p.registrar) :: outsiders p) $ \(who, _) ->
+    cannotRead stage who (seen who) financingTemplates (termValues ++ valuationValues)
   -- the borrower never reads the lender's internal assessment or valuation
-  assertCannotRead stage "borrower" p.owner ["CollateralAssessment"] valuationValues
+  cannotRead stage "borrower" (seen "borrower") ["CollateralAssessment"] valuationValues
   -- pledge records: borrower and Lender A; the registrar only as a lock signatory / released-record observer
-  forA_ (outsiders p) $ \(who, x) -> assertCannotRead stage who x pledgeTemplates []
-  assertCannotRead stage "registrar" p.registrar ["ReleaseRequest", "ReleaseDecision"] []
+  forA_ (outsiders p) $ \(who, _) -> cannotRead stage who (seen who) pledgeTemplates []
+  cannotRead stage "registrar" (seen "registrar") ["ReleaseRequest", "ReleaseDecision"] []
   -- Lender B: only the non-sensitive directory (config, verifier status), nothing of CL-001
-  assertReadsOnly stage "Lender B" p.lenderB ["CollaraConfig", "VerifierStatusMirror"]
-  assertCannotRead stage "Lender B" p.lenderB [] caseValues
+  readsOnly stage "Lender B" (seen "Lender B") ["CollaraConfig", "VerifierStatusMirror"]
+  cannotRead stage "Lender B" (seen "Lender B") [] caseValues
   -- the dealer: its own contribution and the share it consented to (its own document only)
-  assertReadsOnly stage "dealer" p.dealer ["DealerContribution", "PackageShare"]
-  assertCannotRead stage "dealer" p.dealer [] ["DOC-002", "DOC-003", "DOC-004", "ATT-001"]
-  -- the verifier: directory, its accreditation, its request/attestation and disclosures of it
-  assertReadsOnly stage "verifier" p.verifier
+  readsOnly stage "dealer" (seen "dealer") ["DealerContribution", "PackageShare"]
+  cannotRead stage "dealer" (seen "dealer") [] ["DOC-002", "DOC-003", "DOC-004", "ATT-001"]
+  -- the verifier: directory, its accreditation, its request/attestation and disclosures of it (with their
+  -- validity markers, which it archives by withdrawing the disclosure)
+  readsOnly stage "verifier" (seen "verifier")
     ["CollaraConfig", "VerifierStatusMirror", "VerifierAccreditation", "VerificationRequest",
-     "VerificationAttestation", "AttestationDisclosure", "RevokedAttestation"]
+     "VerificationAttestation", "AttestationDisclosure", "DisclosureValidity", "RevokedAttestation"]
   -- the auditor: nothing before a grant, then only its grants
   if auditorGranted
-    then assertReadsOnly stage "auditor" p.auditor ["AuditGrant"]
-    else assertReadsOnly stage "auditor" p.auditor []
+    then readsOnly stage "auditor" (seen "auditor") ["AuditGrant"]
+    else readsOnly stage "auditor" (seen "auditor") []
 
 test_privacy_through_the_walkthrough : Script ()
 test_privacy_through_the_walkthrough = do
@@ -159,7 +177,7 @@ test_privacy_through_the_walkthrough = do
   assertCanRead "proposal accepted" "Lender A" p.lenderA "FinancingAgreement" "100000."
   authorizationCid <- authorizeActivation l agreementCid f.controlCid "AUTH-001" (days 7)
   checkpoint "activation authorized" p False
-  lockCid <- activate l p.lenderA f.controlCid authorizationCid "PL-001"
+  lockCid <- activate l p.lenderA f.controlCid authorizationCid f.validityCid "PL-001"
   checkpoint "pledge active" p False
   assertCanRead "pledge active" "registrar" p.registrar "CollateralLock" "PL-001"
   assertCannotRead "pledge active" "registrar" p.registrar [] termValues
@@ -195,7 +213,7 @@ test_revocation_limits_future_visibility = do
   submit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
   _ <- submit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with lender = p.lenderA; actorRef = ownerActor
   assertCannotRead "after revocation" "Lender A" p.lenderA
-    ["PackageShare", "AttestationDisclosure", "AssetControl"] ["DOC-00"]
+    ["PackageShare", "AttestationDisclosure", "DisclosureValidity", "AssetControl"] ["DOC-00"]
   -- the lender keeps its own assessment record (which references ATT-001 by its display ref)
   assertCanRead "after revocation" "Lender A" p.lenderA "CollateralAssessment" "CA-001"
 

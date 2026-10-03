@@ -34,8 +34,8 @@ test_second_activation_fails = do
       p = l.parties
   fin <- financeToAuthorization f
   auth2 <- authorizeActivation l fin.agreementCid f.controlCid "AUTH-002" (days 7)
-  _ <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
-  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth2 "PL-002"
+  _ <- activate l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth2 f.validityCid "PL-002"
   expectConsumed r
   assertSingleToken p 1
 
@@ -49,13 +49,14 @@ test_competing_lenders_lender_a_first = do
       p = l.parties
   finA <- financeToAuthorization f
   disclosureB <- discloseTo f p.lenderB
+  validityB <- validityOf p.owner disclosureB
   (_, authB) <- financeLender l p.lenderB disclosureB "B01" f.controlCid
-  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid authB validityB "PL-B01"
   expectNotVisible rNotVisible
-  rNotShared <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  rNotShared <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB validityB "PL-B01"
   expectFailure "Control is not shared with this lender" rNotShared
-  _ <- activate l p.lenderA f.controlCid finA.authorizationCid "PL-001"
-  rLate <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB "PL-B01"
+  _ <- activate l p.lenderA f.controlCid finA.authorizationCid f.validityCid "PL-001"
+  rLate <- trySubmit (actAs p.lenderB <> readAs p.owner) $ activateCmd l p.lenderB f.controlCid authB validityB "PL-B01"
   expectConsumed rLate
   assertSingleToken p 1
 
@@ -68,6 +69,7 @@ test_competing_lenders_lender_b_first = do
       p = l.parties
   finA <- financeToAuthorization f
   disclosureB <- discloseTo f p.lenderB
+  validityB <- validityOf p.owner disclosureB
   rTwoLenders <- trySubmit p.owner $ exerciseCmd f.controlCid Control_ShareWithLender with
     lender = p.lenderB; actorRef = ownerActor
   expectFailure "Control is already shared with a lender" rTwoLenders
@@ -75,8 +77,8 @@ test_competing_lenders_lender_b_first = do
     lender = p.lenderA; actorRef = ownerActor
   sharedB <- submit p.owner $ exerciseCmd revoked Control_ShareWithLender with lender = p.lenderB; actorRef = ownerActor
   (_, authB) <- financeLender l p.lenderB disclosureB "B01" sharedB
-  _ <- activate l p.lenderB sharedB authB "PL-B01"
-  rOld <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid finA.authorizationCid "PL-001"
+  _ <- activate l p.lenderB sharedB authB validityB "PL-B01"
+  rOld <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid finA.authorizationCid f.validityCid "PL-001"
   expectConsumed rOld
   locksA <- query @CollateralLock p.lenderA
   assertEq "Lender A holds no lock" 0 (length locksA)
@@ -92,7 +94,7 @@ test_revoked_view_invalidates_authorization = do
   revoked <- submit p.owner $ exerciseCmd f.controlCid Control_RevokeLenderView with
     lender = p.lenderA; actorRef = ownerActor
   reshared <- submit p.owner $ exerciseCmd revoked Control_ShareWithLender with lender = p.lenderA; actorRef = ownerActor
-  r <- trySubmit p.lenderA $ activateCmd l p.lenderA reshared fin.authorizationCid "PL-001"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA reshared fin.authorizationCid f.validityCid "PL-001"
   expectFailure "Control version changed since authorization" r
   assertSingleToken p 0
 
@@ -107,12 +109,12 @@ test_activation_after_manifest_bump_fails = do
       p = l.parties
   fin <- financeToAuthorization f
   (_, bumped) <- newManifestVersion l f.manifestCid (manifestV3Entries p) hashManifestV3 f.controlCid
-  rOldControl <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  rOldControl <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectConsumed rOldControl
-  rStaleAuth <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped fin.authorizationCid "PL-001"
+  rStaleAuth <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped fin.authorizationCid f.validityCid "PL-001"
   expectFailure "Control version changed since authorization" rStaleAuth
   repinned <- authorizeActivation l fin.agreementCid bumped "AUTH-002" (days 7)
-  rStaleEvidence <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped repinned "PL-001"
+  rStaleEvidence <- trySubmit p.lenderA $ activateCmd l p.lenderA bumped repinned f.validityCid "PL-001"
   expectFailure "Evidence package changed since authorization" rStaleEvidence
   assertSingleToken p 0
 
@@ -123,7 +125,7 @@ test_activation_with_expired_attestation_fails = do
   let p = l.parties
   fin <- financeToAuthorization f
   passTime (days 3)
-  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectFailure "Attestation is outside its validity period" r
   now <- getTime
   rReauthorize <- trySubmit p.owner $ exerciseCmd fin.agreementCid Agreement_AuthorizeActivation with
@@ -139,7 +141,7 @@ test_activation_with_expired_authorization_fails = do
       p = l.parties
   fin <- financeToAuthorization f
   passTime (days 8)
-  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectFailure "Activation authorization expired" r
   assertSingleToken p 0
 
@@ -154,13 +156,13 @@ test_rogue_lender_cannot_activate = do
   auth <- fetchAs p.lenderA fin.authorizationCid
   rForge <- trySubmit p.lenderB $ createCmd auth with lender = p.lenderB
   expectAuthorizationFailure rForge
-  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid fin.authorizationCid "PL-B"
+  rNotVisible <- trySubmit p.lenderB $ activateCmd l p.lenderB f.controlCid fin.authorizationCid f.validityCid "PL-B"
   expectNotVisible rNotVisible
   -- even with read access to everything the borrower and Lender A hold, Lender B lacks authority
   let readAll = actAs p.lenderB <> readAs p.owner <> readAs p.lenderA
-  rNotShared <- trySubmit readAll $ activateCmd l p.lenderB f.controlCid fin.authorizationCid "PL-B"
+  rNotShared <- trySubmit readAll $ activateCmd l p.lenderB f.controlCid fin.authorizationCid f.validityCid "PL-B"
   expectFailure "Control is not shared with this lender" rNotShared
-  rImpersonate <- trySubmit readAll $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-B"
+  rImpersonate <- trySubmit readAll $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-B"
   expectAuthorizationFailure rImpersonate
   assertSingleToken p 0
 
@@ -188,7 +190,7 @@ test_authorization_for_another_asset_fails = do
   proposal <- issueProposal p.lenderA eligible "FP-OTHER"
   agreementCid <- acceptProposal l proposal "FP-OTHER" 1
   auth <- authorizeActivation l agreementCid f.controlCid "AUTH-OTHER" (days 7)
-  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth "PL-OTHER"
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid auth f.validityCid "PL-OTHER"
   expectFailure "Authorization is for another asset" r
   assertSingleToken p 0
 
@@ -349,8 +351,8 @@ test_replays_of_consumed_contracts_fail = do
   rAccept <- trySubmit p.owner $ exerciseCmd fin.proposalCid Proposal_Accept with
     expectedProposalRef = "FP-001"; expectedVersion = 1; actorRef = ownerActor
   expectConsumed rAccept
-  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid "PL-001"
-  rActivate <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid "PL-001"
+  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  rActivate <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
   expectConsumed rActivate
   rr <- requestRelease l lockCid "RR-001"
   _ <- submit p.lenderA $ exerciseCmd rr Release_Authorize with decisionRef = "RD-001"; actorRef = approverActor

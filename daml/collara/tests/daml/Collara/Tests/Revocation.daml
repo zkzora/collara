@@ -1,0 +1,205 @@
+-- | The revocation race closed on the ledger (docs/architecture/daml-model.md §4.5 "Disclosure validity", §8.2).
+-- `Control_Activate` fetches the owner-signed `DisclosureValidity` of the lender's disclosure, which every choice
+-- that ends the disclosure archives (owner `AttDisc_Revoke`, verifier `Att_Revoke`, supersession). A revocation
+-- committed before the activation makes it fail; an activation committed first is not undone by a later one.
+module Collara.Tests.Revocation where
+
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Collara.Evidence
+import Collara.Release hiding (ReleaseOutcome(..), ReleaseStatus(..))
+import Collara.Scripts.Scenario
+import Collara.Scripts.Seed
+import Collara.Tests.Common
+import Collara.Tests.Pledge (assertSingleToken)
+import Collara.Tests.Util
+import Collara.Verification hiding (VerificationStatus(..))
+
+-- | The verifier corrects ATT-001 with ATT-002 (a new request on the current manifest version), withdrawing the
+-- listed disclosures of ATT-001. Returns ATT-002.
+supersedeAtt001 : MainFixture -> [ContractId AttestationDisclosure] -> Script (ContractId VerificationAttestation)
+supersedeAtt001 f disclosureCids = do
+  let l = f.ledger
+      p = l.parties
+  request <- submit p.owner $ exerciseCmd f.manifestCid Manifest_RequestVerification with
+    verifier = p.verifier
+    requestRef = "VR-002"
+    passportVersion = 1
+    caseRef = Some fixtureCaseRef
+    equipmentScope = cncScope
+    checklist = ["Serial number consistency"]
+    dueBy = None
+    actorRef = ownerActor
+  accepted <- acceptAssignment l request
+  now <- getTime
+  submit p.verifier $ exerciseCmd accepted VR_IssueAttestation with
+    configCid = l.configCid
+    accreditationCid = l.accreditationCid
+    attestationRef = "ATT-002"
+    checks = fixtureChecks
+    limitations = "Correction of ATT-001."
+    method = "Document review (synthetic)"
+    inspectedAt = now
+    validFrom = now
+    validUntil = addRelTime now (days 180)
+    supersedes = Some Supersession with previousCid = f.attestationCid; previousDisclosureCids = disclosureCids
+    actorRef = verifierActor
+
+-- * Revocation committed first: the activation fails on the ledger
+
+test_owner_revocation_before_activation_fails : Script ()
+test_owner_revocation_before_activation_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  submit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
+  assertArchived "validity marker after the owner's revocation" p.owner f.validityCid
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  expectConsumed r
+  assertSingleToken p 0
+  assertActive "authorization (not consumed by the failed activation)" p.lenderA fin.authorizationCid
+
+test_verifier_revocation_before_activation_fails : Script ()
+test_verifier_revocation_before_activation_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  _ <- submit p.verifier $ exerciseCmd f.attestationCid Att_Revoke with
+    reason = "Synthetic revocation"; disclosureCids = [f.disclosureCid]; actorRef = verifierActor
+  assertArchived "disclosure after the verifier's revocation" p.lenderA f.disclosureCid
+  assertArchived "validity marker after the verifier's revocation" p.owner f.validityCid
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  expectConsumed r
+  -- a revoked attestation cannot be disclosed again
+  rRedisclose <- trySubmit p.owner $ exerciseCmd f.attestationCid Att_DiscloseTo with
+    recipient = p.lenderA; purpose = "LENDER_REVIEW"; disclosureCaseRef = fixtureCaseRef; actorRef = ownerActor
+  expectConsumed rRedisclose
+  assertSingleToken p 0
+
+-- | Supersession withdraws the old disclosure (and its marker). A disclosure of the correction does not rescue an
+-- authorization that pins the superseded attestation.
+test_supersession_before_activation_fails : Script ()
+test_supersession_before_activation_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  att2 <- supersedeAtt001 f [f.disclosureCid]
+  assertArchived "validity marker of the superseded disclosure" p.owner f.validityCid
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  expectConsumed r
+  disclosure2 <- submit p.owner $ exerciseCmd att2 Att_DiscloseTo with
+    recipient = p.lenderA; purpose = "LENDER_REVIEW"; disclosureCaseRef = fixtureCaseRef; actorRef = ownerActor
+  validity2 <- validityOf p.lenderA disclosure2
+  rOtherAttestation <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid validity2 "PL-001"
+  expectFailure "Attestation disclosure does not match the reviewed attestation" rOtherAttestation
+  assertSingleToken p 0
+
+-- | The interleaving that committed before the fix (docs/privacy-verification.md, "Revocation race"): the lender
+-- checks its live disclosure and takes the marker id from it (the API's precheck), the owner's revocation commits,
+-- then the lender submits. The ledger now rejects the activation. The lender cannot mint a marker, and another
+-- lender's marker does not stand in. After the owner discloses again, the new marker backs the same authorization.
+test_race_interleaving_now_fails : Script ()
+test_race_interleaving_now_fails = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  disclosure <- fetchAs p.lenderA f.disclosureCid
+  validity <- fetchAs p.lenderA disclosure.validityCid
+  assertEq "marker of the reviewed attestation" ("ATT-001", p.lenderA, fixtureCaseRef)
+    (validity.attestationRef, validity.recipient, validity.caseRef)
+  submit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
+  rRace <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid disclosure.validityCid "PL-001"
+  expectConsumed rRace
+  rMint <- trySubmit p.lenderA $ createCmd validity
+  expectAuthorizationFailure rMint
+  disclosureB <- discloseTo f p.lenderB
+  validityB <- validityOf p.owner disclosureB
+  rHidden <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid validityB "PL-001"
+  expectNotVisible rHidden
+  rOtherLender <- trySubmit (actAs p.lenderA <> readAs p.lenderB) $
+    activateCmd l p.lenderA f.controlCid fin.authorizationCid validityB "PL-001"
+  expectFailure "Attestation disclosure is for another lender, owner, asset or case" rOtherLender
+  assertSingleToken p 0
+  again <- discloseTo f p.lenderA
+  validityAgain <- validityOf p.lenderA again
+  lockCid <- activate l p.lenderA f.controlCid fin.authorizationCid validityAgain "PL-001"
+  lock <- fetchAs p.registrar lockCid
+  assertEq "lock attestation ref" "ATT-001" lock.attestationRef
+  assertSingleToken p 1
+
+-- * Activation committed first: later revocations do not touch the lock
+
+test_activation_then_owner_revocation_keeps_lock : Script ()
+test_activation_then_owner_revocation_keeps_lock = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let l = f.ledger
+      p = l.parties
+  submit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
+  assertArchived "validity marker" p.owner f.validityCid
+  assertActive "lock after the owner's revocation" p.owner lockCid
+  _ <- submit p.verifier $ exerciseCmd f.attestationCid Att_Revoke with
+    reason = "Synthetic revocation"; disclosureCids = []; actorRef = verifierActor
+  assertActive "lock after the verifier's revocation" p.owner lockCid
+  assertSingleToken p 1
+  rr <- requestRelease l lockCid "RR-001"
+  _ <- submit p.lenderA $ exerciseCmd rr Release_Authorize with decisionRef = "RD-001"; actorRef = approverActor
+  assertSingleToken p 0
+
+-- | Supersession after the activation withdraws the lender's disclosure and archives its marker (both still live
+-- because the activation only fetched the marker); the lock stays ACTIVE.
+test_activation_then_supersession_keeps_lock : Script ()
+test_activation_then_supersession_keeps_lock = do
+  (f, _, lockCid) <- activeLockFrom seedMain
+  let p = f.ledger.parties
+  assertActive "validity marker after the activation (fetched, not consumed)" p.lenderA f.validityCid
+  _ <- supersedeAtt001 f [f.disclosureCid]
+  assertArchived "disclosure" p.lenderA f.disclosureCid
+  assertArchived "validity marker" p.owner f.validityCid
+  assertActive "lock after supersession" p.owner lockCid
+  assertSingleToken p 1
+
+-- * What the ledger does not enforce (daml-model.md §4.5, residuals 1 and 4)
+
+-- | Residual 1, pinned: the owner signs the marker alone, so it can mint one with the snapshot's fields after the
+-- verifier revoked, and the ledger accepts it. No disclosure links to it; the API takes the marker id only from the
+-- lender's live verifier-signed disclosure, so using it needs the lender's cooperation.
+test_residual_owner_minted_marker_is_accepted : Script ()
+test_residual_owner_minted_marker_is_accepted = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  validity <- fetchAs p.owner f.validityCid
+  _ <- submit p.verifier $ exerciseCmd f.attestationCid Att_Revoke with
+    reason = "Synthetic revocation"; disclosureCids = [f.disclosureCid]; actorRef = verifierActor
+  disclosures <- query @AttestationDisclosure p.lenderA
+  assertEq "Lender A holds no disclosure" 0 (length disclosures)
+  minted <- submit p.owner $ createCmd validity
+  _ <- activate l p.lenderA f.controlCid fin.authorizationCid minted "PL-001"
+  assertSingleToken p 1
+
+-- | Residual 4, pinned: an owner that archives its own marker blocks activation and that disclosure's revocation;
+-- the verifier can still revoke the attestation by leaving that disclosure out.
+test_owner_archiving_its_marker_blocks_activation : Script ()
+test_owner_archiving_its_marker_blocks_activation = do
+  f <- seedMain
+  let l = f.ledger
+      p = l.parties
+  fin <- financeToAuthorization f
+  submit p.owner $ archiveCmd f.validityCid
+  r <- trySubmit p.lenderA $ activateCmd l p.lenderA f.controlCid fin.authorizationCid f.validityCid "PL-001"
+  expectConsumed r
+  rRevoke <- trySubmit p.owner $ exerciseCmd f.disclosureCid AttDisc_Revoke with actorRef = ownerActor
+  expectConsumed rRevoke
+  rWithdraw <- trySubmit p.verifier $ exerciseCmd f.attestationCid Att_Revoke with
+    reason = "Synthetic revocation"; disclosureCids = [f.disclosureCid]; actorRef = verifierActor
+  expectConsumed rWithdraw
+  _ <- submit p.verifier $ exerciseCmd f.attestationCid Att_Revoke with
+    reason = "Synthetic revocation"; disclosureCids = []; actorRef = verifierActor
+  assertActive "orphaned disclosure (cannot back an activation)" p.lenderA f.disclosureCid
+  assertSingleToken p 0

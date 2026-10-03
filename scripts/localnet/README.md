@@ -105,7 +105,7 @@ Ports of the extra participants (ledger API / admin API / JSON API): `participan
   "participants": { "sandbox": { "jsonApiUrl": "http://127.0.0.1:7575", "participantId": "sandbox::1220…", "ledgerEndAtBootstrap": 43 } },
   "parties": { "DemoManufacturer": { "party": "DemoManufacturer::1220…", "participant": "sandbox", "user": "borrower-svc" } },
   "users": [{ "id": "borrower-svc", "participant": "sandbox", "role": "org", "party": "DemoManufacturer", "primaryParty": "DemoManufacturer::1220…", "actAs": ["…"], "readAs": ["…"] }],
-  "packages": [{ "file": "daml/collara/contracts/.daml/dist/collara-contracts-0.1.0.dar", "name": "collara-contracts", "version": "0.1.0", "mainPackageId": "…", "sha256": "…" }]
+  "packages": [{ "file": "daml/collara/contracts/.daml/dist/collara-contracts-0.2.0.dar", "name": "collara-contracts", "version": "0.2.0", "mainPackageId": "…", "sha256": "…" }]
 }
 ```
 

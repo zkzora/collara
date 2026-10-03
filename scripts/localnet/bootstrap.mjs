@@ -207,8 +207,30 @@ function findDefaultDars(config) {
     }
   };
   walk(root);
+  // One DAR per package name, the highest version: a stale build output of an older, upgrade-incompatible version
+  // (e.g. collara-contracts 0.1.0 next to 0.2.0) must never be vetted next to the current one (daml-model.md D15).
+  const latest = new Map();
+  for (const file of found) {
+    const { name, version } = inspectDar(file);
+    if (exclude.has(name)) continue;
+    const current = latest.get(name);
+    if (!current || compareVersions(version, current.version) > 0) latest.set(name, { file, version });
+  }
+  const skipped = found.filter((file) => !exclude.has(inspectDar(file).name) && latest.get(inspectDar(file).name)?.file !== file);
+  for (const file of skipped) console.warn(`warning: skipping ${relative(REPO_ROOT, file)} (an older version of a package with a newer DAR)`);
   const extra = (config.dars?.extra ?? []).map((file) => resolve(REPO_ROOT, file));
-  return [...found.filter((file) => !exclude.has(inspectDar(file).name)).sort(), ...extra];
+  return [...[...latest.values()].map((d) => d.file).sort(), ...extra];
+}
+
+/** Compares dotted numeric versions ("0.10.0" > "0.2.0"). */
+function compareVersions(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
 }
 
 async function uploadDars(participants, files, log) {
