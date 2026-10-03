@@ -12,7 +12,7 @@ Living status file so work can resume across sessions. Update it at the end of e
 | 4 | API services, private evidence, DB migrations, command records, projections | Done (2026-10-03) | All `API_ENDPOINTS` routes + directory/overview; projection worker; migrations 0000–0002; private evidence on SeaweedFS; verifier evidence grants; off-ledger note store; database errors logged without parameters. |
 | 5 | Core journey wired to LocalNet; authz failures, concurrency, retry, scoped exports verified | Done on one participant (2026-10-03) | Full LOCALNET IT with S3: 12 files, 71/71 (journey, adversarial 44 routes, concurrency 5 rounds, verifier evidence, notes, create case from clean-start, governance). Browser: LocalNet walkthrough from clean-start 14/14 (46 steps), seeded walkthrough 2/2. |
 | 6 | BitSafe governance (DM) | Tier A done (API/UI); Tier B verified by scripts, not wired into the API | Tier A: DM v1.12.0 GovernanceRules 2-of-3 on one participant (10/10 live tests); governance party is an ordinary local party. Tier B (2026-10-03): 3 × `dec-party-manager` v1.12.0 + Canton OSS 3.5.19 (3 participants) in WSL, DM-onboarded decentralized party, DARs + GovernanceRules through DM; Add/Suspend, one/duplicate/stale, attestation blocked, lock untouchable, one-vs-two member participants, namespace and signing-key thresholds all checked (`docs/governance-tier-b.md`, `docs/evidence/tierb-summary.json`). One operator runs every node. |
-| 7 | Setup scripts, CI, health checks, deployment config, docs | CI fixed, green run not yet confirmed | First GitHub run failed in setup-node@v5 (pnpm cache); fixed in bf5e131 (not pushed yet). Dockerfiles/compose untested (no Docker). Docs refreshed to current evidence (f8bf519). |
+| 7 | Setup scripts, CI, health checks, deployment config, docs | Done for CI and the UI mockup deployment (2026-10-03) | CI green on GitHub (run 37102909305: checks, UI_MOCK e2e, Daml). Web app deployed to Vercel in UI_MOCK mode: https://collara-coral.vercel.app (project zkzoras-projects/collara, root apps/web, auto-deploy from main). Dockerfiles/compose untested (no Docker); LOCALNET is not hosted anywhere. |
 
 ## Verification (2026-10-03, combined tree before commits 16e9b43…b0428c5)
 
@@ -36,10 +36,11 @@ Living status file so work can resume across sessions. Update it at the end of e
 
 ## Next steps
 
-1. Push `bf5e131…` to GitHub (with the user's go-ahead) and confirm CI is green; fix what the first real run reveals.
-2. Decide whether to move LOCALNET onto the Tier B topology (Collara bootstrap on the WSL participants + a DM REST governance adapter) and accept the availability coupling (`docs/governance-tier-b.md` §5, §9).
-3. Dealer consent UI; case-linked verification requests in the UI.
-4. JWKS/client-credentials ledger token provider for a real participant; copy approval; BPD-1.
+1. Decide whether to move LOCALNET onto the Tier B topology (Collara bootstrap on the WSL participants + a DM REST governance adapter) and accept the availability coupling (`docs/governance-tier-b.md` §5, §9).
+2. Dealer consent UI; case-linked verification requests in the UI.
+3. Close the revocation race in Daml (activation must see a live disclosure) if the trust note is not acceptable.
+4. Host LOCALNET somewhere reachable (API, worker, PostgreSQL, storage, Canton participant) — needs a hosting decision.
+5. JWKS/client-credentials ledger token provider for a real participant; copy approval; BPD-1.
 
 ## Environment facts (authoring machine)
 
@@ -65,3 +66,4 @@ Living status file so work can resume across sessions. Update it at the end of e
 - 2026-10-03 — Review of e41a83e addressed: CI setup-node fix + bounded test workers (bf5e131); status docs derived from evidence (f8bf519); DB note store + log-safe errors (16e9b43); shared contracts (9ba1bbd); verifier evidence grants (b8bea52); persisted notes (ba0a319); Create Case, overview figures, contrast (b0428c5). Full LOCALNET IT with S3 71/71. Shared infra (sandbox, WSL Postgres, SeaweedFS) was restarted by builders after the machine stopped them overnight.
 - 2026-10-03 — Privacy on five participants (4467b41, 997f814; bootstrap and gateway routing bugs fixed); clean-start LocalNet browser walkthrough 14/14 with three fixes (c5ecb9a, f126857). Regression after each: LocalNet IT 71/71 with S3; unit tests green.
 - 2026-10-03 — Governance Tier B in WSL (uncommitted at the time of writing): `scripts/tierb/` + `infra/tierb/` install Canton OSS 3.5.19 and DM v1.12.0 (digests verified), onboard a decentralized party across 3 participants with 3 DM nodes, distribute DARs, create GovernanceRules via DM `/contracts`, and run the governance scenario (10/10), namespace and signing-key threshold checks (`docs/governance-tier-b.md`, `docs/evidence/tierb-summary.json`). Final clean run exit 0. Finding: accreditation fetches need 2 of 3 governance participants online. API stays on Tier A. Regression after stopping Tier B: sandbox restored, typecheck + lint pass, domain 68 + web 49 unit tests, LocalNet IT 71/71 (425 s, S3).
+- 2026-10-03 — Pushed 17 commits; CI green on GitHub (37102909305) after fixing setup-node caching and generated-docs drift (5c4fb52). Web deployed to Vercel (UI mockup) at https://collara-coral.vercel.app; repo connected for auto-deploy. Tier B scripted on WSL (6c2a89c, f7ddeba).
