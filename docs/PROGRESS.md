@@ -8,9 +8,9 @@ Living status file so work can resume across sessions. Update it at the end of e
 |---|---|---|---|
 | 1 | Audit, sources of truth, permissions, compatibility, migration plan | Done (2026-10-02) | `docs/_research/*`, ADR-0001, migration map |
 | 2 | Frontend migration (Next.js, UI_MOCK walkthrough, typecheck, build) | Done (2026-10-02/03) | Public site, `/login`, full workspace in UI_MOCK and LOCALNET; Create Case (`/app/cases/new`); Overview per-currency figures; form-control borders ≥ 3:1. Open: copy approval (strings marked INFERRED), BPD-1 legal text, landing FAQ/`/demo` copy still says "planned" (approved copy — needs sign-off to change). |
-| 3 | Daml state model + invariant tests; typed Canton adapter; LocalNet submission + visibility | Done on one participant | 60 Daml Script tests; all workflows submitted on Canton 3.5.19 through the adapter; contention proven live. Open: witness-level privacy on 3 participants. |
+| 3 | Daml state model + invariant tests; typed Canton adapter; LocalNet submission + visibility | Done (2026-10-03) | 60 Daml Script tests; all workflows on Canton 3.5.19 through the adapter; contention proven live; witness-level privacy on five participants (`docs/privacy-verification.md`: 7/7 tests, 80/80 checks, twice). |
 | 4 | API services, private evidence, DB migrations, command records, projections | Done (2026-10-03) | All `API_ENDPOINTS` routes + directory/overview; projection worker; migrations 0000–0002; private evidence on SeaweedFS; verifier evidence grants; off-ledger note store; database errors logged without parameters. |
-| 5 | Core journey wired to LocalNet; authz failures, concurrency, retry, scoped exports verified | Done on one participant (2026-10-03) | Full LOCALNET IT with S3: 12 files, 71/71 (journey, adversarial 44 routes, concurrency 5 rounds, verifier evidence, notes, create case from clean-start, governance). Open: 3-participant witness privacy; LOCALNET browser walkthrough from clean-start. |
+| 5 | Core journey wired to LocalNet; authz failures, concurrency, retry, scoped exports verified | Done on one participant (2026-10-03) | Full LOCALNET IT with S3: 12 files, 71/71 (journey, adversarial 44 routes, concurrency 5 rounds, verifier evidence, notes, create case from clean-start, governance). Browser: LocalNet walkthrough from clean-start 14/14 (46 steps), seeded walkthrough 2/2. |
 | 6 | BitSafe governance (DM) | Tier A done; Tier B not attempted | DM v1.12.0 GovernanceRules 2-of-3 on one participant (10/10 live tests). Governance party is an ordinary local party. |
 | 7 | Setup scripts, CI, health checks, deployment config, docs | CI fixed, green run not yet confirmed | First GitHub run failed in setup-node@v5 (pnpm cache); fixed in bf5e131 (not pushed yet). Dockerfiles/compose untested (no Docker). Docs refreshed to current evidence (f8bf519). |
 
@@ -26,20 +26,20 @@ Living status file so work can resume across sessions. Update it at the end of e
 
 ## Known gaps
 
-- **Privacy across participants is unproven.** Every LocalNet check ran on one participant, whose operator sees every transaction.
+- **Privacy is proven on five participants on one machine and one JVM run by one operator** — not independent infrastructure; sequencer/mediator metadata not examined (`docs/privacy-verification.md`).
+- **Revocation race confirmed on the ledger:** an attestation revocation committed after the API precheck does not stop `Control_Activate` (documented, Daml unchanged).
 - **Tier B governance** (DM nodes, decentralized governance party) not attempted; Tier A's governance party credential could act without the seat quorum.
 - **Trust boundaries (documented):** attestation revocation is an API precheck before `Control_Activate`, not atomic ledger enforcement; the registrar holds issuance, config and mirror authority; analyst/approver mandates are off-ledger.
-- **Not verified:** Docker/compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, ledger persistence across sandbox restarts (in-memory), a green CI run, LOCALNET browser run of the new Create Case / notes / verifier-grant screens.
-- **Product gaps:** no web UI for the dealer's verification consent (API route only); only one verifier org in the demo ("a different verifier is refused" is unit-tested only); no retention policy for notes; decision/information-request text on `LenderDecisionNotice.sharedFeedback` is still on-ledger text (changing it needs a Daml change).
+- **Not verified:** Docker/compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, ledger persistence across sandbox restarts (in-memory), a green CI run, the clean-start browser spec on the mobile layout.
+- **Product gaps:** no web UI for the dealer's consent to share its records with the lender or for verification (API route only); verification requests are asset-level only in the UI; only one verifier org in the demo ("a different verifier is refused" is unit-tested only); no retention policy for notes; decision/information-request text on `LenderDecisionNotice.sharedFeedback` is still on-ledger text (changing it needs a Daml change).
 - **Copy/legal:** INFERRED strings need approval; BPD-1 (privacy, terms, consent, retention) blocks any public URL that collects personal data.
 
 ## Next steps
 
 1. Push `bf5e131…` to GitHub (with the user's go-ahead) and confirm CI is green; fix what the first real run reveals.
-2. Three-participant witness privacy: map orgs to participants (Lender B on its own participant), run seed + walkthrough, assert per-party `LEDGER_EFFECTS` streams carry no terms to verifier/dealer/registrar/Lender B and only granted scope to the auditor; record topology and results.
-3. LOCALNET browser walkthrough from clean-start (register → evidence → selected-document verification → attestation → create case → share → review → … → export).
-4. Tier B DM spike (WSL: Canton OSS 3-participant + DM nodes, decentralized party), time-boxed; record exact blockers if it fails.
-5. JWKS/client-credentials ledger token provider for a real participant; copy approval; BPD-1.
+2. Tier B DM spike (WSL: Canton OSS 3-participant + DM nodes, decentralized party), time-boxed; record exact blockers if it fails.
+3. Dealer consent UI; case-linked verification requests in the UI.
+4. JWKS/client-credentials ledger token provider for a real participant; copy approval; BPD-1.
 
 ## Environment facts (authoring machine)
 
@@ -63,3 +63,4 @@ Living status file so work can resume across sessions. Update it at the end of e
 - 2026-10-02 — Stage 4/5 finished with background subagents (ultracode off): commits 6d3536f (IT harness), 0a3e843 (worker + read model; export lease bug fixed), c9337d3 (all endpoints, governance, app-wide parse serializer). Full LOCALNET stack brought up for the user: sandbox + default seed (24 steps), worker 4100, API 4000, web 3000 (next start, LOCALNET, demo sessions). Running in parallel: LOCALNET polish + Playwright/adversarial tests (own prefix e2e, ports 3100/4200/4210); Stage 7 CI/deploy/docs.
 - 2026-10-02 — Stage 7 committed (25265d0), demo-session production guard (ea4ebf2), LOCALNET polish + e2e + adversarial (bbd1548). Running demo restarted with the fixes (API 4000, worker 4100, web 3000). Environment issue: C: has ~3.2 GB free; SeaweedFS refuses writes below 1% free (~4.8 GB), so evidence uploads and export generation fail until the user frees disk space (reads, ledger workflow and governance work). Next: user frees disk → re-run full LOCALNET IT with S3; 3-participant witness privacy; Tier B DM spike (needs several GB RAM, run with the demo stopped); JWKS ledger auth for a real participant; BPD-1 legal text; copy approval.
 - 2026-10-03 — Review of e41a83e addressed: CI setup-node fix + bounded test workers (bf5e131); status docs derived from evidence (f8bf519); DB note store + log-safe errors (16e9b43); shared contracts (9ba1bbd); verifier evidence grants (b8bea52); persisted notes (ba0a319); Create Case, overview figures, contrast (b0428c5). Full LOCALNET IT with S3 71/71. Shared infra (sandbox, WSL Postgres, SeaweedFS) was restarted by builders after the machine stopped them overnight.
+- 2026-10-03 — Privacy on five participants (4467b41, 997f814; bootstrap and gateway routing bugs fixed); clean-start LocalNet browser walkthrough 14/14 with three fixes (c5ecb9a, f126857). Regression after each: LocalNet IT 71/71 with S3; unit tests green.
