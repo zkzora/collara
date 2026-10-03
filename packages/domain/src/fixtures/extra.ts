@@ -245,6 +245,7 @@ function buildExtra(spec: ExtraSpec, c: Clock, log: EventLog): CaseFacts {
         revokedAt: null,
       },
     ],
+    consents: [],
     review: {
       ref: id("assessment"),
       lenderOrgId: ORG.lenderA,

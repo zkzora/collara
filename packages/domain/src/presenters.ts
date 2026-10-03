@@ -27,6 +27,7 @@ import {
   type AttestationFacts,
   type AudienceTag,
   type CaseFacts,
+  type ConsentPurpose,
   type EventFacts,
   type EvidenceDocumentFacts,
   type ExportFacts,
@@ -47,6 +48,7 @@ import {
   type DemoPersona,
   type CaseSummary,
   type CaseTab,
+  type ConsentRequest,
   type EvidenceDocument,
   type GovernanceProposal,
   type GovernanceState,
@@ -97,6 +99,7 @@ import {
   attestationValidityStates,
   caseStages,
   checkResults,
+  consentStates,
   eventKinds,
   evidenceLedgerStates,
   evidenceReviewStates,
@@ -121,8 +124,10 @@ import {
 import {
   allowedAssetActions,
   allowedCaseActions,
+  allowedConsentActions,
   allowedVerificationActions,
   canViewVerification,
+  effectiveConsentState,
   type CaseAction,
 } from "./workflow";
 
@@ -1044,6 +1049,51 @@ export function presentAccessGrants(facts: CaseFacts, viewer: Actor, pctx: Prese
     });
   }
   return grants;
+}
+
+// --- Dealer consent requests ------------------------------------------------------------------------
+
+export const CONSENT_PURPOSE_LABELS: Readonly<Record<ConsentPurpose, string>> = {
+  LENDER_REVIEW: "Lender review",
+  VERIFICATION: "Verification",
+};
+
+/**
+ * Consent requests of a case: the invited dealer sees the requests for its own documents (to grant, decline or
+ * withdraw), the owner sees every dealer's requests (status per dealer document). Other related parties get an
+ * empty list; unrelated parties null. Document titles and types come only from the requesting dealer's own rows.
+ */
+export function presentConsentRequests(facts: CaseFacts, viewer: Actor, pctx: PresentContext): ConsentRequest[] | null {
+  const d = caseDisclosure(facts, viewer, pctx);
+  if (!d.related) return null;
+  if (!d.isOwner && !d.isDealer) return [];
+  return facts.consents
+    .filter((c) => d.isOwner || c.dealerOrgId === viewer.orgId)
+    .map((c): ConsentRequest => {
+      const state = effectiveConsentState(c, pctx.now);
+      return {
+        id: c.ref,
+        caseId: facts.ref,
+        purpose: c.purpose,
+        purposeLabel: CONSENT_PURPOSE_LABELS[c.purpose],
+        recipient: org(c.recipientOrgId),
+        requestedBy: org(c.ownerOrgId),
+        dealer: org(c.dealerOrgId),
+        verificationRef: c.verificationRef,
+        evidencePackage: { ref: c.packageRef, version: c.packageVersion },
+        documents: c.documents.map((e) => {
+          const doc = facts.asset.documents.find((x) => x.ref === e.documentRef && x.sourceOrgId === c.dealerOrgId);
+          return { documentId: e.documentRef, type: doc?.type ?? null, title: doc?.title ?? null, version: e.version, sha256: e.sha256 };
+        }),
+        permission: c.permission,
+        state: consentStates.badge(state),
+        requestedAt: c.requestedAt,
+        decidedAt: c.decidedAt,
+        expiresAt: c.expiresAt,
+        allowedActions: allowedConsentActions(facts, c, viewer, pctx.now, pctx),
+      };
+    })
+    .sort((a, b) => Number(b.state.value === "PENDING") - Number(a.state.value === "PENDING") || Date.parse(b.requestedAt) - Date.parse(a.requestedAt) || a.id.localeCompare(b.id));
 }
 
 // --- Reports ----------------------------------------------------------------------------------------

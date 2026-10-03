@@ -1,13 +1,15 @@
 // Verification evidence grants (daml-model.md §4.6 "Verification evidence grants"). The documents the owner selects
 // for a verification request reach the ASSIGNED verifier only, as an immutable, scoped, expiring grant created in
 // the same correlated sequence as the request (or the evidence resubmission):
-// A selection must hold at least one owner document or one dealer document its dealer consented to (400 otherwise).
+// A selection must hold at least one owner document or one dealer document that may be requested (400 otherwise).
 //   "grant"            owner-signed PackageShare {purpose VERIFICATION, recipient = the request's verifier,
 //                      evidence = the request's anchor, documents = the selected OWNER documents at the exact
 //                      manifest version + SHA-256, VIEW_DOWNLOAD, expiresAt = the request's due date or 30 days}
-//   "dealer-grant-N"   PackageShareProposal for dealer N's selected documents (only those with an active
-//                      DealerContribution of the case whose verificationUseConsented is true); the verifier gets
-//                      them only after that dealer's own Consent_Grant (dealerVerificationConsent below)
+//   "dealer-grant-N"   PackageShareProposal (a consent request) for dealer N's selected documents, for a
+//                      case-linked request only, unless the dealer's DealerContribution of that exact version
+//                      records verificationUseConsented = false (withheld); the verifier gets them only after
+//                      that dealer's own Consent_Grant (POST /consent-requests/:id/decision, or
+//                      dealerVerificationConsent below)
 //   "revoke-<ref>"     Share_Revoke of every other VERIFICATION grant of the package (superseded evidence version,
 //   "withdraw-<ref>"   or an earlier, closed request: one open request per asset) / ShareProposal_Withdraw
 // The share reference binds the grant to its request and evidence version (verificationGrantRef). No Daml change:
@@ -36,7 +38,7 @@ const slug = (ref: string) => ref.toLowerCase().replace(/[^a-z0-9-]/g, "-");
 /** INFERRED copy (same strings as the UI_MOCK client). */
 export const GRANT_COPY = {
   NOT_AVAILABLE: (docRef: string, assetRef: string) => `Document ${docRef} is not available on ${assetRef}.`,
-  NOTHING_TO_GRANT: "Select at least one of your own documents, or a dealer document its dealer agreed to share for verification.",
+  NOTHING_TO_GRANT: "Select at least one of your own documents. Dealer documents can be requested only for a request linked to the dealer's case.",
   NO_PREVIOUS_SELECTION: "Select the documents to share with the verifier.",
   NO_GRANTED_EVIDENCE: "No evidence has been shared with you for the current version of this request.",
 } as const;
@@ -55,42 +57,44 @@ export const exactKey = (d: { docRef: string; docVersion: number; sha256: string
 export interface GrantPlan {
   /** Selected owner documents (exact version, hash and source from the manifest). */
   readonly owner: SharedDocumentInput[];
-  /** Selected dealer documents the dealer consented to verification use, per dealer (sorted by party). */
+  /** Selected dealer documents to request from their dealer (a consent request each), per dealer (sorted by party). */
   readonly dealers: { readonly dealer: string; readonly documents: SharedDocumentInput[] }[];
-  /** Selected dealer documents without that consent: not shared. */
-  readonly withoutConsent: string[];
+  /** Selected dealer documents that cannot be requested (asset-level request, or withheld by the dealer): not shared. */
+  readonly withheld: string[];
   /** Selected documents that are not in the manifest. */
   readonly missing: string[];
 }
 
 /**
  * Which of the selected documents go into which grant. Pure: `entries` is the current manifest (one entry per
- * document), `dealerConsented` holds exactKey() of the dealer contributions with verificationUseConsented.
+ * document), `caseRef` the request's case (dealer documents need one: the dealer is invited to a case),
+ * `dealerWithheld` holds exactKey() of the dealer contributions that record verificationUseConsented = false.
  */
 export function planVerificationGrant(input: {
   readonly entries: readonly Entry[];
   readonly selection: readonly string[];
   readonly ownerParty: string;
-  readonly dealerConsented: ReadonlySet<string>;
+  readonly caseRef: string | null;
+  readonly dealerWithheld: ReadonlySet<string>;
 }): GrantPlan {
   const byRef = new Map(input.entries.map((e) => [e.docRef, e]));
   const selected = [...new Set(input.selection)].sort();
   const shared = (e: Entry): SharedDocumentInput => ({ docRef: e.docRef, docVersion: e.docVersion, sha256: e.sha256, source: e.source });
   const owner: SharedDocumentInput[] = [];
   const dealers = new Map<string, SharedDocumentInput[]>();
-  const withoutConsent: string[] = [];
+  const withheld: string[] = [];
   const missing: string[] = [];
   for (const docRef of selected) {
     const entry = byRef.get(docRef);
     if (!entry) missing.push(docRef);
     else if (entry.source === input.ownerParty) owner.push(shared(entry));
-    else if (input.dealerConsented.has(exactKey(entry))) dealers.set(entry.source, [...(dealers.get(entry.source) ?? []), shared(entry)]);
-    else withoutConsent.push(docRef);
+    else if (input.caseRef && !input.dealerWithheld.has(exactKey(entry))) dealers.set(entry.source, [...(dealers.get(entry.source) ?? []), shared(entry)]);
+    else withheld.push(docRef);
   }
   return {
     owner,
     dealers: [...dealers.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([dealer, documents]) => ({ dealer, documents })),
-    withoutConsent,
+    withheld,
     missing,
   };
 }
@@ -124,10 +128,10 @@ export async function validateSelection(db: Db, input: { assetRef: string; owner
   }
 }
 
-/** exactKey() of the dealer contributions of a case that record verificationUseConsented (owner's fresh view). */
-async function consentedDealerDocuments(acs: AcsReader, input: { ownerParty: string; caseRef: string | null }): Promise<Set<string>> {
+/** exactKey() of the dealer contributions of a case that withhold verification use (owner's fresh view). */
+async function withheldDealerDocuments(acs: AcsReader, input: { ownerParty: string; caseRef: string | null }): Promise<Set<string>> {
   if (!input.caseRef) return new Set();
-  const contributions = await acs.list("DealerContribution", (c) => c.owner === input.ownerParty && c.caseRef === input.caseRef && c.verificationUseConsented);
+  const contributions = await acs.list("DealerContribution", (c) => c.owner === input.ownerParty && c.caseRef === input.caseRef && !c.verificationUseConsented);
   return new Set(contributions.map((c) => exactKey(c.payload)));
 }
 
@@ -141,7 +145,13 @@ export async function assertGrantable(
   input: { assetRef: string; ownerOrgId: string; ownerParty: string; caseRef: string | null; selection: readonly string[] },
 ): Promise<void> {
   const entries = await manifestEntriesFor(db, input);
-  const plan = planVerificationGrant({ entries, selection: input.selection, ownerParty: input.ownerParty, dealerConsented: await consentedDealerDocuments(ownerAcs, input) });
+  const plan = planVerificationGrant({
+    entries,
+    selection: input.selection,
+    ownerParty: input.ownerParty,
+    caseRef: input.caseRef,
+    dealerWithheld: await withheldDealerDocuments(ownerAcs, input),
+  });
   if (plan.missing.length > 0) {
     throw problems.validation(plan.missing.map((id) => ({ path: "body.documentIds", message: GRANT_COPY.NOT_AVAILABLE(id, input.assetRef) })));
   }
@@ -202,7 +212,8 @@ export async function issueVerificationGrants(seq: WorkflowSequence, input: Issu
     entries: manifest.payload.entries,
     selection: input.selection,
     ownerParty,
-    dealerConsented: await consentedDealerDocuments(ownerAcs, { ownerParty, caseRef: input.caseRef }),
+    caseRef: input.caseRef,
+    dealerWithheld: await withheldDealerDocuments(ownerAcs, { ownerParty, caseRef: input.caseRef }),
   });
   if (plan.missing.length > 0 || (plan.owner.length === 0 && plan.dealers.length === 0)) throw workflowProblems.stateChanged();
   const expiresAt = verificationGrantExpiry(request.payload.dueBy, input.now);
@@ -283,10 +294,9 @@ async function retireGrants(
 }
 
 /**
- * The invited dealer's consent path for verification: Consent_Grant on every pending VERIFICATION grant request of
- * the case naming this dealer (the owner created them only for documents whose DealerContribution records
- * verificationUseConsented). The resulting PackageShare is signed by the owner and the dealer. 409 when nothing
- * awaits the dealer's consent.
+ * The invited dealer's bulk consent path for verification: Consent_Grant on every pending VERIFICATION grant
+ * request of the case naming this dealer. The resulting PackageShare is signed by the owner and the dealer. 409
+ * when nothing awaits the dealer's consent. One request at a time: POST /consent-requests/:id/decision.
  */
 export function dealerVerificationConsent(input: {
   readonly workflow: WorkflowServices;

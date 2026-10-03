@@ -129,9 +129,12 @@ UI_MOCK suite asserts that the section appears once a request exists, and the re
 
 - **Dealer consent has no screen.** The invited dealer's consent to share its records with the lender
   (`POST /api/cases/{id}/sharing` as the dealer) and to their use for verification are API-only, so a dealer document
-  reaches neither the lender nor the verifier through the UI.
+  reaches neither the lender nor the verifier through the UI. *Addressed since (2026-10-03, not re-run in this
+  walkthrough): the dealer's Consent requests (case Sharing & Access tab and `/app/access`) and the owner's Dealer
+  consent status; see `docs/PROGRESS.md`.*
 - **Verification requests from the UI are asset-level.** No screen passes a case to the request, so the verifier never
-  becomes a case participant and dealer documents are never granted to it.
+  becomes a case participant and dealer documents are never granted to it. *Addressed since (2026-10-03, not re-run
+  in this walkthrough): the passport's Request verification dialog has an optional Case field.*
 - **Order matters for the dealer.** In the passport-first order the dealer is invited after the attestation. Per the
   share workflow (read, not run), a dealer document added before sharing enters a new manifest version, so the
   attestation would no longer match it and activation would be refused until a new attestation. The walkthrough adds

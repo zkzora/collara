@@ -50,6 +50,14 @@ export function useAccessGrants(caseId: string | undefined, { enabled = true }: 
   return useQuery({ queryKey: keys.accessGrants.list(query), queryFn: ({ signal }) => client.accessGrants.list(query, { signal }), enabled });
 }
 
+/** Dealer consent requests (the dealer's own, or every dealer's for the owner), optionally of one case. */
+export function useConsentRequests(caseId: string | undefined, { enabled = true }: Opt = {}) {
+  const { client } = useCollara();
+  const { keys } = useSession();
+  const query = { caseId, limit: LIST_LIMIT };
+  return useQuery({ queryKey: keys.consentRequests.list(query), queryFn: ({ signal }) => client.consentRequests.list(query, { signal }), enabled });
+}
+
 export function useAttestation(ref: string | null | undefined) {
   const { client } = useCollara();
   const { keys } = useSession();

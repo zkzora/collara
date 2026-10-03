@@ -7,9 +7,11 @@
 //               expired. A VERIFICATION grant (purpose VERIFICATION) also needs the VERIFIER role and an OPEN
 //               VerificationRequest on the same ledger view that names the actor as verifier, has the grant's
 //               owner, is the request the grant reference names, and points at the grant's evidence version.
-// A former recipient (share revoked or expired) gets 409 with the approved revocation copy; a party that may
-// see the metadata but never had download permission gets 403; everyone else gets the 404-shaped answer.
-import { evidenceDocuments, type Db } from "@collara/db";
+// A former recipient (share revoked or expired, or a dealer's consent withdrawn) gets 409 with the approved
+// revocation copy, also when the document's metadata is no longer visible to it (a verification grant ends its
+// visibility); a party that may see the metadata but never had download permission gets 403; everyone else gets
+// the 404-shaped answer.
+import { evidenceDocuments, loadReadWorld, payloads, readViewerOf, TEMPLATES as PROJECTED, type Db } from "@collara/db";
 import { presentEvidenceDocument, STATUS_COPY, VERIFICATION_GRANT_PURPOSE, verificationGrantRequestRef, type EvidenceDocument, type Role, type RuntimeMode } from "@collara/domain";
 import { and, eq } from "drizzle-orm";
 import { problems, type ProblemError } from "../../errors";
@@ -109,7 +111,29 @@ export async function sharedDownloadVersion(input: {
     return { problem: problems.forbidden() };
   }
   const visible = await presentSharedEvidence(input.db, input.member, input.docRef, input.mode, input.now);
-  if (!visible) return { problem: problems.unavailable() };
+  if (!visible) {
+    if (coverage.length === 0 && (await formerShareRecipient(input.db, input.member, input.docRef, input.now))) {
+      return { problem: problems.stateConflict(STATUS_COPY.ACCESS_REVOKED) };
+    }
+    return { problem: problems.unavailable() };
+  }
   if (coverage.length === 0 && visible.revoked) return { problem: problems.stateConflict(STATUS_COPY.ACCESS_REVOKED) };
   return { problem: problems.forbidden() };
+}
+
+/**
+ * True when the viewer was the recipient of a package share (any purpose) that covered the document and has ended:
+ * archived (revoked by the owner, consent withdrawn by its dealer, superseded) or expired. Reads the viewer's
+ * stakeholder-filtered ledger view, so only a former recipient ever gets the revocation copy.
+ */
+export async function formerShareRecipient(db: Db, member: ResolvedActor, docRef: string, now: Date): Promise<boolean> {
+  const viewer = readViewerOf(member);
+  const mine = new Set(viewer.readableParties);
+  const { view } = await loadReadWorld(db, viewer, { now });
+  return view.contracts.some((c) => {
+    if (c.templateRef !== PROJECTED.PackageShare) return false;
+    const s = payloads.decode.share(c.payload);
+    if (!mine.has(s.recipient) || !s.documents.some((d) => d.docRef === docRef)) return false;
+    return c.archived !== null || (s.expiresAt !== null && Date.parse(s.expiresAt) <= now.getTime());
+  });
 }

@@ -22,6 +22,7 @@ import { formatUtcDate } from "@/lib/format";
 import { allows, useAccessGrants } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { ActionDialog, noPayload } from "../action-dialog";
+import { DealerConsentRequests, DealerConsentStatus } from "../access/consent-requests";
 import { Field, SelectInput, TextInput } from "../form-fields";
 import { actingParty, useCaseWorkspace } from "./case-context";
 
@@ -181,17 +182,24 @@ function AuditGrantDialog({ detail, me }: { detail: CaseDetail; me: Me }) {
   );
 }
 
-/** Sharing & Access tab: package shares, verification scope and audit grants visible to this viewer. */
+/**
+ * Sharing & Access tab: package shares, verification scope and audit grants visible to this viewer; the invited
+ * dealer's consent requests for its own documents; the owner's view of each dealer document's consent status.
+ */
 export function SharingTab() {
   const { detail } = useCaseWorkspace();
   const { me } = useSession();
   const grants = useAccessGrants(detail.caseId);
+  const isOwner = detail.borrower?.id === me.org.id && me.roles.includes("BORROWER");
+  // The tab is shown to the owner, the invited dealer and the selected lender only (server-side allowedTabs).
+  const isDealer = me.roles.includes("DEALER") && !isOwner;
   const head = "px-3.5 py-2.5 text-[12px] font-medium whitespace-nowrap text-fg-muted";
   const canShare = allows(detail, "sharing.share");
   const canGrant = allows(detail, "auditGrant.create") && AUDITORS.length > 0;
 
   return (
     <div className="flex flex-col gap-3">
+      {isDealer ? <DealerConsentRequests caseId={detail.caseId} /> : null}
       {grants.isError ? (
         <ErrorState error={grants.error} onRetry={() => void grants.refetch()} />
       ) : grants.isPending ? (
@@ -252,6 +260,7 @@ export function SharingTab() {
           {canGrant ? <AuditGrantDialog detail={detail} me={me} /> : null}
         </div>
       ) : null}
+      {isOwner ? <DealerConsentStatus caseId={detail.caseId} hideWhenEmpty /> : null}
       <p className="text-[12px] leading-relaxed text-fg-subtle">{BOUNDARY_COPY.SHARING_TERMS}</p>
     </div>
   );

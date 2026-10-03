@@ -1,13 +1,13 @@
 // TanStack Query keys, always prefixed with the session scope so cached data never crosses
 // users, organizations or demo personas (WEB §7.2). Clear the QueryClient on logout/persona switch.
-import type { AccessGrantQuery, AuditEventQuery, CaseListQuery, PageQuery, PersonaId, PledgeListQuery } from "@collara/domain";
+import type { AccessGrantQuery, AuditEventQuery, CaseListQuery, ConsentRequestQuery, PageQuery, PersonaId, PledgeListQuery } from "@collara/domain";
 
 /** "{userId}:{orgId}" for real sessions, "mock:{personaId}" in UI_MOCK. */
 export function sessionScope(session: { readonly userId: string; readonly orgId: string } | { readonly personaId: PersonaId }): string {
   return "personaId" in session ? `mock:${session.personaId}` : `${session.userId}:${session.orgId}`;
 }
 
-type Params = PageQuery | CaseListQuery | AuditEventQuery | PledgeListQuery | AccessGrantQuery | undefined;
+type Params = PageQuery | CaseListQuery | AuditEventQuery | PledgeListQuery | AccessGrantQuery | ConsentRequestQuery | undefined;
 
 /** Drops undefined values so equivalent queries share a key. */
 function clean(params: Params): Record<string, unknown> {
@@ -61,6 +61,9 @@ export function createQueryKeys(scope: string) {
     },
     accessGrants: {
       list: (query?: AccessGrantQuery) => [scope, "access-grants", clean(query)] as const,
+    },
+    consentRequests: {
+      list: (query?: ConsentRequestQuery) => [scope, "consent-requests", clean(query)] as const,
     },
     audit: {
       events: (query?: AuditEventQuery) => [scope, "audit", "events", clean(query)] as const,

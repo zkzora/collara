@@ -16,6 +16,9 @@ import type {
   CommandResponse,
   CommandResult,
   CommandStatus,
+  ConsentDecisionRequest,
+  ConsentRequest,
+  ConsentRequestQuery,
   CreateAuditGrantRequest,
   CreateCaseRequest,
   CreateGovernanceProposalRequest,
@@ -184,6 +187,17 @@ export interface CollaraClient {
     revoke(grantId: string, options?: MutationOptions): Promise<CommandResponse>;
   };
 
+  /**
+   * Dealer consent requests (daml-model.md §4.6): the invited dealer grants or declines the owner's request to
+   * share its OWN documents with one recipient, and may withdraw granted consent (future access only). The owner
+   * reads every dealer's requests of its cases (status per dealer document).
+   */
+  consentRequests: {
+    list(query?: ConsentRequestQuery, options?: RequestOptions): Promise<Page<ConsentRequest>>;
+    decide(consentId: string, body: ConsentDecisionRequest, options?: MutationOptions): Promise<CommandResponse>;
+    withdraw(consentId: string, options?: MutationOptions): Promise<CommandResponse>;
+  };
+
   audit: {
     events(query?: AuditEventQuery, options?: RequestOptions): Promise<Page<AuditEvent>>;
   };
@@ -289,6 +303,10 @@ export const API_ENDPOINTS = {
   "accessGrants.list": { method: "GET", path: "/access-grants" },
   "accessGrants.create": { method: "POST", path: "/access-grants" },
   "accessGrants.revoke": { method: "POST", path: "/access-grants/:id/revoke" },
+  // INFERRED additions (dealer consent UI): one consent request at a time, by its share reference.
+  "consentRequests.list": { method: "GET", path: "/consent-requests" },
+  "consentRequests.decide": { method: "POST", path: "/consent-requests/:id/decision" },
+  "consentRequests.withdraw": { method: "POST", path: "/consent-requests/:id/withdraw" },
   "audit.events": { method: "GET", path: "/audit/events" },
   "reports.list": { method: "GET", path: "/reports" },
   "reports.create": { method: "POST", path: "/reports" },

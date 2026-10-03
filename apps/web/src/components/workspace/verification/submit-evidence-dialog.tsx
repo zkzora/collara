@@ -44,7 +44,7 @@ export function SubmitEvidenceDialog({ vr, me }: { vr: VerificationRequest; me: 
     >
       <Checklist
         legend="Documents shared with the verifier"
-        options={available.map((doc) => ({ value: doc.id, label: grantOptionLabel(doc, me.org.id) }))}
+        options={available.map((doc) => ({ value: doc.id, label: grantOptionLabel(doc, me.org.id, vr.caseId !== null) }))}
         selected={docIds}
         onChange={setDocIds}
         error={error}

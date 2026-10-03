@@ -11,6 +11,7 @@ import {
   CommandResponseSchema,
   CommandStatusSchema,
   commandResultSchema,
+  ConsentRequestSchema,
   DemoPersonaSchema,
   EvidenceDocumentSchema,
   EvidenceDownloadSchema,
@@ -202,6 +203,11 @@ export function createHttpClient(config: HttpClientOptions = {}): CollaraClient 
       list: (query, options) => call("accessGrants.list", page(AccessGrantSchema), { query, options }),
       create: (body, options) => call("accessGrants.create", result.grantId, { body, options }),
       revoke: (id, options) => call("accessGrants.revoke", CommandResponseSchema, { id, body: {}, options }),
+    },
+    consentRequests: {
+      list: (query, options) => call("consentRequests.list", page(ConsentRequestSchema), { query, options }),
+      decide: (id, body, options) => call("consentRequests.decide", CommandResponseSchema, { id, body, options }),
+      withdraw: (id, options) => call("consentRequests.withdraw", CommandResponseSchema, { id, body: {}, options }),
     },
     audit: {
       events: (query, options) => call("audit.events", page(AuditEventSchema), { query, options }),

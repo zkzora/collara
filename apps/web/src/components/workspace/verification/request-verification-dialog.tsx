@@ -20,10 +20,16 @@ export const VERIFICATION_SCOPE_ITEMS = [
   "Ownership / lien",
 ] as const;
 
-/** Checkbox label of a document the verifier may be granted; dealer documents need the dealer's own consent. */
-export function grantOptionLabel(doc: EvidenceDocument, ownerOrgId: string): string {
+/**
+ * Checkbox label of a document the verifier may be granted. Dealer documents are requested from the dealer (a
+ * consent request) and reach the verifier only after its consent; that needs a request linked to the dealer's case.
+ */
+export function grantOptionLabel(doc: EvidenceDocument, ownerOrgId: string, caseLinked = true): string {
   const base = `${doc.title} · ${doc.id} v${doc.version}`;
-  return doc.source.id === ownerOrgId ? base : `${base} · ${doc.source.name} (shared after the dealer's consent)`;
+  if (doc.source.id === ownerOrgId) return base;
+  return caseLinked
+    ? `${base} · ${doc.source.name} (requested from the dealer; shared after its consent)`
+    : `${base} · ${doc.source.name} (not shared: link the request to the dealer's case)`;
 }
 
 /** Checked when the dialog is submitted (an event), never during render. */
@@ -31,7 +37,7 @@ const isFuture = (at: number) => !Number.isNaN(at) && at > Date.now();
 
 /**
  * The documents error of a grant selection, or undefined. The API also refuses a selection that holds neither an
- * owner document nor a dealer document its dealer consented to share for verification (it knows the consents).
+ * owner document nor a dealer document that may be requested from its dealer (a case-linked request).
  */
 export function selectionError(available: readonly EvidenceDocument[], selected: readonly string[]): string | undefined {
   return available.some((doc) => selected.includes(doc.id)) ? undefined : "Select at least one available document.";
@@ -101,6 +107,7 @@ export function RequestVerificationDialog({
   const [scope, setScope] = useState<string[]>([...VERIFICATION_SCOPE_ITEMS]);
   const [docIds, setDocIds] = useState<string[]>([]);
   const [due, setDue] = useState("");
+  const [linkedCase, setLinkedCase] = useState(caseId ?? "");
   const [errors, setErrors] = useState<{ verifier?: string; scope?: string; docs?: string; due?: string }>({});
   const chosen = verifierRef || active[0]?.ref || "";
   const ownerOrgId = detail.owner?.id ?? me.org.id;
@@ -119,7 +126,7 @@ export function RequestVerificationDialog({
       verifierRegistryRef: chosen,
       scope,
       documentIds: docIds,
-      caseId,
+      caseId: linkedCase || undefined,
       dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
     };
   }
@@ -137,6 +144,7 @@ export function RequestVerificationDialog({
         setVerifierRef("");
         setScope([...VERIFICATION_SCOPE_ITEMS]);
         setDocIds(available.map((doc) => doc.id));
+        setLinkedCase(caseId ?? "");
         setDue("");
         setErrors({});
       }}
@@ -161,9 +169,23 @@ export function RequestVerificationDialog({
         onChange={setScope}
         error={errors.scope}
       />
+      {detail.cases.length > 0 ? (
+        <Field label="Case (optional)">
+          {(wired) => (
+            <SelectInput wired={wired} value={linkedCase} onChange={(event) => setLinkedCase(event.target.value)}>
+              <option value="">No case · asset-level request</option>
+              {detail.cases.map((c) => (
+                <option key={c.caseId} value={c.caseId}>
+                  {`${c.caseId} · ${c.title}`}
+                </option>
+              ))}
+            </SelectInput>
+          )}
+        </Field>
+      ) : null}
       <Checklist
         legend="Documents shared with the verifier"
-        options={available.map((doc) => ({ value: doc.id, label: grantOptionLabel(doc, ownerOrgId) }))}
+        options={available.map((doc) => ({ value: doc.id, label: grantOptionLabel(doc, ownerOrgId, linkedCase !== "") }))}
         selected={docIds}
         onChange={setDocIds}
         error={errors.docs}

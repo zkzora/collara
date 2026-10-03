@@ -180,6 +180,9 @@ const ROUTES: Readonly<Partial<Record<EndpointName, RouteSpec>>> = {
   "releaseRequests.respond": { real: () => "RR-001", unknown: "RR-999", actor: "borrower", body: () => ({ message: "Sent (synthetic)." }), otherBody: () => ({ message: "Resent (synthetic)." }) },
   "releaseRequests.withdraw": { real: () => "RR-001", unknown: "RR-999", actor: "borrower", body: () => ({}) },
   "accessGrants.revoke": { real: (ids) => ids.grant, unknown: "AG-999", actor: "borrower", body: () => ({}) },
+  // SHR-001: the dealer's granted consent for its invoice (main seed M14). Lender B is the outsider.
+  "consentRequests.decide": { real: () => "SHR-001", unknown: "SHR-999", actor: "dealer", body: () => ({ decision: "GRANT" }), otherBody: () => ({ decision: "DECLINE" }) },
+  "consentRequests.withdraw": { real: () => "SHR-001", unknown: "SHR-999", actor: "dealer", body: () => ({}) },
   "reports.download": { real: (ids) => ids.report, unknown: "RPT-9999", actor: "auditor" },
   "governance.proposal": { real: (ids) => ids.proposal, unknown: "GP-999", actor: "approver", outsider: "dealer" },
   "governance.confirm": { real: (ids) => ids.proposal, unknown: "GP-999", actor: "auditor", outsider: "dealer", body: () => ({}) },

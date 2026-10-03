@@ -322,6 +322,21 @@ export const accessGrantStates = defineVocabulary(
 export const AccessGrantStateSchema = accessGrantStates.schema;
 export type AccessGrantState = z.infer<typeof AccessGrantStateSchema>;
 
+// --- #14b Dealer consent request (PackageShareProposal → Consent_Grant | Consent_Decline; PackageShare →
+// Share_WithdrawConsent | Share_Revoke; daml-model.md §4.6). States and labels INFERRED (need copy approval).
+
+export const consentStates = defineVocabulary(["PENDING", "GRANTED", "DECLINED", "WITHDRAWN", "REVOKED", "EXPIRED", "CANCELLED"], {
+  PENDING: { label: "Awaiting consent", tone: "pending" },
+  GRANTED: { label: "Consent granted", tone: "success" },
+  DECLINED: { label: "Declined", tone: "neutral" },
+  WITHDRAWN: { label: "Consent withdrawn", tone: "neutral" },
+  REVOKED: { label: "Revoked by the owner", tone: "neutral" },
+  EXPIRED: { label: "Expired", tone: "warning" },
+  CANCELLED: { label: "Request withdrawn by the owner", tone: "neutral" },
+});
+export const ConsentStateSchema = consentStates.schema;
+export type ConsentState = z.infer<typeof ConsentStateSchema>;
+
 // --- #15–#16 Invitation, organization, membership, party binding (inferred) -------------------
 
 export const invitationStates = defineVocabulary(["PENDING", "ACCEPTED", "DECLINED", "EXPIRED", "REVOKED"], {
@@ -444,6 +459,7 @@ export const VOCABULARIES = {
   caseStage: caseStages,
   command: commandStates,
   accessGrant: accessGrantStates,
+  consent: consentStates,
   invitation: invitationStates,
   organization: organizationStates,
   membership: membershipStates,

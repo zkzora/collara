@@ -21,6 +21,8 @@ import {
   type AuditScope,
   type CaseFacts,
   type CheckResult,
+  type ConsentFacts,
+  type ConsentState,
   type DocumentType,
   type EvidenceContentType,
   type EvidenceDocumentFacts,
@@ -644,6 +646,51 @@ export function buildWorld(input: WorldInput): BuiltWorld {
       });
     }
 
+    // Dealer consent requests (daml-model.md §4.6), both purposes: PackageShareProposals naming a dealer and the
+    // PackageShares a dealer co-signed (Consent_Grant). Latest contract per share reference; a granted proposal
+    // continues as its share. Expiry is applied by the presenter (effectiveConsentState).
+    const consentFacts = new Map<string, ConsentFacts>();
+    const requestedAt = new Map<string, string>();
+    for (const c of cs.filter((x) => x.templateRef === T.PackageShareProposal || x.templateRef === T.PackageShare)) {
+      const s = decode.share(c.payload);
+      const isProposal = c.templateRef === T.PackageShareProposal;
+      const dealer = isProposal ? s.dealer : (s.consenters[0] ?? null);
+      if (!dealer) continue;
+      const choice = c.archived?.choice ?? null;
+      if (isProposal && choice === "Consent_Grant") {
+        requestedAt.set(s.shareRef, c.createdAt);
+        continue;
+      }
+      const state: ConsentState = isProposal
+        ? choice === null
+          ? "PENDING"
+          : choice === "Consent_Decline"
+            ? "DECLINED"
+            : "CANCELLED"
+        : choice === null
+          ? "GRANTED"
+          : choice === "Share_WithdrawConsent"
+            ? "WITHDRAWN"
+            : "REVOKED";
+      const purpose = s.purpose === VERIFICATION_GRANT_PURPOSE ? "VERIFICATION" : "LENDER_REVIEW";
+      consentFacts.set(s.shareRef, {
+        ref: s.shareRef,
+        purpose,
+        dealerOrgId: org(dealer),
+        ownerOrgId: org(s.owner),
+        recipientOrgId: org(s.recipient),
+        verificationRef: purpose === "VERIFICATION" ? verificationGrantRequestRef(s.shareRef) : null,
+        packageRef: s.evidence?.packageRef ?? "",
+        packageVersion: s.evidence?.manifestVersion ?? 0,
+        documents: s.documents.map((d) => ({ documentRef: d.docRef, version: d.docVersion, sha256: d.sha256 })),
+        permission: s.permission,
+        state,
+        requestedAt: isProposal ? c.createdAt : (requestedAt.get(s.shareRef) ?? c.createdAt),
+        decidedAt: c.archived?.at ?? (isProposal ? null : c.createdAt),
+        expiresAt: s.expiresAt ?? c.createdAt,
+      });
+    }
+
     // Review ------------------------------------------------------------------------------------------------
     const assessmentVersions = pick(T.CollateralAssessment);
     const latestAssessment = latestOf(assessmentVersions, (c) => decode.assessment(c.payload).version);
@@ -959,6 +1006,7 @@ export function buildWorld(input: WorldInput): BuiltWorld {
       policyRef: row?.policyRef || (latestAssessment ? decode.assessment(latestAssessment.payload).policyRef : "") || CREDIT_POLICY_REF,
       asset,
       shares: shareFacts,
+      consents: [...consentFacts.values()],
       review,
       proposals: proposalFacts.sort((a, b) => a.version - b.version),
       activation,

@@ -19,7 +19,7 @@ import type { WorkflowActor } from "../actors";
 import type { WorkflowServices } from "../context";
 import { must } from "../preconditions";
 import { workflowProblems } from "../problems";
-import type { WorkflowOutcome } from "../run";
+import type { WorkflowOutcome, WorkflowSequence } from "../run";
 import { commitManifestIfChanged, currentManifest } from "../assets/manifest";
 import { allocateFreshRef } from "../cases/read";
 import { createdField } from "../cases/steps";
@@ -211,34 +211,8 @@ export async function dealerConsent(input: ShareInput & { readonly dealer: Workf
         (a, b) => a.payload.shareRef.localeCompare(b.payload.shareRef),
       );
       if (proposals.length === 0) throw workflowProblems.stateChanged();
-      const contributions = await acs.list("DealerContribution", (c) => c.dealer === dealerParty && c.caseRef === caseRef);
       const documents = [...new Map(proposals.flatMap((p) => p.payload.documents).map((d) => [`${d.docRef}#${d.docVersion}`, d])).values()];
-      for (const doc of documents.sort((a, b) => a.docRef.localeCompare(b.docRef) || a.docVersion - b.docVersion)) {
-        if (contributions.some((c) => c.payload.docRef === doc.docRef && c.payload.docVersion === doc.docVersion && c.payload.sha256 === doc.sha256)) continue;
-        const [row] = await db
-          .select({ type: evidenceDocuments.type })
-          .from(evidenceDocuments)
-          .where(and(eq(evidenceDocuments.docRef, doc.docRef), eq(evidenceDocuments.version, doc.docVersion)))
-          .limit(1);
-        const owner = proposals[0]!.payload.owner;
-        await seq.step(`contribute-${doc.docRef.toLowerCase()}-v${doc.docVersion}`, {
-          prepare: async (ctx) => ({
-            commands: [
-              L.createDealerContribution({
-                dealer: dealerParty,
-                owner,
-                caseRef,
-                docRef: doc.docRef,
-                docType: row ? (LEDGER_DOC_TYPES[row.type as DocumentType] ?? "OTHER") : "OTHER",
-                docVersion: doc.docVersion,
-                sha256: doc.sha256,
-                contributorRef: ctx.actorRef,
-                verificationUseConsented: true,
-              }),
-            ],
-          }),
-        });
-      }
+      await recordContributions(seq, { db, acs, dealerParty, owner: proposals[0]!.payload.owner, caseRef, documents });
       for (const proposal of proposals) {
         await seq.step(`consent-${proposal.payload.shareRef.toLowerCase()}`, {
           payload: { shareRef: proposal.payload.shareRef },
@@ -252,4 +226,52 @@ export async function dealerConsent(input: ShareInput & { readonly dealer: Workf
       return { grantId: proposals[0]!.payload.shareRef };
     },
   });
+}
+
+/**
+ * The dealer's own ledger record of each listed document ("contribute-<doc>-v<n>" steps): a dealer-signed
+ * DealerContribution (owner observer) for every document without one for that exact version and hash. The type
+ * comes from the dealer's own evidence row. `verificationUseConsented` stays true, as before: the per-recipient
+ * Consent_Grant is the signature the ledger requires; a contribution recorded with false withholds the document
+ * from verification requests (../verification/grants.ts).
+ */
+export async function recordContributions(
+  seq: WorkflowSequence,
+  input: {
+    readonly db: Db;
+    readonly acs: AcsReader;
+    readonly dealerParty: string;
+    readonly owner: string;
+    readonly caseRef: string;
+    readonly documents: readonly { docRef: string; docVersion: number; sha256: string }[];
+  },
+): Promise<void> {
+  const { db, dealerParty, owner, caseRef } = input;
+  const contributions = await input.acs.list("DealerContribution", (c) => c.dealer === dealerParty && c.caseRef === caseRef);
+  const documents = [...input.documents].sort((a, b) => a.docRef.localeCompare(b.docRef) || a.docVersion - b.docVersion);
+  for (const doc of documents) {
+    if (contributions.some((c) => c.payload.docRef === doc.docRef && c.payload.docVersion === doc.docVersion && c.payload.sha256 === doc.sha256)) continue;
+    const [row] = await db
+      .select({ type: evidenceDocuments.type })
+      .from(evidenceDocuments)
+      .where(and(eq(evidenceDocuments.docRef, doc.docRef), eq(evidenceDocuments.version, doc.docVersion)))
+      .limit(1);
+    await seq.step(`contribute-${doc.docRef.toLowerCase()}-v${doc.docVersion}`, {
+      prepare: async (ctx) => ({
+        commands: [
+          L.createDealerContribution({
+            dealer: dealerParty,
+            owner,
+            caseRef,
+            docRef: doc.docRef,
+            docType: row ? (LEDGER_DOC_TYPES[row.type as DocumentType] ?? "OTHER") : "OTHER",
+            docVersion: doc.docVersion,
+            sha256: doc.sha256,
+            contributorRef: ctx.actorRef,
+            verificationUseConsented: true,
+          }),
+        ],
+      }),
+    });
+  }
 }

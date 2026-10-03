@@ -19,30 +19,43 @@ const ENTRIES = [entry("DOC-001", 1, DEALER), entry("DOC-002", 1, OWNER), entry(
 
 describe("planVerificationGrant", () => {
   it("grants exactly the selected owner documents at the manifest's version and hash, never the rest of the package", () => {
-    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-003", "DOC-002"], ownerParty: OWNER, dealerConsented: new Set() });
+    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-003", "DOC-002"], ownerParty: OWNER, caseRef: "CL-001", dealerWithheld: new Set() });
     expect(plan.owner).toEqual([
       { docRef: "DOC-002", docVersion: 1, sha256: "sha-doc-002-v1", source: OWNER },
       { docRef: "DOC-003", docVersion: 2, sha256: "sha-doc-003-v2", source: OWNER },
     ]);
     expect(plan.dealers).toEqual([]);
-    expect(plan.withoutConsent).toEqual([]);
+    expect(plan.withheld).toEqual([]);
     expect(plan.missing).toEqual([]);
   });
 
-  it("routes dealer documents through the dealer's consent: only with a consented contribution of that exact version", () => {
-    const consented = new Set([exactKey(entry("DOC-001", 1, DEALER))]);
-    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001", "DOC-002", "DOC-006"], ownerParty: OWNER, dealerConsented: consented });
+  it("requests dealer documents from their dealer (one consent request per dealer), for a case-linked request only", () => {
+    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001", "DOC-002", "DOC-006"], ownerParty: OWNER, caseRef: "CL-001", dealerWithheld: new Set() });
     expect(plan.owner.map((d) => d.docRef)).toEqual(["DOC-002"]);
-    expect(plan.dealers).toEqual([{ dealer: DEALER, documents: [{ docRef: "DOC-001", docVersion: 1, sha256: "sha-doc-001-v1", source: DEALER }] }]);
-    expect(plan.withoutConsent).toEqual(["DOC-006"]);
-    // A consent recorded for another version (or hash) does not carry over.
-    const stale = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001"], ownerParty: OWNER, dealerConsented: new Set([exactKey({ docRef: "DOC-001", docVersion: 1, sha256: "other" })]) });
-    expect(stale.dealers).toEqual([]);
-    expect(stale.withoutConsent).toEqual(["DOC-001"]);
+    expect(plan.dealers).toEqual([
+      { dealer: DEALER, documents: [{ docRef: "DOC-001", docVersion: 1, sha256: "sha-doc-001-v1", source: DEALER }] },
+      { dealer: OTHER_DEALER, documents: [{ docRef: "DOC-006", docVersion: 1, sha256: "sha-doc-006-v1", source: OTHER_DEALER }] },
+    ]);
+    expect(plan.withheld).toEqual([]);
+    // An asset-level request has no invited dealer: dealer documents are withheld.
+    const assetLevel = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001", "DOC-002"], ownerParty: OWNER, caseRef: null, dealerWithheld: new Set() });
+    expect(assetLevel.dealers).toEqual([]);
+    expect(assetLevel.withheld).toEqual(["DOC-001"]);
+  });
+
+  it("withholds a dealer document whose contribution of that exact version withholds verification use", () => {
+    const withheld = new Set([exactKey(entry("DOC-001", 1, DEALER))]);
+    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001", "DOC-006"], ownerParty: OWNER, caseRef: "CL-001", dealerWithheld: withheld });
+    expect(plan.dealers.map((d) => d.dealer)).toEqual([OTHER_DEALER]);
+    expect(plan.withheld).toEqual(["DOC-001"]);
+    // A veto recorded for another version (or hash) does not carry over.
+    const other = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-001"], ownerParty: OWNER, caseRef: "CL-001", dealerWithheld: new Set([exactKey({ docRef: "DOC-001", docVersion: 1, sha256: "other" })]) });
+    expect(other.dealers.map((d) => d.dealer)).toEqual([DEALER]);
+    expect(other.withheld).toEqual([]);
   });
 
   it("reports documents that are not in the manifest and ignores duplicates", () => {
-    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-002", "DOC-002", "DOC-999"], ownerParty: OWNER, dealerConsented: new Set() });
+    const plan = planVerificationGrant({ entries: ENTRIES, selection: ["DOC-002", "DOC-002", "DOC-999"], ownerParty: OWNER, caseRef: "CL-001", dealerWithheld: new Set() });
     expect(plan.owner.map((d) => d.docRef)).toEqual(["DOC-002"]);
     expect(plan.missing).toEqual(["DOC-999"]);
   });

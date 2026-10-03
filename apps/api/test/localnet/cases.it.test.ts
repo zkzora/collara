@@ -185,6 +185,12 @@ describe.skipIf(!LOCALNET_IT_ENABLED)("LocalNet: assets, evidence, verification 
     expect(requests).toHaveLength(1);
     expect(requests[0]!.payload).toMatchObject({ status: "REQUESTED", caseRef: caseId, owner: h.party("borrower") });
     expect(await h.acsAs("lenderB", "VerificationRequest")).toHaveLength(0);
+    // The dealer's invoice reaches the verifier only through the dealer's consent: a consent request (proposal)
+    // listing that document alone; the owner's grant lists the owner's documents.
+    const grants = await h.acsAs("verifier", "PackageShare", (g) => g.purpose === "VERIFICATION" && g.caseRef === caseId);
+    expect(grants.flatMap((g) => g.payload.documents.map((d) => d.docRef))).not.toContain(docs.invoice!.docRef);
+    const consentRequests = await h.acsAs("dealer", "PackageShareProposal", (p) => p.caseRef === caseId && p.purpose === "VERIFICATION");
+    expect(consentRequests.map((p) => [p.payload.recipient, p.payload.documents.map((d) => d.docRef)])).toEqual([[h.party("verifier"), [docs.invoice!.docRef]]]);
   });
 
   it("verifier: invalid transition 409, Lender B 404, then accept and request changes", async () => {
@@ -273,7 +279,8 @@ describe.skipIf(!LOCALNET_IT_ENABLED)("LocalNet: assets, evidence, verification 
     expect(control!.payload).toMatchObject({ sharedLender: lenderA, controlVersion: 3 });
     const lenderShares = await h.acsAs("lenderA", "PackageShare", (s) => s.caseRef === caseId);
     expect(lenderShares.map((s) => [s.payload.shareRef, s.payload.consenters.length, s.payload.documents.length])).toEqual([[ownerShareRef, 0, 3]]);
-    const proposals = await h.acsAs("dealer", "PackageShareProposal", (p) => p.caseRef === caseId);
+    // The dealer's lender-review request (its verification consent request is separate).
+    const proposals = await h.acsAs("dealer", "PackageShareProposal", (p) => p.caseRef === caseId && p.purpose === "LENDER_REVIEW");
     expect(proposals).toHaveLength(1);
     dealerShareRef = proposals[0]!.payload.shareRef;
     // The dealer's request lists only the dealer's own document.
@@ -317,7 +324,7 @@ describe.skipIf(!LOCALNET_IT_ENABLED)("LocalNet: assets, evidence, verification 
         [dealerShareRef, [h.party("dealer")]],
       ].sort(),
     );
-    expect(await h.acsAs("dealer", "PackageShareProposal", (p) => p.caseRef === caseId)).toHaveLength(0);
+    expect(await h.acsAs("dealer", "PackageShareProposal", (p) => p.caseRef === caseId && p.purpose === "LENDER_REVIEW")).toHaveLength(0);
   });
 
   it("serves shared evidence to the lender (fresh share check at download), never to Lender B or the dealer", async () => {

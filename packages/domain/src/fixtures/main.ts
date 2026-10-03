@@ -232,6 +232,27 @@ export function buildCl001Case(c: Clock, log: EventLog, asset: AssetFacts): Case
         revokedAt: null,
       },
     ],
+    // The dealer's consent for its own invoice inside AG-001 (LocalNet: the dealer-signed share SHR-001).
+    consents: [
+      {
+        ref: "AG-001",
+        purpose: "LENDER_REVIEW",
+        dealerOrgId: ORG.dealer,
+        ownerOrgId: ORG.manufacturer,
+        recipientOrgId: ORG.lenderA,
+        verificationRef: null,
+        packageRef: "PKG-001",
+        packageVersion: 2,
+        documents: asset.documents
+          .filter((d) => d.sourceOrgId === ORG.dealer)
+          .map((d) => ({ documentRef: d.ref, version: 1, sha256: d.versions[0]?.sha256 ?? syntheticSha256(`${d.ref}:v1`) })),
+        permission: "VIEW_DOWNLOAD",
+        state: "GRANTED",
+        requestedAt: c.at("2026-09-12T10:30:00Z"),
+        decidedAt: c.at("2026-09-12T10:35:00Z"),
+        expiresAt: c.at("2026-12-31T23:59:59Z"),
+      },
+    ],
     review: {
       ref: "CA-001",
       lenderOrgId: ORG.lenderA,

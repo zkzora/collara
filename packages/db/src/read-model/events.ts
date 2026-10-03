@@ -198,6 +198,8 @@ function onExercise(e: VisibleEvent): Mapping | null {
     case "Share_Revoke":
     case "AttDisc_Revoke":
       return { type: "ACCESS_REVOKED", ref, actorRef, actorParty, from: "GRANTED", to: "REVOKED", role: "BORROWER" };
+    case "Share_WithdrawConsent":
+      return { type: "ACCESS_REVOKED", ref, actorRef, actorParty, detail: "Dealer consent withdrawn", from: "GRANTED", to: "REVOKED", role: "DEALER" };
     case "Assessment_StartReview":
       return { type: "REVIEW_STARTED", ref, actorRef, actorParty, from: str(payload.status) || null, to: "IN_REVIEW" };
     case "Assessment_Save":

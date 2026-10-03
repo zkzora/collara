@@ -15,7 +15,8 @@ import {
   reviewSnapshotStale,
   usableActivation,
 } from "./derive";
-import type { AssetFacts, AuditScope, CaseFacts, ExportFacts, VerificationFacts } from "./facts";
+import type { AssetFacts, AuditScope, CaseFacts, ConsentFacts, ExportFacts, VerificationFacts } from "./facts";
+import type { ConsentState } from "./states";
 import {
   assetContext,
   can,
@@ -339,4 +340,50 @@ export function allowedVerificationActions(
   options: ContextOptions = {},
 ): VerificationAction[] {
   return VERIFICATION_ACTIONS.filter((action) => checkVerificationAction(asset, verification, actor, action, now, options).ok);
+}
+
+// --- Dealer consent requests (daml-model.md §4.6): only the dealer whose documents are listed decides ---------
+
+export const CONSENT_ACTIONS = ["consent.grant", "consent.decline", "consent.withdraw"] as const;
+export type ConsentAction = (typeof CONSENT_ACTIONS)[number];
+
+/** INFERRED copy (needs approval): consent refusals, shared by the API and the UI_MOCK client. */
+export const CONSENT_COPY = {
+  EXPIRED: "This consent request has expired. Ask the owner for a new request.",
+  NOT_PENDING: "This consent request has already been answered.",
+  NOT_GRANTED: "Only granted consent can be withdrawn.",
+} as const;
+
+/** Stored state with expiry applied (a pending request or a granted share past its expiry is EXPIRED). */
+export function effectiveConsentState(consent: ConsentFacts, now: Date): ConsentState {
+  const expired = Date.parse(consent.expiresAt) <= now.getTime();
+  return (consent.state === "PENDING" || consent.state === "GRANTED") && expired ? "EXPIRED" : consent.state;
+}
+
+/**
+ * Policy + state for a consent decision. The invited dealer whose documents the request lists decides
+ * ("Consent for own records"); unrelated parties get UNAVAILABLE, other case participants (the owner
+ * included) FORBIDDEN.
+ */
+export function checkConsentAction(
+  facts: CaseFacts,
+  consent: ConsentFacts,
+  actor: Actor,
+  action: ConsentAction,
+  now: Date,
+  options: ContextOptions = {},
+): ActionCheck {
+  const ctx = caseContext(facts, now, options);
+  if (!isRelated(actor, ctx)) return unavailable;
+  const isConsentingDealer =
+    actor.roles.includes("DEALER") && consent.dealerOrgId === actor.orgId && facts.dealerOrgId === actor.orgId && facts.borrowerOrgId !== actor.orgId;
+  if (!isConsentingDealer || !can(actor, "sharing.approve", ctx)) return forbidden(action);
+  const state = effectiveConsentState(consent, now);
+  if (action === "consent.withdraw") return state === "GRANTED" ? OK : conflict(CONSENT_COPY.NOT_GRANTED);
+  if (state === "EXPIRED" && consent.state === "PENDING") return conflict(CONSENT_COPY.EXPIRED);
+  return state === "PENDING" ? OK : conflict(CONSENT_COPY.NOT_PENDING);
+}
+
+export function allowedConsentActions(facts: CaseFacts, consent: ConsentFacts, actor: Actor, now: Date, options: ContextOptions = {}): ConsentAction[] {
+  return CONSENT_ACTIONS.filter((action) => checkConsentAction(facts, consent, actor, action, now, options).ok);
 }

@@ -1,6 +1,7 @@
 // UI_MOCK parity of the verification evidence grants (same rules as the LOCALNET API, apps/api
 // workflow/verification/grants.ts): the verifier sees exactly the selected owner documents at the granted versions,
-// a resubmission re-grants the selection at the new version, dealer documents need the dealer's consent.
+// a resubmission re-grants the selection at the new version, dealer documents need the dealer's consent
+// (consents.test.ts).
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
 import { createMockClient } from "./index";
@@ -102,7 +103,7 @@ describe("mock client: verification evidence grants", () => {
     expect((await rejection(client.evidence.download(inspection))).code).toBe("unavailable");
   });
 
-  it("never grants a dealer document on the owner's authority (the dealer's consent is not simulated in UI_MOCK)", async () => {
+  it("never grants a dealer document on the owner's authority (an asset-level request does not even request it)", async () => {
     const client = createMockClient({ personaId: "manufacturer-owner", now: new Date(NOW), latencyMs: 0 });
     const docs = await client.assets.evidence("ASSET-DEMO-001");
     const dealerDoc = docs.find((d) => d.source.id !== "demo-manufacturer");

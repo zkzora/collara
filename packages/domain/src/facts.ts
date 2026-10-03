@@ -11,6 +11,7 @@ import type {
   AssetControlState,
   AssetLifecycleState,
   CheckResult,
+  ConsentState,
   EventKind,
   EvidenceLedgerState,
   EvidenceReviewState,
@@ -234,6 +235,44 @@ export interface ShareFacts {
   revokedAt: string | null;
 }
 
+/** What a dealer consent request is for: onward sharing with the selected lender, or the assigned verifier. */
+export const CONSENT_PURPOSES = ["LENDER_REVIEW", "VERIFICATION"] as const;
+export const ConsentPurposeSchema = z.enum(CONSENT_PURPOSES);
+export type ConsentPurpose = z.infer<typeof ConsentPurposeSchema>;
+
+/** One of the dealer's own documents in a consent request: the exact version and SHA-256 the ledger names. */
+export interface ConsentDocumentFacts {
+  documentRef: string;
+  version: number;
+  sha256: string;
+}
+
+/**
+ * The owner's request for an invited dealer's consent to share the dealer's OWN documents with one recipient
+ * (daml-model.md §4.6, D9): a PackageShareProposal, and once granted the PackageShare signed by owner + dealer.
+ * It never lists the owner's documents. `ref` is the share reference (AG-…/SHR-… for lender review,
+ * `<requestRef>-G<v>-D<n>` for verification).
+ */
+export interface ConsentFacts {
+  ref: string;
+  purpose: ConsentPurpose;
+  dealerOrgId: OrgId;
+  ownerOrgId: OrgId;
+  /** The selected lender (LENDER_REVIEW) or the assigned verifier (VERIFICATION). */
+  recipientOrgId: OrgId;
+  /** VERIFICATION only: the request the grant belongs to. */
+  verificationRef: string | null;
+  packageRef: string;
+  packageVersion: number;
+  documents: ConsentDocumentFacts[];
+  permission: Exclude<AccessPermission, "VIEW_EXPORT">;
+  state: ConsentState;
+  requestedAt: string;
+  /** Granted, declined, withdrawn, revoked or cancelled at. */
+  decidedAt: string | null;
+  expiresAt: string;
+}
+
 export interface AssessmentFacts {
   valuation: Money;
   valuationSource: string;
@@ -429,6 +468,8 @@ export interface CaseFacts {
   policyRef: string;
   asset: AssetFacts;
   shares: ShareFacts[];
+  /** Dealer consent requests of the case (both purposes), latest per reference. */
+  consents: ConsentFacts[];
   review: ReviewFacts;
   /** Every proposal version, oldest first. */
   proposals: ProposalVersionFacts[];

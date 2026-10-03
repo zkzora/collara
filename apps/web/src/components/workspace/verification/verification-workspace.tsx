@@ -22,6 +22,7 @@ import { openDownload } from "../audit/download";
 import { MessageAction } from "../audit/message-action";
 import { actingParty } from "../case/case-context";
 import { assetHref, caseTabHref } from "../case/links";
+import { DealerConsentStatus } from "../access/consent-requests";
 import { AttestationDetails } from "./attestation-details";
 import { IssueAttestationDialog } from "./issue-attestation-dialog";
 import { SubmitEvidenceDialog } from "./submit-evidence-dialog";
@@ -231,6 +232,9 @@ export function VerificationWorkspace({ verificationRef }: { verificationRef: st
           <h2 className="text-[14px] font-medium text-fg">Assigned evidence</h2>
           <AssignedEvidence vr={vr} />
         </section>
+        {vr.caseId && me.roles.includes("BORROWER") && vr.requester.id === me.org.id ? (
+          <DealerConsentStatus caseId={vr.caseId} verificationRef={vr.ref} hideWhenEmpty />
+        ) : null}
         {vr.attestation ? (
           <section aria-label="Attestation" className="flex flex-col gap-2">
             <h2 className="text-[14px] font-medium text-fg">Attestation</h2>

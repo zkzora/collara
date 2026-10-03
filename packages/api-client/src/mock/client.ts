@@ -6,6 +6,8 @@
 import {
   AUDIT_SCOPE_OWNERS,
   AssignmentDecisionRequestSchema,
+  ConsentDecisionRequestSchema,
+  ConsentRequestQuerySchema,
   CreateAuditGrantRequestSchema,
   CreateCaseRequestSchema,
   CreateGovernanceProposalRequestSchema,
@@ -43,6 +45,7 @@ import {
   can,
   checkAssetAction,
   checkCaseAction,
+  checkConsentAction,
   checkVerificationAction,
   currentAttestation,
   effectiveProposalState,
@@ -68,6 +71,7 @@ import {
   presentCaseEvidence,
   presentCaseList,
   presentCaseSummary,
+  presentConsentRequests,
   presentEvidenceDocument,
   presentEvidenceList,
   presentGovernanceProposal,
@@ -83,6 +87,7 @@ import {
   presentVerifierEntries,
   primaryRole,
   releaseReasons,
+  verificationGrantRef,
   verifierActiveLookup,
   type ActionCheck,
   type Actor,
@@ -91,6 +96,7 @@ import {
   type CaseAction,
   type CaseFacts,
   type CommandResult,
+  type ConsentFacts,
   type CommandStatus,
   type DemoWorld,
   type EventFacts,
@@ -316,7 +322,12 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
     proposal: () => world.cases.flatMap((c) => c.proposals.map((p) => p.ref)),
     pledge: () => world.cases.flatMap((c) => (c.lock ? [c.lock.ref] : [])),
     releaseRequest: () => world.cases.flatMap((c) => c.releaseRequests.map((r) => r.ref)),
-    accessGrant: () => world.cases.flatMap((c) => [...c.shares.map((s) => s.ref), ...c.auditGrants.map((g) => g.ref)]),
+    accessGrant: () =>
+      world.cases.flatMap((c) => [
+        ...c.shares.map((s) => s.ref),
+        ...c.auditGrants.map((g) => g.ref),
+        ...c.consents.filter((x) => x.purpose === "LENDER_REVIEW").map((x) => x.ref),
+      ]),
     report: () => world.cases.flatMap((c) => c.exports.map((e) => e.ref)),
     governanceProposal: () => world.governance.proposals.map((p) => p.ref),
     verifier: () => [...world.governance.verifiers.map((v) => v.ref), ...world.governance.proposals.map((p) => p.target.verifierRef)],
@@ -349,8 +360,8 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
   /**
    * Verification grants (same rules as the API, workflow/verification/grants.ts): every selected document must be
    * available. INFERRED copy, same string as the API. (The API also refuses a selection with nothing grantable: no
-   * owner document and no dealer document whose dealer consented to verification use; the fixtures' dealer
-   * documents are consented, as in the LocalNet seed, so that refusal cannot occur here.)
+   * owner document and no dealer document that may be requested; dealer documents of a case-linked request are
+   * requested from their dealer below, so that refusal does not occur here.)
    */
   function checkGrantSelection(asset: AssetFacts, documentIds: readonly string[]): void {
     for (const id of documentIds) {
@@ -361,13 +372,74 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
 
   /**
    * The exact versions granted to the verifier: the selected OWNER documents at their committed package version.
-   * Dealer documents need the dealer's own consent (Consent_Grant in LOCALNET), which UI_MOCK does not simulate.
+   * Dealer documents reach the verifier only through the dealer's own consent (requestDealerConsent below).
    */
   function grantedVersions(asset: AssetFacts, documentIds: readonly string[]): { documentRef: string; version: number }[] {
     return asset.package.entries
       .filter((e) => documentIds.includes(e.documentRef) && asset.documents.find((d) => d.ref === e.documentRef)?.sourceOrgId === asset.ownerOrgId)
       .map((e) => ({ documentRef: e.documentRef, version: e.version }))
       .sort((a, b) => a.documentRef.localeCompare(b.documentRef));
+  }
+
+  /** The case's invited dealer's selected documents at their committed package version (case-linked requests only). */
+  function dealerEntries(asset: AssetFacts, facts: CaseFacts | null, documentIds: readonly string[]): ConsentFacts["documents"] {
+    const dealer = facts?.dealerOrgId;
+    if (!facts || !dealer || dealer === asset.ownerOrgId) return [];
+    return asset.package.entries
+      .filter((e) => documentIds.includes(e.documentRef) && asset.documents.find((d) => d.ref === e.documentRef)?.sourceOrgId === dealer)
+      .map((e) => ({
+        documentRef: e.documentRef,
+        version: e.version,
+        sha256: asset.documents.find((d) => d.ref === e.documentRef)?.versions.find((v) => v.version === e.version)?.sha256 ?? "",
+      }))
+      .sort((a, b) => a.documentRef.localeCompare(b.documentRef));
+  }
+
+  /**
+   * The owner's consent request to the case's dealer (LOCALNET: a PackageShareProposal listing only that dealer's
+   * documents; daml-model.md §4.6). Nothing reaches the recipient before the dealer grants it.
+   */
+  function requestDealerConsent(
+    facts: CaseFacts,
+    input: Pick<ConsentFacts, "ref" | "purpose" | "recipientOrgId" | "verificationRef" | "documents" | "permission" | "expiresAt">,
+  ): void {
+    if (!facts.dealerOrgId || input.documents.length === 0) return;
+    facts.consents = facts.consents.filter((c) => c.ref !== input.ref);
+    facts.consents.push({
+      ...input,
+      dealerOrgId: facts.dealerOrgId,
+      ownerOrgId: facts.borrowerOrgId,
+      packageRef: facts.asset.package.ref,
+      packageVersion: facts.asset.package.version,
+      state: "PENDING",
+      requestedAt: now().toISOString(),
+      decidedAt: null,
+    });
+  }
+
+  /** A resubmission ends the request's earlier verification consents (LOCALNET: ShareProposal_Withdraw / Share_Revoke). */
+  function retireVerificationConsents(facts: CaseFacts | null, verificationRef: string): void {
+    for (const c of facts?.consents ?? []) {
+      if (c.purpose !== "VERIFICATION" || c.verificationRef !== verificationRef) continue;
+      if (c.state === "PENDING") c.state = "CANCELLED";
+      else if (c.state === "GRANTED") c.state = "REVOKED";
+      else continue;
+      c.decidedAt = now().toISOString();
+    }
+  }
+
+  const DAY_MS = 86_400_000;
+  /** Grant lifetime as the API: the request's due date, else 30 days. */
+  const grantExpiry = (dueAt: string | null | undefined) =>
+    dueAt && Date.parse(dueAt) > now().getTime() ? new Date(Date.parse(dueAt)).toISOString() : new Date(now().getTime() + 30 * DAY_MS).toISOString();
+
+  /** The consent request `id` as the viewer may see it (presenter-scoped) and its case; 404-shaped otherwise. */
+  function visibleConsent(id: string): { facts: CaseFacts; consent: ConsentFacts } {
+    for (const facts of world.cases) {
+      const consent = facts.consents.find((c) => c.ref === id);
+      if (consent && presentConsentRequests(facts, actor(), pctx())?.some((r) => r.id === id)) return { facts, consent };
+    }
+    throw unavailable();
   }
 
   function requestVerificationOn(asset: AssetFacts, caseRef: string | null, body: unknown, opts?: MutationOptions) {
@@ -384,6 +456,18 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
       const ref = nextFreeRef("verification", allRefs.verification());
       const at = now().toISOString();
       const granted = grantedVersions(asset, input.documentIds);
+      const facts = caseRef ? (world.cases.find((c) => c.ref === caseRef) ?? null) : null;
+      if (facts) {
+        requestDealerConsent(facts, {
+          ref: verificationGrantRef(ref, asset.package.version, 1),
+          purpose: "VERIFICATION",
+          recipientOrgId: verifierOrgId,
+          verificationRef: ref,
+          documents: dealerEntries(asset, facts, input.documentIds),
+          permission: "VIEW_DOWNLOAD",
+          expiresAt: grantExpiry(input.dueAt),
+        });
+      }
       asset.verifications.push({
         ref,
         assetRef: asset.ref,
@@ -498,6 +582,7 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
               policyRef: "CP-2026-CNC-01",
               asset,
               shares: [],
+              consents: [],
               review: {
                 ref: nextFreeRef("assessment", allRefs.assessment()),
                 lenderOrgId: input.selectedLenderOrgId,
@@ -541,21 +626,30 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
           const asset = facts.asset;
           commitManifest(asset);
           const ref = nextFreeRef("accessGrant", allRefs.accessGrant());
-          const dealerContributed = asset.documents.some((d) => d.sourceOrgId === facts.dealerOrgId);
+          // Same split as the API: the owner shares its own records; the dealer's records wait for its consent.
+          const dealerDocs = dealerEntries(asset, facts, asset.package.entries.map((e) => e.documentRef));
           facts.shares.push({
             ref,
             recipientOrgId: input.recipientOrgId,
             purpose: "LENDER_REVIEW",
             packageRef: asset.package.ref,
             packageVersion: asset.package.version,
-            entries: asset.package.entries.map((e) => ({ ...e })),
+            entries: asset.package.entries.filter((e) => !dealerDocs.some((d) => d.documentRef === e.documentRef)).map((e) => ({ ...e })),
             permission: input.permission,
             state: "GRANTED",
-            // The dealer's separate consent step (PARTIALLY_CONSENTED) is not simulated in UI_MOCK.
-            consentingOrgIds: dealerContributed && facts.dealerOrgId ? [facts.borrowerOrgId, facts.dealerOrgId] : [facts.borrowerOrgId],
+            consentingOrgIds: [facts.borrowerOrgId],
             createdAt: now().toISOString(),
             expiresAt: input.expiresAt ?? null,
             revokedAt: null,
+          });
+          requestDealerConsent(facts, {
+            ref: nextFreeRef("accessGrant", allRefs.accessGrant()),
+            purpose: "LENDER_REVIEW",
+            recipientOrgId: input.recipientOrgId,
+            verificationRef: null,
+            documents: dealerDocs,
+            permission: input.permission,
+            expiresAt: input.expiresAt ?? new Date(now().getTime() + 30 * DAY_MS).toISOString(),
           });
           facts.review.state = "SUBMITTED";
           facts.review.evidenceSnapshot = asset.package.entries.map((e) => ({ ...e }));
@@ -779,7 +873,11 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
       requestVerification: async (assetRef, body, opts) => {
         const asset = findAsset((a) => a.ref === assetRef);
         guard(checkAssetAction(asset, world.cases, actor(), "verification.request", now(), pctx()));
-        return requestVerificationOn(asset, null, body, opts);
+        const caseId = (body as { caseId?: unknown } | null)?.caseId;
+        const caseRef = typeof caseId === "string" && caseId ? caseId : null;
+        // The case must be one of this asset's cases owned by the caller (the API's check).
+        if (caseRef && !world.cases.some((c) => c.ref === caseRef && c.asset.ref === asset.ref && c.borrowerOrgId === actor().orgId)) throw unavailable();
+        return requestVerificationOn(asset, caseRef, body, opts);
       },
     },
 
@@ -983,6 +1081,19 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
             const granted = grantedVersions(asset, chosen);
             vr.documentRefs = granted.map((e) => e.documentRef);
             vr.documentVersions = granted;
+            const facts = vr.caseRef ? (world.cases.find((c) => c.ref === vr.caseRef) ?? null) : null;
+            retireVerificationConsents(facts, vr.ref);
+            if (facts) {
+              requestDealerConsent(facts, {
+                ref: verificationGrantRef(vr.ref, asset.package.version, 1),
+                purpose: "VERIFICATION",
+                recipientOrgId: vr.verifierOrgId,
+                verificationRef: vr.ref,
+                documents: dealerEntries(asset, facts, chosen),
+                permission: "VIEW_DOWNLOAD",
+                expiresAt: grantExpiry(vr.dueAt),
+              });
+            }
             vr.state = "IN_REVIEW";
             vr.updatedAt = now().toISOString();
             assetEvent(asset, { ref, type: "EVIDENCE_RESUBMITTED", from: "CHANGES_REQUESTED", to: "IN_REVIEW", version: `package v${asset.package.version}` });
@@ -1389,11 +1500,108 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
             if (share) {
               share.state = "REVOKED";
               share.revokedAt = at;
+              // A dealer consent held in this share ends with it (LOCALNET: Share_Revoke of the dealer's share).
+              for (const c of facts.consents) {
+                if (c.ref === grantId && c.purpose === "LENDER_REVIEW" && c.state === "GRANTED") {
+                  c.state = "REVOKED";
+                  c.decidedAt = at;
+                }
+              }
               caseEvent(facts, { ref: grantId, type: "ACCESS_REVOKED", detail: orgName(share.recipientOrgId), from: "GRANTED", to: "REVOKED" });
             } else {
               const grant = must(facts.auditGrants.find((g) => g.ref === grantId));
               grant.revokedAt = at;
               caseEvent(facts, { ref: grantId, type: "AUDIT_GRANT_REVOKED", detail: orgName(grant.auditorOrgId), from: "GRANTED", to: "REVOKED" });
+            }
+          }),
+        );
+      },
+    },
+
+    consentRequests: {
+      list: (query) =>
+        read(() => {
+          const q = parse(ConsentRequestQuerySchema, query ?? {});
+          const cases = q.caseId ? [visibleCase(q.caseId)] : world.cases;
+          return paginate(
+            cases.flatMap((c) => presentConsentRequests(c, actor(), pctx()) ?? []),
+            q,
+          );
+        }),
+
+      decide: async (id, body, opts) => {
+        const { facts, consent } = visibleConsent(id);
+        const input = parse(ConsentDecisionRequestSchema, body);
+        guard(checkConsentAction(facts, consent, actor(), input.decision === "GRANT" ? "consent.grant" : "consent.decline", now(), pctx()));
+        return asCommand(
+          mutate("consent.decision", { id, decision: input.decision }, opts, () => {
+            const at = now().toISOString();
+            consent.decidedAt = at;
+            if (input.decision === "DECLINE") {
+              consent.state = "DECLINED";
+              return;
+            }
+            consent.state = "GRANTED";
+            const entries = consent.documents.map((d) => ({ documentRef: d.documentRef, version: d.version }));
+            if (consent.purpose === "LENDER_REVIEW") {
+              // LOCALNET: Consent_Grant creates the PackageShare signed by owner + dealer, observed by the lender.
+              facts.shares.push({
+                ref: consent.ref,
+                recipientOrgId: consent.recipientOrgId,
+                purpose: "LENDER_REVIEW",
+                packageRef: consent.packageRef,
+                packageVersion: consent.packageVersion,
+                entries,
+                permission: consent.permission,
+                state: "GRANTED",
+                consentingOrgIds: [consent.ownerOrgId, consent.dealerOrgId],
+                createdAt: at,
+                expiresAt: consent.expiresAt,
+                revokedAt: null,
+              });
+              caseEvent(facts, { ref: consent.ref, type: "PACKAGE_SHARED", detail: `${orgName(consent.recipientOrgId)} · ${entries.length} documents`, to: "GRANTED" });
+              return;
+            }
+            // VERIFICATION: the assigned verifier receives exactly these versions for this request.
+            const vr = facts.asset.verifications.find((v) => v.ref === consent.verificationRef);
+            if (vr && vr.packageVersion === consent.packageVersion) {
+              const versions = [...(vr.documentVersions ?? []), ...entries].sort((a, b) => a.documentRef.localeCompare(b.documentRef));
+              vr.documentVersions = versions;
+              vr.documentRefs = [...new Set(versions.map((e) => e.documentRef))];
+            }
+          }),
+        );
+      },
+
+      withdraw: async (id, opts) => {
+        const { facts, consent } = visibleConsent(id);
+        guard(checkConsentAction(facts, consent, actor(), "consent.withdraw", now(), pctx()));
+        return asCommand(
+          mutate("consent.withdraw", { id }, opts, () => {
+            const at = now().toISOString();
+            consent.state = "WITHDRAWN";
+            consent.decidedAt = at;
+            const docs = new Set(consent.documents.map((d) => d.documentRef));
+            if (consent.purpose === "LENDER_REVIEW") {
+              // The dealer's share ends (LOCALNET: Share_WithdrawConsent archives it). The seed's AG-001 holds the
+              // owner's and the dealer's records together: only the dealer's records leave it.
+              const share = facts.shares.find((x) => x.ref === consent.ref && x.state === "GRANTED");
+              if (share) {
+                share.entries = share.entries.filter((e) => !docs.has(e.documentRef));
+                share.consentingOrgIds = share.consentingOrgIds.filter((o) => o !== consent.dealerOrgId);
+                if (share.entries.length === 0) {
+                  share.state = "REVOKED";
+                  share.revokedAt = at;
+                }
+              }
+              caseEvent(facts, { ref: consent.ref, type: "ACCESS_REVOKED", detail: "Dealer consent withdrawn", from: "GRANTED", to: "REVOKED" });
+            } else {
+              // Verification grants are not case events for the lender (LOCALNET: owner, dealer and verifier only).
+              const vr = facts.asset.verifications.find((v) => v.ref === consent.verificationRef);
+              if (vr) {
+                vr.documentVersions = (vr.documentVersions ?? []).filter((e) => !docs.has(e.documentRef));
+                vr.documentRefs = vr.documentRefs.filter((ref) => !docs.has(ref));
+              }
             }
           }),
         );

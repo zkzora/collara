@@ -19,6 +19,7 @@ import { EmptyRow, TableRegion, TD, TR } from "../audit/table-region";
 import { actingParty } from "../case/case-context";
 import { caseTabHref } from "../case/links";
 import { AuditGrantDialog } from "./audit-grant-dialog";
+import { DealerConsentRequests } from "./consent-requests";
 import { PageCommands, PageCommandStatus } from "../audit/page-command";
 
 const PERMISSION_LABELS: Readonly<Record<AccessGrant["permission"], string>> = {
@@ -113,6 +114,7 @@ export function AccessCenter({ caseId }: { caseId?: string }) {
             {STATUS_COPY.ACCESS_REVOKED}
           </p>
         ) : null}
+        {me.roles.includes("DEALER") ? <DealerConsentRequests caseId={caseId} /> : null}
         {grants.isError ? (
           <ErrorState error={grants.error} onRetry={() => void grants.refetch()} />
         ) : grants.isPending ? (

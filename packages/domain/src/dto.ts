@@ -6,6 +6,7 @@ import { CapabilityStatusSchema } from "./capabilities";
 import {
   AccessPermissionSchema,
   AuditScopeSchema,
+  ConsentPurposeSchema,
   DocumentTypeSchema,
   EvidenceContentTypeSchema,
   EVIDENCE_MAX_BYTES,
@@ -13,7 +14,7 @@ import {
   ReportFormatSchema,
 } from "./facts";
 import { MoneySchema } from "./money";
-import { CASE_ACTIONS, ASSET_ACTIONS, VERIFICATION_ACTIONS } from "./workflow";
+import { CASE_ACTIONS, ASSET_ACTIONS, CONSENT_ACTIONS, VERIFICATION_ACTIONS } from "./workflow";
 import {
   AssetRefSchema,
   AttestationRefSchema,
@@ -46,6 +47,7 @@ import {
   CaseStageSchema,
   CheckResultSchema,
   CommandStateSchema,
+  ConsentStateSchema,
   DataSourceSchema,
   EventKindSchema,
   EvidenceLedgerStateSchema,
@@ -594,6 +596,50 @@ export const ShareCaseRequestSchema = z.object({
   expiresAt: IsoDateTimeSchema.optional(),
 });
 export type ShareCaseRequest = z.infer<typeof ShareCaseRequestSchema>;
+
+// --- Dealer consent requests (daml-model.md §4.6) ----------------------------------------------------
+
+export const ConsentActionSchema = z.enum(CONSENT_ACTIONS);
+
+/**
+ * A request for an invited dealer's consent to share its OWN documents with one recipient (the selected lender or
+ * the assigned verifier). Shown to that dealer and to the owner who asked; never lists the owner's documents.
+ */
+export const ConsentRequestSchema = z.object({
+  /** Share reference: AG-…/SHR-… (lender review) or `<requestRef>-G<v>-D<n>` (verification). */
+  id: z.string().min(1).max(80),
+  caseId: CaseRefSchema,
+  purpose: ConsentPurposeSchema,
+  /** "Lender review" | "Verification" */
+  purposeLabel: z.string(),
+  recipient: OrgRefSchema,
+  requestedBy: OrgRefSchema,
+  dealer: OrgRefSchema,
+  verificationRef: VerificationRefSchema.nullable(),
+  evidencePackage: z.object({ ref: z.string(), version: z.number().int() }),
+  documents: z.array(
+    z.object({
+      documentId: DocumentRefSchema,
+      type: DocumentTypeSchema.nullable(),
+      title: z.string().nullable(),
+      version: z.number().int().positive(),
+      sha256: z.string(),
+    }),
+  ),
+  permission: z.enum(["VIEW", "VIEW_DOWNLOAD"]),
+  state: badgeSchema(ConsentStateSchema),
+  requestedAt: IsoDateTimeSchema,
+  decidedAt: IsoDateTimeSchema.nullable(),
+  expiresAt: IsoDateTimeSchema,
+  allowedActions: z.array(ConsentActionSchema),
+});
+export type ConsentRequest = z.infer<typeof ConsentRequestSchema>;
+
+export const ConsentRequestQuerySchema = PageQuerySchema.extend({ caseId: CaseRefSchema.optional() });
+export type ConsentRequestQuery = z.infer<typeof ConsentRequestQuerySchema>;
+
+export const ConsentDecisionRequestSchema = z.object({ decision: z.enum(["GRANT", "DECLINE"]) });
+export type ConsentDecisionRequest = z.infer<typeof ConsentDecisionRequestSchema>;
 
 export const CreateAuditGrantRequestSchema = z.object({
   caseId: CaseRefSchema,

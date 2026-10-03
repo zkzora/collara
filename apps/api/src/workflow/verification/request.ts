@@ -51,7 +51,7 @@ export async function requestVerification(input: RequestVerificationInput): Prom
       const verifier = await resolveRegistryVerifier(workflow.acs(registrar), { verifierRef: body.verifierRegistryRef, namespace, now: input.now });
       const active = await ownerAcs.list("VerificationRequest", (r) => r.namespace === namespace);
       const requestRef = await allocateFreshRef(db, "verification", active.map((r) => r.payload.requestRef));
-      // Something must reach the verifier: an owner document, or a dealer document its dealer consented to.
+      // Something must reach the verifier: an owner document, or a dealer document requested from its dealer.
       await assertGrantable(db, ownerAcs, { assetRef: asset.ref, ownerOrgId: owner.orgId, ownerParty, caseRef: input.caseRef, selection: body.documentIds });
       await commitManifestIfChanged(seq, { db, ownerAcs, namespace, assetRef: asset.ref, ownerOrgId: owner.orgId, ownerParty });
       const { verificationRef } = await seq.step<{ verificationRef: string }>("request", {
