@@ -39,6 +39,19 @@ describe("/api proxy", () => {
     expect(response.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/"]);
   });
 
+  it("does not forward anything in UI mockup mode (no API exists there)", async () => {
+    vi.stubEnv("COLLARA_MODE", "UI_MOCK");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(new NextRequest("http://localhost:3000/api/system/health"), context("system", "health"));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toEqual({ error: "not_available_in_ui_mockup" });
+  });
+
   it("streams request bodies and maps an unreachable API to 502", async () => {
     const fetchMock = vi.fn(async () => {
       throw new TypeError("fetch failed");

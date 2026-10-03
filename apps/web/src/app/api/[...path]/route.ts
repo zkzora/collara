@@ -44,6 +44,8 @@ function jsonError(status: number, error: string) {
 }
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  // UI mockup deployments have no API: the workspace uses the in-browser mock client and never calls /api.
+  if (process.env.COLLARA_MODE === "UI_MOCK") return jsonError(404, "not_available_in_ui_mockup");
   const { path } = await context.params;
   const origin = process.env.API_INTERNAL_ORIGIN || DEFAULT_API_ORIGIN;
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`, origin);

@@ -1,0 +1,22 @@
+# Root-anchored (a bare "docs" would also drop apps/web/src/app/(marketing)/docs).
+# Upload only what the web build needs (Vercel Root Directory = apps/web; workspace packages are imported from source).
+.git
+/.local
+/.spike
+/.vendor
+/.github
+/Collara Website
+/daml
+/infra
+/scripts/tierb
+/docs
+**/node_modules
+**/.next
+**/.next-*
+**/test-results
+**/playwright-report
+**/coverage
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example

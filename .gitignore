@@ -39,3 +39,6 @@ Thumbs.db
 # next.js (NEXT_DIST_DIR may point at .next-<name>/ for parallel builds)
 .next*/
 next-env.d.ts
+
+# Vercel CLI project link (local)
+.vercel
