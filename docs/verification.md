@@ -3,6 +3,138 @@
 What was actually run to check the LOCALNET build, with the observed results, and what has **not** been verified.
 Synthetic data only. Nothing here is a production-readiness or security claim.
 
+## 2026-10-03: clean start through the browser, full LOCALNET IT with S3
+
+- Machine and services as in the 2026-10-02 record below (Canton 3.5.19 `dpm sandbox`, one participant, shared and
+  left running; PostgreSQL 16.14 in WSL; SeaweedFS 4.48 on 8333). Code: HEAD `997f814` plus the uncommitted changes
+  listed under [Defects found by the clean-start walkthrough and fixed](#defects-found-by-the-clean-start-walkthrough-and-fixed).
+- Isolated stack (setup.md, "A second, isolated stack"): bootstrap `--prefix e2e3`, database `collara_e2e`, worker
+  4210, API 4200 (`DEMO_SESSIONS_ENABLED=true`, `PUBLIC_ORIGIN=http://localhost:3100`), web 3100 from
+  `NEXT_DIST_DIR=.next-e2e` built with `COLLARA_MODE=LOCALNET`. Prefixes `e2e` and `e2e2` were development worlds
+  (see the development notes). Every database, state file and build directory of this run was removed afterwards.
+
+### Commands
+
+```bash
+# Git Bash, repo root
+node scripts/localnet/bootstrap.mjs --prefix e2e3
+pnpm localnet:seed --prefix e2e3 --profile clean-start --database-url postgres://collara:collara_dev@127.0.0.1:5432/collara_e2e
+COLLARA_MODE=LOCALNET WORKER_PORT=4210 DATABASE_URL=postgres://collara:collara_dev@127.0.0.1:5432/collara_e2e \
+  COLLARA_LOCALNET_STATE=C:/Collara/.local/localnet/state-e2e3.json pnpm --filter @collara/worker start
+COLLARA_MODE=LOCALNET PORT=4200 DATABASE_URL=postgres://collara:collara_dev@127.0.0.1:5432/collara_e2e \
+  COLLARA_LOCALNET_STATE=C:/Collara/.local/localnet/state-e2e3.json DEMO_SESSIONS_ENABLED=true \
+  PUBLIC_ORIGIN=http://localhost:3100 pnpm --filter @collara/api start
+cd apps/web
+COLLARA_MODE=LOCALNET NEXT_DIST_DIR=.next-e2e pnpm exec next build
+COLLARA_MODE=LOCALNET NEXT_DIST_DIR=.next-e2e API_INTERNAL_ORIGIN=http://127.0.0.1:4200 pnpm exec next start --port 3100
+E2E_MODE=LOCALNET PLAYWRIGHT_BASE_URL=http://localhost:3100 pnpm exec playwright test e2e/localnet-clean-start.spec.ts --project=desktop --output=<private dir>
+```
+
+### Results
+
+| Check | Command | Result |
+|---|---|---|
+| Clean-start walkthrough, browser, LOCALNET | `e2e/localnet-clean-start.spec.ts` on the fresh `clean-start` seed above | **14/14 passed, 46 recorded steps, 2.0 min** (desktop project; the mobile project skips it). Detail below |
+| Main-seed walkthrough and negatives, browser, LOCALNET | `e2e/localnet-walkthrough.spec.ts --project=desktop` on a fresh `main` seed (prefix `e2e4`, database `collara_e2e4`), same worker, API and web setup | **2/2 passed** (40.8 s and 13.5 s): both tests in one invocation on one fresh seed |
+| LocalNet integration tests, full suite, S3 storage | `LOCALNET_IT=1 pnpm --filter @collara/api exec vitest run --config vitest.localnet.config.ts` | **12 files, 71/71 passed, 389 s** on the final tree (S3 from `.env`; the two tests that need a real presigned URL passed). An earlier run with the same API and read-model changes, before one presenter change was reverted, also gave 71/71 (400 s) |
+| Playwright, UI_MOCK, full suite | `COLLARA_MODE=UI_MOCK NEXT_DIST_DIR=.next-mock` build, `next start --port 3110`, `PLAYWRIGHT_BASE_URL=http://localhost:3110 playwright test --workers=2` | **70 passed, 42 skipped, 0 failed** (3.4 min). Skips: 32 LOCALNET-only tests (the two LOCALNET files × two projects) and 10 viewport guards |
+| Typecheck, lint | `pnpm typecheck`, `pnpm lint` | Pass (7 packages; 0 lint problems) |
+| Unit tests of the touched packages | `pnpm --filter @collara/<p> run test --maxWorkers=2` | domain 68, db 62, api 112, web 49: all pass |
+
+What the clean-start walkthrough did in the browser, with demo sessions from `/login` (a new session at every
+persona switch, so every switch is also a re-login). Every sign-in checked the banner `Synthetic demo data — Canton
+LocalNet.` and the absence of the UI_MOCK banner and simulated copy. Every ledger action waited for its command to be
+committed and projected; the confirmations read `Confirmed on the ledger.` with an update id and an offset.
+
+1. Borrower: the clean start has no asset and `0 of 0 accessible cases`; registers `ASSET-DEMO-001`
+   (`CNC machining center`, `DEMO-CNC-500`, `SYNTH-CNC-001`) through `/app/assets/new`.
+2. Borrower: uploads four synthetic files on the passport (`DOC-001`…`DOC-004`: a dealer invoice copy, photos as
+   PNG, inspection report, maintenance summary); each row shows `v1` and the SHA-256 prefix of the uploaded bytes.
+3. Borrower: requests verification from the passport overview with **3 of the 4 documents** (the invoice copy left
+   out); `VR-001` Requested.
+4. Verifier: accepts; **Assigned evidence lists exactly the 3 selected documents**, never the invoice copy, and no
+   terms; downloads the inspection report through the presigned link: 665 bytes, SHA-256 equal to the uploaded file,
+   `%PDF-` header; requests changes.
+5. Borrower: reads the change request, uploads `DOC-003` v2, resubmits (selection preselected, invoice copy still
+   off). Verifier: sees `DOC-003` v2 among the same 3 documents and submits the attestation; `ATT-001` lists the
+   supporting versions inspection report v2, photos v1 and maintenance summary v1, not the invoice copy. The
+   borrower's passport shows the same.
+6. Borrower: `/app/cases/new` with Demo Lender A, invited dealer Demo CNC Dealer and `100000.00` USD → `CL-001` on
+   Sharing & Access (no ledger transaction); shares the package with Demo Lender A. The invited dealer opens `CL-001`:
+   participants, no principal, no proposal reference.
+7. Lender analyst: opens the case (which creates `CA-001`); review snapshot `PKG-001 v2 · matches attested versions`;
+   the disclosed `ATT-001` shows the same 3 reviewed versions; saves the assessment (valuation 150,000.00, internal
+   notes, shared feedback), both notes read back after a reload; submits for approval; the analyst gets the mandate
+   notice and no approve button.
+8. Approver: ELIGIBLE; issues `FP-001` v1 (principal prefilled `100000.00`). Borrower: accepts exactly v1 and
+   authorizes activation. Approver: activates; `Confirmed on the ledger.` with the update id; `Lock and activation
+   evidence · PL-001`.
+9. Overview after activation: the approver sees `Recorded financing principal` USD 100,000.00 and `Recorded
+   collateral valuation` USD 150,000.00 separately, with `1 of 1 active pledge with a recorded principal.`; the
+   borrower sees the principal only; Lender B `No active pledges in your organization's scope.`; the verifier, the
+   dealer and the auditor get no figures panel.
+10. Borrower: requests release with a note (the lock stays active). Approver: requests information with a question.
+    Borrower: responds. Approver: sees the 3-item thread and authorizes; the pledge shows `Released`, and the owner's
+    passport shows the collateral control `Available` (v5).
+11. Borrower and approver each grant audit access; the auditor exports `RPT-0001` and downloads it through the
+    presigned link: SHA-256 equal to the checksum on screen, watermark `Synthetic demo data — Canton LocalNet.`, no
+    note text in the report.
+12. Dealer: on the case's Evidence tab adds its own invoice (`DOC-005`); the tab lists only that record (none of the
+    owner's four) and the download is intact. The borrower sees it with Demo CNC Dealer as source; the lender does
+    not.
+13. New sign-ins: the analyst sees internal notes and shared feedback; the borrower sees the shared feedback, never
+    the internal notes, and the release thread in order; the verifier and the dealer see no `100,000`, `100000`,
+    `FP-…` or note text, and no simulated copy, on 11 pages each (overview, cases, case tabs, pledge, review,
+    passport, verification); the auditor sees no note text on 5 pages; Lender B has no case in the list or counts and
+    gets `This record is unavailable to your account.` on 7 direct URLs, without owner data.
+
+### Defects found by the clean-start walkthrough and fixed
+
+| Defect | Fix | Tests |
+|---|---|---|
+| **Evidence could not be uploaded to a passport without a case** (404 `unavailable` on `POST /api/evidence/upload-intents`). The route takes the owner from the projections, and the projection reader's `assetOwnerOrgId` was a stub that returned null; only case rows supplied an owner. The API-level clean-start test creates the case first, so it never hit this. | `apps/api/src/services/ledger.ts`: `assetOwnerOrgId` reads the asset's active projected `AssetPassport` among the caller's stakeholder contracts and maps its owner party to the organization. | `apps/api/src/services/ledger.test.ts` (3, PGlite); browser steps 2 and 5 |
+| **The selected lender's copy of the attestation listed every document of the package version as supporting**, including the invoice copy the verifier never received. Only the owner and the verifier see the verification grants, so a disclosure holder fell back to the package entries. | `packages/db/src/read-model/disclosure.ts` (`discloseReviewedVersions`, applied in `read-model/index.ts`): for an attestation the viewer holds a disclosure of, the document refs and versions of the owner's matching VERIFICATION grants (same request, owner, verifier and evidence anchor; owner-signed) replace the fallback. A read-side disclosure of refs and versions only; the lender still sees no grant contract. | `verification-grants.test.ts` (new case); browser step 7 |
+| **The invited dealer could not see the case it was invited to** until it held a contract of it, so it had no screen to contribute from; and the case's Evidence tab had no upload control. | `packages/db/src/read-model/index.ts` and `world.ts`: an invited dealer (dealer role) gets the case's application record; the presenters still give it only the dealer's slice (no terms, only its own documents, no equipment identity without an entitling contract). `world.ts`: a case participant without the owner-only passport sees the asset as registered (a case exists only for a registered asset) instead of `Draft`; the passport's `Registered` row then reads `Not disclosed`. `apps/web/src/components/workspace/case/evidence-tab.tsx` and `assets/evidence-upload-dialog.tsx`: **Add evidence** on the case's Evidence tab when the server allows `evidence.upload` (owner, invited dealer); the document is recorded for the case. | `read-model.test.ts` (new case), `evidence-tab.test.tsx` (2); browser steps 6, 12 and 13 |
+
+Development notes: the walkthrough first ran phase by phase on prefix `e2e` while the fixes were made. A first
+fresh run on `e2e2` failed at registration because the `e2e` worker was still bound to port 4210 and projected the
+old prefix into the recreated database; that world was discarded and the recorded run used a fresh `e2e3`. A
+presenter change that showed the owner the passport's Verification section before any request was reverted: the
+UI_MOCK suite asserts that the section appears once a request exists, and the request is made from the overview.
+
+### Gaps found, not fixed
+
+- **Dealer consent has no screen.** The invited dealer's consent to share its records with the lender
+  (`POST /api/cases/{id}/sharing` as the dealer) and to their use for verification are API-only, so a dealer document
+  reaches neither the lender nor the verifier through the UI.
+- **Verification requests from the UI are asset-level.** No screen passes a case to the request, so the verifier never
+  becomes a case participant and dealer documents are never granted to it.
+- **Order matters for the dealer.** In the passport-first order the dealer is invited after the attestation. Per the
+  share workflow (read, not run), a dealer document added before sharing enters a new manifest version, so the
+  attestation would no longer match it and activation would be refused until a new attestation. The walkthrough adds
+  the dealer's document after the journey.
+- Before any request, `/app/assets/<ref>/verification` tells the owner `This section of … is not disclosed to your
+  organization.`, which is misleading for the owner (the request itself is on the overview).
+- The passport header shows the owner claim reference in lower case (`claim-…`), a technical id.
+
+### Items of the 2026-10-02 lists covered by this run
+
+- A single run of both `localnet-walkthrough.spec.ts` tests on one fresh `main` seed (above).
+- The full LocalNet suite with S3 storage after the changes (above).
+- "A verifier sees no assigned documents" and "the overview's per-currency totals have no endpoint": in the
+  clean-start run the verifier lists its granted documents (step 4) and the Overview shows per-currency figures
+  (step 9). Both were fixed in earlier commits; this run checked them in the browser.
+
+### Not verified in this run
+
+- The clean-start spec on the mobile project (desktop only); the UI_MOCK suite covers the mobile layouts.
+- Witness-level privacy of the two new read-side disclosures (the invited dealer's case record, the reviewed
+  versions): they are application reads over projected contracts on one participant, not ledger visibility.
+- What the 2026-10-02 record lists as not verified and this run did not touch: Docker, Keycloak OIDC through a
+  browser, Secure cookies over HTTPS, Tier B governance, JWKS ledger auth.
+
+## 2026-10-02 record
+
 - Date: 2026-10-02, authoring machine (Windows 11, Node 24.16.0, pnpm 11.28.2, Canton 3.5.19 `dpm sandbox` with one
   participant, PostgreSQL 16.14 in WSL, SeaweedFS 4.48).
 - Code: HEAD `ea4ebf2` plus the uncommitted LOCALNET presentation and verification changes described in
@@ -11,7 +143,7 @@ Synthetic data only. Nothing here is a production-readiness or security claim.
   database and ports: bootstrap `--prefix`, database `collara_<prefix>` or `collara_it_<prefix>`, API 4200,
   worker 4210, web 3100/3103 from `NEXT_DIST_DIR=.next-e2e`. See [`setup.md`](setup.md#a-second-isolated-stack-next-to-the-demo).
 
-## Results
+### Results
 
 | Check | Command | Result |
 |---|---|---|
@@ -30,7 +162,7 @@ The two LOCALNET Playwright tests passed in two invocations on the same fresh wo
 the corrected negatives test. A final single run of both on a new seed was not possible (the walkthrough ends
 with an export written to SeaweedFS, which by then refused writes).
 
-### What the adversarial sweep checks (`apps/api/test/localnet/adversarial.it.test.ts`)
+#### What the adversarial sweep checks (`apps/api/test/localnet/adversarial.it.test.ts`)
 
 It covers every route of `API_ENDPOINTS` (`packages/api-client/src/client.ts`) that takes an id: **44 routes**
 (15 reads, 29 mutations). CL-001's real ids come from a fresh main seed driven through the API to an open
@@ -47,7 +179,7 @@ release request: `DOC-001`, `VR-001`, `ATT-001`, `CA-001`, `FP-001`, `PL-001`, `
 | Ledger down (a second app whose gateway points at `127.0.0.1:7599`) | 0 successes. 9 ledger mutations answered **503 `ledger_unavailable`** with the approved copy and a **FAILED** command (`cases.requestVerification`, `assets.requestVerification`, `releaseRequests.decide/requestInformation/withdraw`, `accessGrants.revoke`, `governance.confirm/execute/cancel`). 18 were refused from the projections before any ledger call (409). Ledger ACS unchanged; reads still served from the projections |
 | Same key, different payload → 409 | 19 routes with a payload: 409. 4 were `idempotency_conflict`, where a command record already existed (one after a committed first call). 15 were `state_conflict`, refused before any record. The 10 routes without a payload replay the stored outcome with the same command |
 
-## LOCALNET presentation fixes in this change
+### LOCALNET presentation fixes in this change
 
 Found by the browser sweep. Each one is covered by tests.
 
@@ -76,7 +208,7 @@ Found by the browser sweep. Each one is covered by tests.
   sequence, route-level reads) is now 503 `ledger_unavailable`. A sequence or `prepare` that cannot reach the
   participant records the command FAILED, and a retry with the same key prepares again.
 
-## Environment issue found during verification
+### Environment issue found during verification
 
 From about 11:31 local time, **SeaweedFS refused every write** (`failed to find writable volumes`; a test
 `PutObject` returned `InternalError`). The cause is that drive C: is almost full: 3.8 GB, later 2.3 GB, free of
@@ -84,7 +216,7 @@ From about 11:31 local time, **SeaweedFS refused every write** (`failed to find 
 below its minimum (about 1 % of the disk). The live demo shares this SeaweedFS: **evidence uploads and auditor
 export generation fail until space is freed.** Reads, the ledger and the database were unaffected when checked.
 
-## Not verified
+### Not verified
 
 - **Witness-level privacy across participants** (as of this record). Since checked once on five participants run by
   one operator: see [`privacy-verification.md`](privacy-verification.md) for what it shows and what it does not. The

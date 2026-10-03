@@ -5,7 +5,7 @@ A walkthrough of the synthetic case **CL-001** (`ASSET-DEMO-001`, a `CNC machini
 What has been verified, and how:
 
 - **UI_MOCK:** the full click path below is automated by `apps/web/e2e/walkthrough.spec.ts` (Playwright), which passed in the UI_MOCK suite recorded in [`docs/verification.md`](verification.md) (2026-10-02). Button and dialog names in this script are the ones that spec asserts. Actions are simulated in the browser; no ledger transaction is submitted.
-- **LOCALNET:** the same steps were verified at the API level against the Canton 3.5.19 sandbox (one participant, not Splice LocalNet) by `apps/api/test/localnet/*.it.test.ts` (49/49 at commit `c9337d3`), with assertions on the ledger's active contracts. Steps 1–8 were also run in the browser by `apps/web/e2e/localnet-walkthrough.spec.ts` (desktop project, passed on 2026-10-02, with the negative checks of §4 for Lender B, the verifier and the dealer; see [`docs/verification.md`](verification.md)). The governance steps (§5) and the clean-start steps (§6) are covered at the API level only. Screen labels can still change while in-progress UI work lands.
+- **LOCALNET:** the same steps were verified at the API level against the Canton 3.5.19 sandbox (one participant, not Splice LocalNet) by `apps/api/test/localnet/*.it.test.ts` (49/49 at commit `c9337d3`), with assertions on the ledger's active contracts. Steps 1–8 were also run in the browser by `apps/web/e2e/localnet-walkthrough.spec.ts` (desktop project, passed on 2026-10-02, with the negative checks of §4 for Lender B, the verifier and the dealer; see [`docs/verification.md`](verification.md)). On 2026-10-03 the whole journey from a `clean-start` seed (§6: register, evidence, selected-document verification, attestation, case creation, sharing, then the steps of §3 with notes, and the dealer's own record) passed in the browser in `apps/web/e2e/localnet-clean-start.spec.ts`, and both `localnet-walkthrough.spec.ts` tests passed again on a fresh `main` seed ([`docs/verification.md`](verification.md)). The governance steps (§5) are covered at the API level only. Screen labels can still change while in-progress UI work lands.
 
 ## 1. Before you start
 
@@ -50,7 +50,7 @@ Each step lists what to do, the Daml choice the API submits (daml-model.md §7, 
 
 Ledger: `Assessment_StartReview` and `Assessment_Save` (W1, W2), then `Assessment_SubmitForApproval` (W3) on `CollateralAssessment`, which is signed by Demo Lender A only: the valuation exists only in the lender's contract. Valuation (USD 150,000.00) and requested principal (USD 100,000.00) are separate figures; the review shows the ratio against the policy maximum.
 
-Check: on the **Decision** section the analyst sees `Your mandate (Lender Analyst) does not include collateral approval.` and no approve button. The analyst/approver split is a mandate enforced by the API (403); the ledger sees only the Demo Lender A party (see [limitations](limitations.md#authority)). In LOCALNET the internal notes are not stored (as verified on 2026-10-02; persisting them is in progress).
+Check: on the **Decision** section the analyst sees `Your mandate (Lender Analyst) does not include collateral approval.` and no approve button. The analyst/approver split is a mandate enforced by the API (403); the ledger sees only the Demo Lender A party (see [limitations](limitations.md#authority)). In LOCALNET the internal notes and the shared feedback are stored as private application records: after a reload or a new sign-in the lender sees both, the borrower only the shared feedback (browser-checked from a clean start on 2026-10-03, §6).
 
 ### Step 2: Morgan Hale (Lender Approver) records eligibility and issues the proposal
 
@@ -78,7 +78,7 @@ Ledger: before submitting, the API confirms that Demo Lender A still holds an ac
 1. Switch to the Plant manager; go to `/app/pledges`, open **PL-001**, press **Request release** (reason `EXTERNAL_LOAN_COMPLETION`, optional note and servicing reference) and confirm.
 2. The page shows `Release requested. The collateral lock remains active.` and the status `Active · release requested`.
 
-Ledger: a `ReleaseRequest` (W9) signed by the requester. Creating it never touches the lock. In LOCALNET the free-text note is not stored (as verified on 2026-10-02; persisting it is in progress).
+Ledger: a `ReleaseRequest` (W9) signed by the requester. Creating it never touches the lock. The free-text note, a lender's question and the borrower's response are private application records shown as **Notes and questions** to the borrower and the designated lender only (browser-checked in LOCALNET on 2026-10-03, §6).
 
 Checks:
 
@@ -123,9 +123,30 @@ This is not a ledger transaction: the worker generates the report (JSON or CSV) 
 
 Seat holders: Morgan Hale (seat 1), Lender B approver (seat 2), Audit lead (seat 3). Go to `/app/governance`. A seat proposes **Suspend verifier** for `VER-001`; a second seat confirms; any seat executes. One confirmation is not enough to execute, and a seat cannot count twice. Do this **last**: suspending the only demo verifier blocks new attestations and, under the `REQUIRE_ACTIVE_VERIFIER` policy, new activations. Re-adding Demo Verifier through an **Add verifier** proposal is covered by `governance.it.test.ts`. Governance never touches collateral. Details: [`docs/governance.md`](governance.md).
 
-## 6. Optional: from a clean start
+## 6. From a clean start (LOCALNET, browser)
 
-With the `clean-start` seed profile (organizations, parties, users and the registry only), the earlier steps can be shown too: registering the asset (`POST /api/assets`: owner request, registrar reservation and acceptance; a duplicate identity is declined), creating the case, uploading evidence as the owner and the invited dealer, requesting verification, the verifier accepting, requesting changes and attesting a new evidence version, and sharing the package with Demo Lender A with the dealer's consent. These are covered at the API level by `apps/api/test/localnet/cases.it.test.ts`. Uploads are not virus-scanned; use only the synthetic files.
+The `clean-start` seed profile holds organizations, parties, users, the verifier registry (`VER-001`), Tier A governance and the configuration only: no asset, no case, no document. From there the whole journey runs in the browser with the demo personas. `apps/web/e2e/localnet-clean-start.spec.ts` automates it (results in [`docs/verification.md`](verification.md)). Record refs are allocated by the server and read from the screen; on a fresh namespace they come out as `ASSET-DEMO-001`, `DOC-001`…, `VR-001`, `ATT-001`, `CL-001`, `CA-001`, `FP-001`, `PL-001`, `RR-001` and `RPT-0001`. Uploads are not virus-scanned; use only synthetic files.
+
+Seed and stack: as in [`docs/setup.md`](setup.md#5-run-the-localnet-demo), with `pnpm localnet:seed --profile clean-start` instead of `main` (or on an isolated prefix: `pnpm localnet:seed --prefix <p> --profile clean-start --database-url …/collara_<p>`).
+
+The order is passport first: the asset is registered, documented and verified before a case exists.
+
+1. **Plant manager.** `/app/assets` → **Register asset**. Equipment class `CNC machining center`, a manufacturer, model `DEMO-CNC-500`, serial `SYNTH-CNC-001`, year and location → **Register passport** → confirm **Register passport**. The passport opens once the registration is committed (owner request, registrar reservation and acceptance on the ledger).
+2. **Plant manager.** Passport → **Evidence** → **Add evidence**, once per document: dealer invoice (a copy uploaded by the owner, see the dealer note below), equipment photos, inspection report, maintenance summary (PDF, JPEG or PNG). Each row shows the version and the server's SHA-256.
+3. **Plant manager.** Passport **Overview** → *Permitted actions* → **Request verification** (the **Verification** section appears once a request exists). The verifier is the active registry entry (`VER-001`). Every available document starts selected; untick the ones the verifier must not receive (the walkthrough leaves out the invoice copy) → **Request verification**.
+4. **Inspector.** `/app/verifications` → the request → **Accept assignment**. **Assigned evidence** lists only the selected documents; **Download** opens a 60 s link to the exact bytes. **Request changes** with a message.
+5. **Plant manager.** On the request, **Add a new evidence version** → **Add evidence** → *New version of …* for the inspection report. Back on the request, **Submit new evidence** (the earlier selection is preselected) → **Submit evidence**.
+6. **Inspector.** **Submit attestation** (defaults: method, today, 180 days, checks per item, limitations) → **Submit attestation**. The **Attestation** section lists the supporting versions it reviewed: the new inspection report version and the other selected documents, never the unselected ones. The owner's passport and, after sharing, the lender's case show the same list.
+7. **Plant manager.** `/app/cases` → **Create case**: case name, the registered asset (preselected), **Selected lender** Demo Lender A, **Invited dealer** Demo CNC Dealer, **Requested principal** `100000.00` USD → **Review sharing**. Creating the case submits nothing to the ledger. On **Sharing & Access**, **Share package with Demo Lender A** → **Share package** (package share, control view and attestation disclosure).
+8. Continue with §3 steps 1–8, using the refs on screen (the analyst first opens the case from `/app/cases`; that first open creates the lender's own review record). Internal assessment notes, shared feedback, the release note, the lender's question and the borrower's response are stored as private application records and read back after a reload or a new sign-in.
+
+The invited dealer (Sales desk) sees its case once it is created: participants and its own records only, no principal, proposal or notes. It adds its own documents on the case's **Evidence** tab (**Add evidence**); the owner sees them with the dealer as source, the lender does not.
+
+Limits of this path, as of 2026-10-03:
+
+- In this order the dealer is invited when the case is created, after the attestation. Per the share workflow, a dealer document added before sharing enters the evidence package (a new manifest version), so the attestation would no longer match it and activation would be refused (`EVIDENCE_STALE`) until a new attestation; this was read from the code, not run. The walkthrough therefore adds the dealer's document after the journey. To have it verified, create the case (inviting the dealer) before requesting verification.
+- The UI requests verification for the asset, not for a case, so the verifier never becomes a case participant and a dealer document is never granted to the verifier.
+- The dealer's consent to share its records with the lender (`POST /api/cases/{id}/sharing` as the dealer) and to their use for verification have no screen; they are covered at the API level by `apps/api/test/localnet/cases.it.test.ts`.
 
 ## 7. What this demo does not show
 
