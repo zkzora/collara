@@ -13,14 +13,14 @@ Every check named below ran on one authoring machine (Windows 11) with synthetic
 | Daml model | Implemented: 60 invariant, attack and privacy tests + 4 script tests on the IDE ledger. |
 | Governance Tier A (DLC-link DM v1.12.0 `GovernanceRules`, 2-of-3 seats, one local participant) | Implemented and tested on the sandbox. The governance party is an ordinary local party: its credential could act without the seat quorum. |
 | Verifier suspension | Default policy `REQUIRE_ACTIVE_VERIFIER` (`CollaraConfig.suspensionPolicy`): a suspended verifier cannot accept assignments or issue attestations (the ledger checks the governance-signed accreditation). Its issued attestations are not revoked, but `Control_Activate` requires the registrar's `VerifierStatusMirror` for that verifier to be `ACTIVE`, so they cannot back a new activation once the registrar has synced the mirror (it can lag the suspension). Existing locks are unaffected. |
-| Governance Tier B (Decentralization Manager nodes, decentralized party) | Planned, not attempted. |
+| Governance Tier B (Decentralization Manager nodes, decentralized party) | Exercised by scripts only (`scripts/tierb/`, `docs/governance-tier-b.md`): 3 × DM v1.12.0 + Canton OSS 3.5.19 with 3 participants in WSL, one operator. Governance checks passed; the API and UI do not use it. |
 | CI (GitHub Actions) | Ran once on GitHub (2026-10-02) and **failed** in `actions/setup-node@v5` (its package-manager cache looked for pnpm before the workflow installed it). Fixed in `bf5e131`; **a passing run is not yet confirmed**. |
 | Container images, Compose `app`/`canton` profiles, hosting | Written; **untested** (no Docker on the authoring machine). Nothing is deployed. |
 | Demo sessions | The API refuses to start with `DEMO_SESSIONS_ENABLED=true` under `NODE_ENV=production` unless `DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true`. |
 | In progress (not done) | Verifier scoped evidence assignment; Create Case UI, overview per-currency totals and input contrast; persisted internal and release notes. |
 | Legal pages (BPD-1), INFERRED copy | Pending; block any public deployment. |
 
-**Not verified:** witness-level privacy on 3 participants, Tier B governance, Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
+**Not verified:** witness-level privacy on 3 participants, Tier B governance in the API/UI (only scripted), Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
 
 Evidence: [`docs/verification.md`](docs/verification.md) (what was run and observed) and [`docs/PROGRESS.md`](docs/PROGRESS.md). Commits cited in older notes (`e320c59`, `5ca4faa`, `8384a2b`, `3a3dd85`) are the same trees as `c9337d3`, `ea4ebf2`, `bbd1548` and `25265d0` on `main`, before a history rewrite.
 

@@ -123,7 +123,7 @@ const RUN_LOCALLY = [
 
 const NOT_VERIFIED = [
   "Witness-level privacy on three participants. With one participant, its operator sees every transaction.",
-  "Tier B governance: Decentralization Manager nodes and a decentralized governance party",
+  "Tier B governance in the workspace: Decentralization Manager nodes and a decentralized governance party (scripted local run only)",
   "Docker Compose and the container images",
   "Keycloak sign-in through a browser, and Secure cookies over HTTPS",
   "Ledger authentication with JWKS tokens for a real participant",
@@ -644,7 +644,8 @@ export function GovernanceSection({ now }: { now: Date }) {
         {/* INFERRED (pending approval) from here, replacing "It is a planned capability. The workspace contains…". */}
         Tier A is implemented: Decentralization Manager governance contracts with three seats and a 2-of-3 threshold, on
         one local participant run by one operator, so it does not yet meet that aim. Tier B, a decentralized governance
-        party on Decentralization Manager nodes, has not been attempted. In UI mockup mode, the workspace simulates
+        party on Decentralization Manager nodes, has been exercised only by scripts on a separate local three-node
+        topology run by one operator; the workspace does not use it. In UI mockup mode, the workspace simulates
         governance in the browser.
       </DocsLead>
       <Callout tone="info">{BOUNDARY_COPY.GOVERNANCE_SCOPE}</Callout>
@@ -711,7 +712,7 @@ export function GovernanceSection({ now }: { now: Date }) {
             <DocsList
               small
               items={[
-                "Tier B: Decentralization Manager nodes on separate participants and a decentralized governance party (not attempted)",
+                "Tier B in the workspace: Decentralization Manager nodes and a decentralized governance party (exercised by scripts on a local three-node topology only)",
                 "Independent operators, one participant node per seat holder",
                 "Seat key management and membership changes",
                 "Governance procedures: who may hold a seat, rotation and disputes (not yet specified)",

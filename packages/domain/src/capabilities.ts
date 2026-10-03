@@ -79,7 +79,8 @@ export const CAPABILITIES: readonly Capability[] = [
   {
     id: "governance",
     label: "BitSafe governance for the verifier registry",
-    // Tier A implemented (one local participant); Tier B (DM nodes, decentralized party) not attempted.
+    // Tier A implemented (one local participant). Tier B (DM nodes, decentralized party) is exercised by scripts/tierb on a
+    // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here.
     statuses: ["IMPLEMENTED", "PLANNED"],
     where: { text: "Tier A on one participant; Tier B planned · ", link: { label: "BitSafe governance", href: "#governance" } },
   },

@@ -450,4 +450,4 @@ Still not verified:
 
 - Witness-level privacy of the paths the 5-participant run did not take: share revocation, consent withdrawal, verification grants created by the API, supersession and revocation of attestations, governed add/suspend verifier and `Mirror_Sync`, declines and withdrawals, audit grant revocation.
 - Independent operators: the five participants, the sequencer and the mediator ran in one JVM controlled by one person; what the sequencer and mediator learn was not examined, nor the participants' internal stores.
-- Tier B (DM decentralized party) is not attempted. The Collara proposal templates are the same in both tiers.
+- Tier B (DM decentralized party) is exercised by `scripts/tierb/` on a separate local topology only (`docs/governance-tier-b.md`); the API does not use it. The Collara proposal templates are the same in both tiers.

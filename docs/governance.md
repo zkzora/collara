@@ -1,6 +1,6 @@
 # Governance (verifier registry)
 
-Status, 2026-10-02: **Tier A is implemented and tested on a local Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet). Tier B (Decentralization Manager nodes and a decentralized governance party) was not attempted.** Everything here uses synthetic organizations and one local operator. Tier A uses DLC-link Decentralization Manager v1.12.0 `GovernanceRules` contracts with 2-of-3 seats, but the governance party is an ordinary local party: whoever holds its credential could act without the seat quorum (§4). Nothing here is a production-readiness or security claim.
+Status, 2026-10-03: **Tier A is implemented and tested on a local Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet); the Collara API and UI use it. Tier B (three Decentralization Manager nodes and a decentralized governance party on a separate local 3-participant Canton in WSL, one operator) now runs through scripts and its governance checks pass, but it is not wired into the API: see [governance-tier-b.md](governance-tier-b.md).** Everything here uses synthetic organizations and one local operator. Tier A uses DLC-link Decentralization Manager v1.12.0 `GovernanceRules` contracts with 2-of-3 seats, but the governance party is an ordinary local party: whoever holds its credential could act without the seat quorum (§4). Nothing here is a production-readiness or security claim.
 
 Governance in Collara administers the **verifier registry only**: adding a verifier and suspending one. It never touches collateral. The domain copy states it (`packages/domain/src/copy.ts`, `BOUNDARY_COPY.GOVERNANCE_SCOPE`):
 
@@ -54,9 +54,9 @@ Bootstrap (daml-model.md §7, B2–B8): the governance party creates `Governance
 
 These are often conflated. Collara's documentation keeps them apart (research notes: `docs/_research/research-dm.md` §2).
 
-1. **Application governance threshold.** `GovernanceRules.threshold` in Daml: how many distinct member *parties* must confirm before a governed action executes. **Tier A: 2 of 3. Implemented and tested.**
-2. **Decentralized-namespace (topology) threshold.** In a DM deployment, how many owner participants must sign topology changes of the decentralized party (namespace and hosting updates, member changes, threshold changes). **Not present in Tier A**: there is no decentralized namespace.
-3. **Participant confirmation threshold (and party signing-key threshold).** In a DM deployment, the decentralized party is hosted on every member participant with confirmation permission; this threshold says how many hosting participants must confirm a transaction in which that party is a confirming party, and how many Daml signing keys must sign a submission that acts as it. It would make governance transactions (and, likely, accreditation fetches) depend on enough member nodes being online. **Not present in Tier A**: one participant hosts everything.
+1. **Application governance threshold.** `GovernanceRules.threshold` in Daml: how many distinct member *parties* must confirm before a governed action executes. **Tier A: 2 of 3. Implemented and tested. Tier B: the same contract, signed by the decentralized party, tested through DM.**
+2. **Decentralized-namespace (topology) threshold.** In a DM deployment, how many owner participants must sign topology changes of the decentralized party (namespace and hosting updates, member changes, threshold changes). **Not present in Tier A**: there is no decentralized namespace. Tier B: 2 of 3 owner keys; one owner's signature leaves a hosting change pending, two apply it (governance-tier-b.md §4.2).
+3. **Participant confirmation threshold (and party signing-key threshold).** In a DM deployment, the decentralized party is hosted on every member participant with confirmation permission; this threshold says how many hosting participants must confirm a transaction in which that party is a confirming party, and how many Daml signing keys must sign a submission that acts as it. It would make governance transactions (and, likely, accreditation fetches) depend on enough member nodes being online. **Not present in Tier A**: one participant hosts everything. Tier B: confirmation threshold 2 of 3 participants and signing-key threshold 2 of 3 keys; with one member participant online a governance confirm and a verifier's accreditation fetch are rejected (`MEDIATOR_SAYS_TX_TIMED_OUT`), with two they commit (governance-tier-b.md §4.3, §4.4, §5).
 
 ## 4. Tier A trust limits (stated, not hidden)
 
@@ -64,17 +64,30 @@ These are often conflated. Collara's documentation keeps them apart (research no
 - **One participant, one operator.** All seats, the governance party and every organization live on one local participant run by one operator, who sees every transaction. Seats are separate parties, which shows the authorization model, not operator independence. No local setup proves operator independence.
 - **Registrar mirror.** Pledge activation trusts the registrar's `VerifierStatusMirror`, which can lag a governed suspension; attestation issuance and assignment acceptance always check the real accreditation (daml-model.md §8, item 3). The registrar alone sets the suspension policy.
 
-## 5. Tier B: not attempted, and why
+## 5. Tier B
 
-Tier B means the DLC-link Decentralization Manager (`dec-party-manager` v1.12.0) running one node per member participant, creating a decentralized governance party (`collara-gov::1220…`) and the `GovernanceRules` contract through its `/contracts` workflow, with members confirming and executing through DM or the Ledger API (synthesis §3, research-dm.md §10).
+Tier B ran on 2026-10-03; see [governance-tier-b.md](governance-tier-b.md).
 
-It was not attempted in this build because:
+The setup:
 
-- **Topology.** DM needs one Canton participant per member (at least 3 for the `/contracts` workflow) with Admin API access to each; three DM nodes on one participant cannot form a decentralized party.
-- **Environment.** The DM application is published as a Linux amd64 container image; the authoring machine has no Docker. The planned workaround (extracting the binary and running Canton OSS with 3 participants, a sequencer and a mediator inside WSL) needs several GB of RAM on a machine that is already memory-constrained, and DM itself was tested by its maintainers against Canton 3.5.8, not plain Canton OSS 3.5.19.
-- **Schedule.** Tier A was the agreed floor (synthesis risk R-02); Tier B was time-boxed behind the LOCALNET journey and was not started.
+- DM `dec-party-manager` v1.12.0, one node per participant.
+- Canton open-source 3.5.19 in WSL: one sequencer, one mediator and three participants, in one JVM.
+- A decentralized governance party `collara-gov::1220…` onboarded by DM, with `GovernanceRules` created through DM `/contracts`.
 
-The Collara proposal templates are the same in both tiers; only the governance party, its hosting and the confirm/execute path change.
+What passed, with confirms and executes going through each member's own DM node:
+
+- the same Collara proposal templates as Tier A;
+- one-confirmation, duplicate, two-member Add and Suspend checks;
+- the stale-proposal check;
+- attestation blocked after suspension;
+- the lock not releasable by governance;
+- the one-member versus two-member topology check.
+
+Limits:
+
+- It is a separate topology run by one operator.
+- The Collara API, worker and UI still run Tier A (governance-tier-b.md §9).
+- The attestation workflow must share the governance party's synchronizer, and on Tier B an accreditation fetch needs two governance member participants online.
 
 ## 6. What a real independent-operator deployment needs
 

@@ -1,0 +1,563 @@
+{
+  "generatedBy": "scripts/tierb/summary.mjs",
+  "generatedAt": "2026-10-03T05:19:59.842Z",
+  "label": "Decentralization Manager · local 3-node topology · one operator",
+  "honesty": "One local operator runs every node (one Canton JVM in WSL with 3 participants, 3 DM processes). This demonstrates the mechanism, not independent operators. Synthetic data only.",
+  "receipts": {
+    "onboarding": ".local/tierb/receipts/onboard-2026-10-03T05-15-41.044Z.json",
+    "scenario": ".local/tierb/receipts/scenario-2026-10-03T05-15-43.228Z.json",
+    "topology": ".local/tierb/receipts/topology-2026-10-03T05-18-29.933Z.json",
+    "signing": ".local/tierb/receipts/signing-2026-10-03T05-19-08.868Z.json"
+  },
+  "versions": {
+    "install": [
+      "java: openjdk version \"21.0.12.1\" 2026-08-18",
+      "canton-tarball-sha256: d5798f9dd41e6b1226c8579b40df9694839df72884c69efb309b52ed2ba09494",
+      "canton: 3.5.19 /opt/collara-tierb/canton-open-source-3.5.19/lib/canton-open-source-3.5.19.jar sha256=1d760bbe8266c5336c975db3124986ab95408334986e539ad142759b4e1f5430",
+      "dm-image: public.ecr.aws/dlc-link/decentralization-manager:v1.12.0@sha256:54ec6ce6783d7bc32f765f40e541b9584d32dd737a12434c8f426df381d7039d",
+      "dm-amd64-manifest: sha256:563f1ae14b0d779270813dffee4bcc23c8a899ef4546a75a131d4047629eb030",
+      "dm-binary-layer: sha256:4f06a12e7e9663f30b8472fcdf77a504064e9606b777e6502c186d23bc024e6b",
+      "dm-binary: /opt/collara-tierb/bin/dec-party-manager sha256=971f9e51b003682a8dddef603e32df7c9926897db9133c08f197cb1f401329c7"
+    ],
+    "cantonProtocolVersion": 35,
+    "synchronizerAlias": "global",
+    "dmMode": "dec-party-manager serve --insecure (unsafe HMAC Canton token, any inbound bearer accepted)"
+  },
+  "onboarding": {
+    "decentralizedParty": "collara-gov::122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7",
+    "request": {
+      "party_id_prefix": "collara-gov",
+      "peer_ids": [
+        "p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+        "p3::12202b7af7f7721b4ede42fd92ec75e3f394557f6e08bb9c31605ba5564e44668b0b"
+      ],
+      "threshold": 2
+    },
+    "workflowStatus": {
+      "onboarding": "completed",
+      "dars": "completed",
+      "contracts": "completed"
+    },
+    "members": {
+      "p1": "gov-member-p1::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49",
+      "p2": "gov-member-p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+      "p3": "gov-member-p3::12202b7af7f7721b4ede42fd92ec75e3f394557f6e08bb9c31605ba5564e44668b0b"
+    },
+    "darsVetted": {
+      "p1": [
+        "governance-action-v1@48acd500fc0b",
+        "governance-core-v1@361d1f2857f8",
+        "collara-governance@16cb6e82174e",
+        "collara-contracts@66efe1ca7ce2"
+      ],
+      "p2": [
+        "collara-governance@16cb6e82174e",
+        "governance-action-v1@48acd500fc0b",
+        "collara-contracts@66efe1ca7ce2",
+        "governance-core-v1@361d1f2857f8"
+      ],
+      "p3": [
+        "collara-governance@16cb6e82174e",
+        "governance-action-v1@48acd500fc0b",
+        "collara-contracts@66efe1ca7ce2",
+        "governance-core-v1@361d1f2857f8"
+      ]
+    },
+    "governanceRules": [
+      {
+        "seenBy": "p1",
+        "contractId": "00f55ca1cda7fdf054cc81fe49189da765f5bc59ad680a56dbf4129ab6543d1599ca121220309dfc171def26852d4a31d160631951f6d929f1e0544833e818e09932d0d1b3",
+        "threshold": 2,
+        "members": 3,
+        "timeoutMicroseconds": 1800000000,
+        "packageRef": "#governance-core-v1"
+      },
+      {
+        "seenBy": "p2",
+        "contractId": "00f55ca1cda7fdf054cc81fe49189da765f5bc59ad680a56dbf4129ab6543d1599ca121220309dfc171def26852d4a31d160631951f6d929f1e0544833e818e09932d0d1b3",
+        "threshold": 2,
+        "members": 3,
+        "timeoutMicroseconds": 1800000000,
+        "packageRef": "#governance-core-v1"
+      },
+      {
+        "seenBy": "p3",
+        "contractId": "00f55ca1cda7fdf054cc81fe49189da765f5bc59ad680a56dbf4129ab6543d1599ca121220309dfc171def26852d4a31d160631951f6d929f1e0544833e818e09932d0d1b3",
+        "threshold": 2,
+        "members": 3,
+        "timeoutMicroseconds": 1800000000,
+        "packageRef": "#governance-core-v1"
+      }
+    ]
+  },
+  "thresholds": {
+    "application": {
+      "what": "GovernanceRules.threshold (Daml): distinct member parties that must confirm",
+      "value": 2,
+      "of": 3
+    },
+    "decentralizedNamespace": {
+      "what": "DecentralizedNamespaceDefinition threshold: owner-key signatures needed for topology changes of the party",
+      "from": {
+        "kind": "decentralized_namespace",
+        "seenBy": "p1",
+        "namespace": "122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7",
+        "threshold": 2,
+        "owners": [
+          "1220005140b6e1623128fd3f7ba4cc8f102d6d2bd545ac636e3b783c05c95fa78fd8",
+          "122030d44cfa0bc7e14a5128168e5002144cd2b930e46fc1c763bef7a6baae5504ee",
+          "12206ea39fb982c46f8fe0e1d8c324e4a2a51271bad570dfe1b3388aa0ddcde9a523"
+        ],
+        "serial": 1
+      }
+    },
+    "participantConfirmation": {
+      "what": "PartyToParticipant threshold: hosting participants that must confirm a transaction the party confirms",
+      "from": {
+        "kind": "party_to_participant",
+        "seenBy": "p1",
+        "party": "collara-gov::122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7",
+        "threshold": 2,
+        "participants": [
+          {
+            "participant": "p1::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49",
+            "permission": "Confirmation"
+          },
+          {
+            "participant": "p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+            "permission": "Confirmation"
+          },
+          {
+            "participant": "p3::12202b7af7f7721b4ede42fd92ec75e3f394557f6e08bb9c31605ba5564e44668b0b",
+            "permission": "Confirmation"
+          }
+        ],
+        "partySigningKeys": {
+          "threshold": 2,
+          "keys": [
+            "122001665c64e8f6fd6710c55f80a9556707a6338037b46b435bbcc262afb59235f0",
+            "122049b78ef865c1c356868f6e0ace2367d1592b5e25122250b4dff3515fafe24aa6",
+            "1220db6d61ae20327c3fddd04f8460eadadc7cc883cb5312910a6472318fec90103b"
+          ]
+        },
+        "serial": 1,
+        "validFrom": "2026-10-03T05:14:40.631253Z"
+      }
+    },
+    "partySigningKeys": {
+      "what": "party signing-key threshold inside PartyToParticipant: signatures needed on a submission that acts as the party (DM /contracts)",
+      "from": {
+        "threshold": 2,
+        "keys": [
+          "122001665c64e8f6fd6710c55f80a9556707a6338037b46b435bbcc262afb59235f0",
+          "122049b78ef865c1c356868f6e0ace2367d1592b5e25122250b4dff3515fafe24aa6",
+          "1220db6d61ae20327c3fddd04f8460eadadc7cc883cb5312910a6472318fec90103b"
+        ]
+      }
+    }
+  },
+  "checks": {
+    "bootstrap": {
+      "ok": true,
+      "registryCid": "0016c0548fc462896ba09f6a4e82d08df826c2ed58fd089bc1c16959005f5d1716ca121220ca96a5fbe6a0110e864a614171fd6c3c55bffa120f233b0bd0ca2cae040641be",
+      "executeUpdateId": "122065fd6bdbb989bae9e2ae3c1ead1587bab13690a4a2ba80a7271556d850ac9d5a",
+      "executeOffset": 75,
+      "confirmers": [
+        "gov-member-p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+        "gov-member-p1::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49"
+      ]
+    },
+    "one_confirmation_cannot_execute": {
+      "ok": true,
+      "dmView": {
+        "confirmation_count": 1,
+        "can_execute": false,
+        "threshold": 2
+      },
+      "dmHttpStatus": 500,
+      "ledgerError": {
+        "httpStatus": 400,
+        "code": "DAML_FAILURE",
+        "cause": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): The requirement 'Enough confirmations to execute action' was not met.",
+        "grpcCodeValue": 9
+      }
+    },
+    "duplicate_confirmation_does_not_count": {
+      "ok": true,
+      "secondConfirmation": {
+        "updateId": "12202375c65131fa4715009bbdd5467193dce97936e98ccf1847cbc8cb7e6fd45450",
+        "offset": 102
+      },
+      "dmView": {
+        "confirmation_count": 1,
+        "can_execute": false,
+        "executable_confirmation_cids": [
+          "00c03cc001d27cac0dabc856c27f86e5efd7c95c17860487206253339b05b42015ca1212202fec3a549dab3a2ceb7b1e777a32d96516c37fb1f17aac11a287f5523d00c687"
+        ]
+      },
+      "dmError": "Failed to execute action: code: 'The system is not in a state required for the operation's execution', message: \"DAML_FAILURE(9,a2de8d22): Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): The requirement 'No duplicate confirmers' was not met.\""
+    },
+    "two_confirmations_execute_add": {
+      "ok": true,
+      "executeUpdateId": "1220ec2b97819b1b936a93d4cb062c85f8c19e885ab90691c40e5e59de0701ea7703",
+      "executeOffset": 91,
+      "registryCid": "007443a81847654bd8a149c4922257531780fe72b48c76a7d154ea8d17282eeca5ca12122094b5b5ee1881f86233acfe79ad01cd8cec7d82d21a2f9541beb3254a68d512fb",
+      "accreditationCid": "00a04e1c8e56c13215e27a6e84930ed637730b7d75b129edf4a52612fca2b72aa6ca121220c68ca376918ad484cebdac69890c6e32b014f9ae90e4d9e073e00644dcc9cc45",
+      "usedConfirmations": [
+        "00c7a4167c18447f7a076ae8c81d7cb993a9464d0a70488adad59e9ad8820d367dca121220af777a6fe1fd80fa4e783be9ba0b1689dda05cf5aa01045014a2fe0827cc1dad",
+        "00c03cc001d27cac0dabc856c27f86e5efd7c95c17860487206253339b05b42015ca1212202fec3a549dab3a2ceb7b1e777a32d96516c37fb1f17aac11a287f5523d00c687"
+      ]
+    },
+    "two_confirmations_execute_add_result": {
+      "governanceParty": "collara-gov::122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7",
+      "actionLabel": "CollaraAddVerifier",
+      "description": "Add verifier VER-001 'tierb-DemoVerifier::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49' (Demo Verifier), scope [\"CNC_MACHINERY\"], registry v0: Accredit Demo Verifier (proposal A)",
+      "executor": "gov-member-p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+      "confirmers": [
+        "gov-member-p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32",
+        "gov-member-p1::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49"
+      ],
+      "executedAt": "2026-10-03T05:15:56.036247Z"
+    },
+    "stale_proposal_fails": {
+      "ok": true,
+      "summary": "DM can_execute=true (2 confirmations) but the ledger rejected the execute",
+      "dmError": "Failed to execute action: code: 'Some requested entity was not found', message: \"CONTRACT_NOT_FOUND(11,6e1c034d): Contract could not be found with id 0016c0548fc462896ba09f6a4e82d08df826c2ed58fd089bc1c16959005f5d1716ca121220ca96a5fbe6a0110e864a614171fd6c3c55bffa120f233b0bd0ca2cae040641be\""
+    },
+    "attestation_before_suspension": {
+      "ok": true,
+      "updateId": "12200737b3111442f5e912f1b26b960ce11f718cf500a2a3017d2b89d2d6d2d1624a",
+      "offset": 123,
+      "inGovernancePartyStreamOn": {
+        "p2": false,
+        "p3": false
+      }
+    },
+    "two_confirmations_execute_suspend": {
+      "ok": true,
+      "executeUpdateId": "1220ac79a33d7bff257dcbaccc2f88f2dda4d96a243c0025727095a0ddab2fb22f09",
+      "executeOffset": 140,
+      "registryCid": "00dfc25f65c27b381a3286acb47dce5c0a0ab04873eaa3d2fe156515c7c28a3e8cca121220a79be5612077deac547cfd5872fcea2f6fc840e1507c822d1a5732aeaa97b32b",
+      "accreditationCid": "009f2a99733400308cfcaf137bea0cc03fb64e577cee393d6023045ab4d8c6d15fca12122045b84c48fc212dc864422b336854b21bfa69c72b19ac8e64ad522891b4a61f2f"
+    },
+    "two_confirmations_execute_suspend_result": {
+      "governanceParty": "collara-gov::122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7",
+      "actionLabel": "CollaraSuspendVerifier",
+      "description": "Suspend verifier 'tierb-DemoVerifier::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49', registry v1: Suspend Demo Verifier pending re-accreditation (synthetic)",
+      "executor": "gov-member-p1::12208fadd04f8c1391378eca2d4408225cbb87ca56be49175017bfb46553c84ccc49",
+      "confirmers": [
+        "gov-member-p3::12202b7af7f7721b4ede42fd92ec75e3f394557f6e08bb9c31605ba5564e44668b0b",
+        "gov-member-p2::12203742bb8dd814f0ede80abad694c8c3ab78401b256726205c640019f84f120b32"
+      ],
+      "executedAt": "2026-10-03T05:16:01.927022Z"
+    },
+    "suspension_blocks_attestation": {
+      "ok": true,
+      "currentAccreditation": {
+        "httpStatus": 400,
+        "code": "DAML_FAILURE",
+        "cause": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): Verifier suspended",
+        "grpcCodeValue": 9
+      },
+      "archivedAccreditation": {
+        "httpStatus": 404,
+        "code": "CONTRACT_NOT_FOUND",
+        "cause": "Contract could not be found with id 00a04e1c8e56c13215e27a6e84930ed637730b7d75b129edf4a52612fca2b72aa6ca121220c68ca376918ad484cebdac69890c6e32b014f9ae90e4d9e073e00644dcc9cc45",
+        "grpcCodeValue": 5
+      }
+    },
+    "governance_cannot_release_lock": {
+      "ok": true,
+      "asGovernanceParty": {
+        "httpStatus": 404,
+        "code": "NO_SYNCHRONIZER_ON_WHICH_ALL_SUBMITTERS_CAN_SUBMIT",
+        "cause": "This participant cannot submit as the given submitter on any connected synchronizer",
+        "grpcCodeValue": 5
+      },
+      "asMember": {
+        "httpStatus": 404,
+        "code": "CONTRACT_NOT_FOUND",
+        "cause": "Contract could not be found with id 00c6c285d01b86b5e9a9964cd736794111193c0e8db9274ed1a2f572c63efb9941ca12122009564fb53550caed88795037812e3bc59e32071504c35ac3b6447c4695cd60cc",
+        "grpcCodeValue": 5
+      },
+      "codePath": "collara-governance has no dependency on collara-contracts and no template that references CollateralLock; Lock_Release is controlled by the lender only"
+    },
+    "topology_threshold_one_vs_two": {
+      "ok": true,
+      "summary": "only p1: confirm failed after 34 s; p1+p2: confirm x2 + execute committed with p3 offline",
+      "oneUpError": "Failed to submit confirmation: code: 'The operation was aborted', message: \"MEDIATOR_SAYS_TX_TIMED_OUT(2,0): Rejected transaction as the mediator did not receive sufficient confirmations within the expected timeframe.\"",
+      "twoUpExecuteUpdateId": "122028fac3f3337a2a98d2609b6c6fb5eb9a497d1fc08d3c0f6cdffd628e019cb96a",
+      "twoUpExecuteOffset": 159
+    },
+    "accreditation_fetch_needs_governance_threshold": {
+      "ok": true,
+      "observation": "rejected with only p1 (MEDIATOR_SAYS_TX_TIMED_OUT(2,0)); committed once p2+p3 were back",
+      "onlyP1": {
+        "accepted": false,
+        "phase": "completion",
+        "commandId": "c724f215-d242-4b1c-a520-563df603263f",
+        "offset": 165,
+        "status": {
+          "code": 10,
+          "message": "MEDIATOR_SAYS_TX_TIMED_OUT(2,0): Rejected transaction as the mediator did not receive sufficient confirmations within the expected timeframe."
+        },
+        "ms": 35823
+      },
+      "allThree": {
+        "accepted": true,
+        "phase": "completion",
+        "commandId": "d3d6264d-0a92-492c-b8cf-bd92d65c312a",
+        "updateId": "1220405095069dbb06b0dfcbb8d6736967ac1cd2fc77d9ab118b03ae73506e190596",
+        "offset": 169,
+        "status": {
+          "code": 0,
+          "message": ""
+        },
+        "ms": 1736
+      }
+    },
+    "dns_threshold": [
+      {
+        "step": "initial",
+        "effectiveThreshold": 2,
+        "effectiveSerial": 1,
+        "pendingProposals": []
+      },
+      {
+        "step": "after p1 owner key signed threshold 3 (1 of 2 required owner signatures)",
+        "effectiveThreshold": 2,
+        "effectiveSerial": 1,
+        "pendingProposals": [
+          {
+            "threshold": 3,
+            "serial": 2,
+            "context": "BaseResult(Synchronizer(Right(global::1220e885cd57...::35-0)),2026-10-03T05:18:59.287244Z,None,2026-10-03T05:18:59.037244Z,Replace,TxHash(SHA-256:abc0cb091aeb...),2,Vector(1220005140b6...))"
+          }
+        ]
+      },
+      {
+        "step": "after p2 owner key signed the same change (2 of 2 required owner signatures)",
+        "effectiveThreshold": 3,
+        "effectiveSerial": 2,
+        "pendingProposals": []
+      },
+      {
+        "step": "restored threshold 2 (signed by p1 + p3 owner keys)",
+        "effectiveThreshold": 2,
+        "effectiveSerial": 3,
+        "pendingProposals": []
+      }
+    ],
+    "party_signing_key_threshold": {
+      "oneSigner": {
+        "http": 202,
+        "response": {
+          "status": "inprogress",
+          "message": "Contracts workflow started",
+          "instance_name": "collara-gov-contracts-1791004749"
+        },
+        "after30s": {
+          "status": "inprogress",
+          "step": "WaitingForPeers",
+          "expectedPeers": []
+        }
+      },
+      "twoSigners": {
+        "workflow": "completed",
+        "contractCid": "002cdddc30810b4b04a8c36f14f91242953f69b32345489f13a854733c83008ccaca121220445728c53823a2149912a15d044d7952e65c170d578e9e10996c3535a8fbd269",
+        "proposer": "collara-gov::122035667ab6c34affe162570fec5dd8a7a5d361352158b44198f61d624428f417c7"
+      }
+    }
+  },
+  "dmCalls": [
+    {
+      "label": "bootstrap:confirm m1",
+      "node": "p1",
+      "http": 200,
+      "ms": 655,
+      "ledger": {
+        "updateId": "12200b65fb342495ec29113d87effdecb5dcbddcba6588e49ad719293e15640f5388",
+        "offset": 84
+      }
+    },
+    {
+      "label": "bootstrap:confirm m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 666,
+      "ledger": {
+        "updateId": "1220900605ce69ade291e4f6ad1150b58359499881299ed05b1392098f1b7f92c681",
+        "offset": 72
+      }
+    },
+    {
+      "label": "bootstrap:execute by m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 449,
+      "ledger": {
+        "updateId": "122065fd6bdbb989bae9e2ae3c1ead1587bab13690a4a2ba80a7271556d850ac9d5a",
+        "offset": 75
+      }
+    },
+    {
+      "label": "add A:confirm m1",
+      "node": "p1",
+      "http": 200,
+      "ms": 440,
+      "ledger": {
+        "updateId": "1220ab62c8fa2d37f7f3486aee3beba39bb3a2bcb88987b422c36d1c3657a085e6cc",
+        "offset": 99
+      }
+    },
+    {
+      "label": "add A:execute with 1 confirmation (DM)",
+      "node": "p1",
+      "http": 500,
+      "ms": 150,
+      "ledger": null,
+      "error": "Failed to execute action: code: 'The system is not in a state required for the operation's execution', message: \"DAML_FAILURE(9,61dec0ea): Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): The requirement 'Enough confirmat"
+    },
+    {
+      "label": "add A:confirm m1 again (duplicate)",
+      "node": "p1",
+      "http": 200,
+      "ms": 495,
+      "ledger": {
+        "updateId": "12202375c65131fa4715009bbdd5467193dce97936e98ccf1847cbc8cb7e6fd45450",
+        "offset": 102
+      }
+    },
+    {
+      "label": "add A:execute with m1+m1 (DM)",
+      "node": "p1",
+      "http": 500,
+      "ms": 70,
+      "ledger": null,
+      "error": "Failed to execute action: code: 'The system is not in a state required for the operation's execution', message: \"DAML_FAILURE(9,a2de8d22): Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): The requirement 'No duplicate con"
+    },
+    {
+      "label": "add A:confirm m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 474,
+      "ledger": {
+        "updateId": "12204fbb37a27a6c7f37b2a0aec3ef610fb3a6c1365dd900d8b698ab11ea2c640610",
+        "offset": 88
+      }
+    },
+    {
+      "label": "add A:execute by m2 with m1+m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 668,
+      "ledger": {
+        "updateId": "1220ec2b97819b1b936a93d4cb062c85f8c19e885ab90691c40e5e59de0701ea7703",
+        "offset": 91
+      }
+    },
+    {
+      "label": "add B:confirm m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 437,
+      "ledger": {
+        "updateId": "1220deed801e163d36c29871633462df0c909563828e7b4ed7cc9a6e04b8f9f36e3f",
+        "offset": 94
+      }
+    },
+    {
+      "label": "add B:confirm m3",
+      "node": "p3",
+      "http": 200,
+      "ms": 536,
+      "ledger": {
+        "updateId": "1220ed75ddcfe0af03562475ab6a2fa9ff2c3403fab5c3f26ca3a4be61438e884517",
+        "offset": 104
+      }
+    },
+    {
+      "label": "add B:execute by m3 (stale pin v0)",
+      "node": "p3",
+      "http": 500,
+      "ms": 59,
+      "ledger": null,
+      "error": "Failed to execute action: code: 'Some requested entity was not found', message: \"CONTRACT_NOT_FOUND(11,6e1c034d): Contract could not be found with id 0016c0548fc462896ba09f6a4e82d08df826c2ed58fd089bc1c16959005f5d1716ca121220ca96a5fbe6a0110e864a614171fd6c3c55bffa120f233b0bd0ca2cae040641be\""
+    },
+    {
+      "label": "suspend:confirm m2",
+      "node": "p2",
+      "http": 200,
+      "ms": 479,
+      "ledger": {
+        "updateId": "12202566979bc1700ff4b1fecca1418f6b9b2d0409dfd115eb41512ccc7bdd789dd7",
+        "offset": 112
+      }
+    },
+    {
+      "label": "suspend:confirm m3",
+      "node": "p3",
+      "http": 200,
+      "ms": 433,
+      "ledger": {
+        "updateId": "12208420c0acb8d77ac60abaa9cb1f4ad49ca52d071c5360423e469968ff89551094",
+        "offset": 121
+      }
+    },
+    {
+      "label": "suspend:execute by m1 with m2+m3",
+      "node": "p1",
+      "http": 200,
+      "ms": 519,
+      "ledger": {
+        "updateId": "1220ac79a33d7bff257dcbaccc2f88f2dda4d96a243c0025727095a0ddab2fb22f09",
+        "offset": 140
+      }
+    },
+    {
+      "label": "add C:confirm m1 with only p1 connected",
+      "node": "p1",
+      "http": 500,
+      "ms": 33742,
+      "ledger": null,
+      "error": "Failed to submit confirmation: code: 'The operation was aborted', message: \"MEDIATOR_SAYS_TX_TIMED_OUT(2,0): Rejected transaction as the mediator did not receive sufficient confirmations within the expected timeframe.\""
+    },
+    {
+      "label": "add C:confirm m1 with p1+p2 connected",
+      "node": "p1",
+      "http": 200,
+      "ms": 576,
+      "ledger": {
+        "updateId": "1220c14c3f77f3d63829aabe8feaf30d540c4f76fd666cbf5146d75f187c25ee290a",
+        "offset": 153
+      }
+    },
+    {
+      "label": "add C:confirm m2 with p1+p2 connected",
+      "node": "p2",
+      "http": 200,
+      "ms": 565,
+      "ledger": {
+        "updateId": "1220e75688d695b38d8bfb0097def973aa2591055a9aa4c5239a51a64e7d6d6aec66",
+        "offset": 132
+      }
+    },
+    {
+      "label": "add C:execute by m1 with p3 down",
+      "node": "p1",
+      "http": 200,
+      "ms": 509,
+      "ledger": {
+        "updateId": "122028fac3f3337a2a98d2609b6c6fb5eb9a497d1fc08d3c0f6cdffd628e019cb96a",
+        "offset": 159
+      }
+    }
+  ],
+  "statusAtSummary": [
+    "canton: running (pid 14762, rss 2622 MB)",
+    "dm-p1: running (pid 15336); 5001:open 5002:open 8081:open 9001:open",
+    "dm-p2: running (pid 15961); 5011:open 5012:open 8082:open 9002:open",
+    "dm-p3: running (pid 16592); 5021:open 5022:open 8083:open 9003:open",
+    "wsl memory: used 3804 MB, available 3984 MB"
+  ]
+}

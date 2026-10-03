@@ -3,6 +3,29 @@
 What was actually run to check the LOCALNET build, with the observed results, and what has **not** been verified.
 Synthetic data only. Nothing here is a production-readiness or security claim.
 
+## 2026-10-03: governance Tier B (scripted, WSL), then regression on the sandbox
+
+- Tier B: Canton open-source 3.5.19 inside WSL Ubuntu 24.04 (one JVM: one sequencer, one mediator, three
+  participants), plus three `dec-party-manager` v1.12.0 nodes in `--insecure` mode. All downloads were verified by
+  digest. One operator runs every node. Details, thresholds and what was not verified:
+  [`governance-tier-b.md`](governance-tier-b.md). Compact evidence: [`evidence/tierb-summary.json`](evidence/tierb-summary.json).
+  Full receipts: `.local/tierb/receipts/` (git-ignored).
+- Code: HEAD `324796d` plus the uncommitted Tier B scripts and docs.
+
+| Check | Command | Result |
+|---|---|---|
+| Install | `pnpm tierb:install` | JRE 21.0.12.1 via apt. Canton tarball sha256 matched; its jar is identical to the dpm SDK's 3.5.19 jar. DM image index, amd64 manifest and binary layer digests matched. |
+| Full Tier B run, clean | `pnpm tierb:down && pnpm tierb:up && pnpm tierb:onboard && pnpm tierb:scenario && pnpm tierb:topology && pnpm tierb:signing && pnpm tierb:summary && pnpm tierb:status` | **Exit 0.** DM onboarding, DAR distribution and `/contracts` completed. The four DARs were vetted on all three participants. `GovernanceRules` (threshold 2 of 3) was signed by the decentralized party and seen identically by the three DM nodes. Scenario: **10/10 checks passed** (bootstrap; one confirmation fails; duplicate does not count; two members execute Add; stale proposal fails; attestation before suspension; two members execute Suspend; suspension blocks issuance; governance cannot release a lock; one member participant fails, two commit). Accreditation fetch with only p1 connected: rejected (`MEDIATOR_SAYS_TX_TIMED_OUT`, governance party unresponsive); with all three: committed. Namespace threshold: 1 owner signature leaves the change pending, 2 apply it. Signing keys: 2 of 3 accepted; DM never submits with 1. |
+| Earlier Tier B runs | earlier versions of the same scripts, on two other fresh topologies | The same governance results. The first run checked the accreditation fetch with submit-and-wait, which hit the JSON API's ~20 s HTTP timeout (HTTP 503); the Canton log showed the same mediator rejection. The script now waits for the command completion. The configuration fixes found along the way are in governance-tier-b.md §3. |
+| Typecheck, lint | `pnpm typecheck`, `pnpm lint` | Pass (7 packages; 0 lint problems, including `scripts/tierb`) |
+| Unit tests of the touched packages | `pnpm --filter @collara/domain run test --maxWorkers=2`, same for `@collara/web` | domain 68/68, web 49/49 |
+| Sandbox restored | `pnpm localnet:up && pnpm localnet:bootstrap` (default namespace not seeded) | Ready after 31.9 s; 11 parties, 13 users, 3 DARs |
+| LocalNet integration tests, full suite | `LOCALNET_IT=1 pnpm --filter @collara/api exec vitest run --config vitest.localnet.config.ts` | **12 files, 71/71 passed, 425 s** (S3 from `.env`), after Tier B was stopped |
+
+Not verified in this record: the Collara API, worker and UI on Tier B (they still use Tier A); Canton rejecting a
+1-of-3 signature set for the decentralized party; Tier B expiry and deadline staleness; DM with real
+authentication; independent operators.
+
 ## 2026-10-03: clean start through the browser, full LOCALNET IT with S3
 
 - Machine and services as in the 2026-10-02 record below (Canton 3.5.19 `dpm sandbox`, one participant, shared and
