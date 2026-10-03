@@ -163,7 +163,7 @@ push(
   "",
   "### Ledger users per organization (LocalNet)",
   "",
-  "From `scripts/localnet/localnet.config.json`. Party ids are allocated by Canton and change on every sandbox start; they are never hard-coded. `participant` applies only in 3-participant mode.",
+  "From `scripts/localnet/localnet.config.json`. Party ids are allocated by Canton and change on every sandbox start; they are never hard-coded. `participant` applies only in 3-participant mode; `placements[\"5\"]` in 5-participant mode (the privacy topology, [`privacy-verification.md`](privacy-verification.md)).",
   "",
 );
 
@@ -173,7 +173,7 @@ const seatHolders = new Map(
 );
 push(
   table(
-    ["Party hint", "Organization / purpose", "Ledger user", "Rights", "3-participant placement"],
+    ["Party hint", "Organization / purpose", "Ledger user", "Rights", "3-participant placement", "5-participant placement"],
     LOCALNET_CONFIG.parties.map((p) => {
       const seat = /^GovSeat([123])$/.exec(p.hint)?.[1];
       const org = orgByHint.get(p.hint);
@@ -186,7 +186,7 @@ push(
             ? `Governance seat ${seat}, held by ${DEMO_ORGANIZATIONS[holder.orgId].name}`
             : "—";
       const rights = ["CanActAs + CanReadAs own party", ...(p.readAs ?? []).map((r) => `CanReadAs ${r}`)].join("; ");
-      return [code(p.hint), purpose, code(p.user), rights, p.participant];
+      return [code(p.hint), purpose, code(p.user), rights, p.participant, LOCALNET_CONFIG.placements?.["5"]?.[p.hint] ?? "—"];
     }),
   ),
   "",
