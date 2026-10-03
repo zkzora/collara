@@ -8,7 +8,9 @@ import { ErrorState } from "@/components/collara/error-state";
 import { EvidenceList } from "@/components/collara/evidence-list";
 import { LoadingState } from "@/components/collara/loading-state";
 import { useCollara } from "@/lib/collara-client";
-import { useCaseEvidence } from "@/lib/queries";
+import { allows, useCaseEvidence } from "@/lib/queries";
+import { useSession } from "@/lib/session";
+import { EvidenceUploadDialog } from "../assets/evidence-upload-dialog";
 import { useCaseWorkspace } from "./case-context";
 
 /** Opens a short-lived link issued after the server-side access check (never a stored URL). */
@@ -24,6 +26,7 @@ function openDownload(url: string, fileName: string): void {
 
 export function EvidenceTab() {
   const { detail } = useCaseWorkspace();
+  const { me } = useSession();
   const { client } = useCollara();
   const evidence = useCaseEvidence(detail.caseId);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -47,12 +50,20 @@ export function EvidenceTab() {
       ) : evidence.isPending ? (
         <LoadingState variant="table" rows={5} label="Loading evidence…" />
       ) : (
-        <EvidenceList
-          documents={evidence.data}
-          caption={`Evidence documents · ${detail.caseId}${detail.references.package ? ` · ${detail.references.package.ref} v${detail.references.package.version}` : ""}`}
-          onDownload={(doc) => void download(doc)}
-          downloadingId={downloading}
-        />
+        <>
+          {/* The owner and the invited dealer (its own records) add documents here; the server re-checks both. */}
+          {allows(detail, "evidence.upload") ? (
+            <div className="flex flex-wrap gap-2">
+              <EvidenceUploadDialog assetRef={detail.asset.ref} caseId={detail.caseId} me={me} documents={evidence.data} />
+            </div>
+          ) : null}
+          <EvidenceList
+            documents={evidence.data}
+            caption={`Evidence documents · ${detail.caseId}${detail.references.package ? ` · ${detail.references.package.ref} v${detail.references.package.version}` : ""}`}
+            onDownload={(doc) => void download(doc)}
+            downloadingId={downloading}
+          />
+        </>
       )}
       <p className="text-[12px] leading-relaxed text-fg-subtle">{BOUNDARY_COPY.HASH_MATCH}</p>
       <p className="text-[12px] leading-relaxed text-fg-subtle">{BOUNDARY_COPY.NOT_SCANNED}</p>

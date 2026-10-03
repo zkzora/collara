@@ -6,7 +6,6 @@ import {
   DOCUMENT_TYPES,
   EVIDENCE_CONTENT_TYPES,
   EVIDENCE_MAX_BYTES,
-  type AssetDetail,
   type DocumentType,
   type EvidenceContentType,
   type EvidenceDocument,
@@ -35,14 +34,17 @@ const isContentType = (value: string): value is EvidenceContentType => (EVIDENCE
  * Add evidence (S §9.6–9.7): upload intent → bytes into quarantine → server-side finalize (hash,
  * type and size checks, version). Each step has its own idempotency key derived from the intent key,
  * so a retry resumes instead of creating a second document. Nothing is virus-scanned in this demo.
+ * From a case (`caseId`), the document is recorded for that case: the invited dealer contributes there.
  */
 export function EvidenceUploadDialog({
-  detail,
+  assetRef,
+  caseId,
   me,
   documents,
   size,
 }: {
-  detail: AssetDetail;
+  assetRef: string;
+  caseId?: string;
   me: Me;
   documents: readonly EvidenceDocument[];
   size?: "default" | "sm" | "lg";
@@ -81,9 +83,9 @@ export function EvidenceUploadDialog({
       label="Add evidence"
       variant="primary"
       size={size}
-      title={`Add evidence · ${detail.ref}`}
-      description={`Uploads a document to the ${detail.ref} passport as a ${me.org.name} record. The server hashes the bytes (SHA-256), checks type and size, and assigns the version. Sharing with lenders or verifiers is a separate step.`}
-      facts={{ actingParty: actingParty(me), record: `${detail.ref} · evidence`, effect: "Upload → pending validation → available" }}
+      title={`Add evidence · ${caseId ?? assetRef}`}
+      description={`Uploads a document to the ${assetRef} passport${caseId ? ` for case ${caseId}` : ""} as a ${me.org.name} record. The server hashes the bytes (SHA-256), checks type and size, and assigns the version. Sharing with lenders or verifiers is a separate step.`}
+      facts={{ actingParty: actingParty(me), record: `${caseId ? `${caseId} · ` : ""}${assetRef} · evidence`, effect: "Upload → pending validation → available" }}
       caveat={`${BOUNDARY_COPY.NOT_SCANNED} PDF, JPEG or PNG, up to 20 MB per file. Do not upload real financial documents.`}
       confirmLabel="Upload document"
       onOpen={() => {
@@ -98,7 +100,8 @@ export function EvidenceUploadDialog({
         const key = idempotencyKey ?? randomId();
         const intent = await client.evidence.createUploadIntent(
           {
-            assetRef: detail.ref,
+            assetRef,
+            caseId,
             type: payload.type,
             title: payload.title,
             fileName: payload.file.name,

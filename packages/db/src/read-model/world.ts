@@ -534,9 +534,12 @@ export function buildWorld(input: WorldInput): BuiltWorld {
     }
     documents.sort((a, b) => a.ref.localeCompare(b.ref));
 
+    // A case application record exists only for a registered asset (POST /cases refuses any other), so a case
+    // participant without the owner-only passport (e.g. the invited dealer) still sees the asset as registered.
+    const hasCase = input.caseRows.some((r) => r.assetRef === ref);
     const lifecycle: AssetLifecycleState = pick(T.RetiredControl).length
       ? "ARCHIVED"
-      : passport || tokenCandidates.length || pick(T.CollateralLockReleased).length || assetVrs.length || attestationFacts.size || ticket
+      : passport || tokenCandidates.length || pick(T.CollateralLockReleased).length || assetVrs.length || attestationFacts.size || ticket || hasCase
         ? "REGISTERED"
         : rq
           ? "REGISTRATION_REQUESTED"
@@ -571,7 +574,7 @@ export function buildWorld(input: WorldInput): BuiltWorld {
   // --- Case facts ---------------------------------------------------------------------------------------
   const caseRefs = new Set<string>();
   for (const c of view.contracts) if (c.caseRef) caseRefs.add(c.caseRef);
-  for (const r of input.caseRows) if (r.borrowerOrgId === viewer.orgId) caseRefs.add(r.caseRef);
+  for (const r of input.caseRows) if (r.borrowerOrgId === viewer.orgId || r.dealerOrgId === viewer.orgId) caseRefs.add(r.caseRef);
   const byCase = groupBy(view.contracts, (c) => c.caseRef);
 
   const assetsByRef = new Map<string, AssetFacts>();

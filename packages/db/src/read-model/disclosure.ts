@@ -17,7 +17,7 @@
 // names the passport's signatory as owner. Nobody else qualifies: Demo Lender B, a dealer or verifier without such
 // a contract, auditors (they see the identity only through the owner's AuditGrant, i.e. the grantor's view built
 // by the audit delegation) and operators. Ledger privacy is unchanged; this is a read-side disclosure.
-import { VERIFICATION_GRANT_PURPOSE, type AssetFacts, type CaseFacts } from "@collara/domain";
+import { VERIFICATION_GRANT_PURPOSE, verificationGrantRequestRef, type AssetFacts, type CaseFacts, type ManifestEntry } from "@collara/domain";
 import type { DbOrTx } from "../client";
 import { T } from "../projection/templates";
 import { decode } from "./decode";
@@ -160,6 +160,90 @@ export async function discloseEquipmentIdentity(
     if (existing) return existing;
     const next = { ...asset, ...identity };
     replaced.set(asset.ref, next);
+    return next;
+  };
+  return {
+    assets: world.assets.map(disclose),
+    cases: world.cases.map((c) => {
+      const asset = disclose(c.asset);
+      return asset === c.asset ? c : { ...c, asset };
+    }),
+  };
+}
+
+// --- Reviewed versions of a disclosed attestation --------------------------------------------------------------
+//
+// An attestation names its evidence package version, not the documents the verifier was granted. The owner and the
+// verifier read those from the owner's VERIFICATION grants (both are stakeholders); the holder of an
+// AttestationDisclosure (the selected lender) is not, so its copy would otherwise list every entry of the package
+// version, including documents the verifier never received. For each attestation the viewer holds a disclosure of,
+// the application copies the document refs and versions of the matching grants (same request, owner, verifier and
+// evidence anchor, owner-signed, any state) from the owner's projected contracts: refs and versions only.
+
+/** Reviewed versions (ref → entries) of the attestations disclosed to the viewer, from the owner's grants. */
+async function reviewedVersionsOfDisclosures(
+  db: DbOrTx,
+  viewer: ReadViewer,
+  view: LedgerView,
+  sources: readonly string[] | undefined,
+): Promise<Map<string, ManifestEntry[]>> {
+  const parties = new Set(viewer.readableParties);
+  const disclosed = new Map<string, ReturnType<typeof decode.attestation>>();
+  for (const c of view.contracts) {
+    if (c.templateRef !== T.AttestationDisclosure) continue;
+    const d = decode.disclosure(c.payload);
+    const a = decode.attestation(d.attestation);
+    // The viewer's own copy, of an attestation it does not hold as owner or verifier.
+    if (!parties.has(d.recipient) || parties.has(a.owner) || parties.has(a.verifier) || !a.evidence) continue;
+    disclosed.set(a.attestationRef, a);
+  }
+  const owners = [...new Set([...disclosed.values()].map((a) => a.owner))];
+  if (owners.length === 0) return new Map();
+  const grants = await loadLedgerView(db, { orgId: viewer.orgId, readableParties: owners }, { templateRefs: [T.PackageShare], ...(sources ? { sources } : {}) });
+  const reviewed = new Map<string, ManifestEntry[]>();
+  for (const [ref, a] of disclosed) {
+    const entries = new Map<string, ManifestEntry>();
+    for (const c of grants.contracts) {
+      const s = decode.share(c.payload);
+      const e = s.evidence;
+      const matches =
+        s.purpose === VERIFICATION_GRANT_PURPOSE &&
+        verificationGrantRequestRef(s.shareRef) === a.requestRef &&
+        s.owner === a.owner &&
+        c.signatories.includes(a.owner) &&
+        s.recipient === a.verifier &&
+        !!e &&
+        e.packageRef === a.evidence?.packageRef &&
+        e.manifestVersion === a.evidence.manifestVersion &&
+        e.manifestHash === a.evidence.manifestHash;
+      if (!matches) continue;
+      for (const d of s.documents) entries.set(`${d.docRef}#${d.docVersion}`, { documentRef: d.docRef, version: d.docVersion });
+    }
+    if (entries.size > 0) reviewed.set(ref, [...entries.values()].sort((x, y) => x.documentRef.localeCompare(y.documentRef) || x.version - y.version));
+  }
+  return reviewed;
+}
+
+/**
+ * Replaces the supporting versions of attestations disclosed to the viewer with the versions the verifier was
+ * granted (see above) and returns new assets and cases; everything else is returned unchanged.
+ */
+export async function discloseReviewedVersions(
+  db: DbOrTx,
+  viewer: ReadViewer,
+  world: { readonly assets: readonly AssetFacts[]; readonly cases: readonly CaseFacts[] },
+  view: LedgerView,
+  options: { readonly sources?: readonly string[] } = {},
+): Promise<{ assets: AssetFacts[]; cases: CaseFacts[] }> {
+  const reviewed = await reviewedVersionsOfDisclosures(db, viewer, view, options.sources);
+  if (reviewed.size === 0) return { assets: [...world.assets], cases: [...world.cases] };
+  const replaced = new Map<AssetFacts, AssetFacts>();
+  const disclose = (asset: AssetFacts): AssetFacts => {
+    if (!asset.attestations.some((a) => reviewed.has(a.ref))) return asset;
+    const existing = replaced.get(asset);
+    if (existing) return existing;
+    const next = { ...asset, attestations: asset.attestations.map((a) => ({ ...a, supportingVersions: reviewed.get(a.ref) ?? a.supportingVersions })) };
+    replaced.set(asset, next);
     return next;
   };
   return {

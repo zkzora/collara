@@ -5,6 +5,10 @@
 import type { LedgerCommand, LedgerTransaction } from "@collara/canton";
 import {
   ledgerCheckpoints,
+  ledgerContracts,
+  loadPartyDirectory,
+  payloads,
+  TEMPLATES,
   visibleContracts,
   visibleEvents,
   type CommandRow,
@@ -16,6 +20,7 @@ import {
   type VisibleEventsQuery,
 } from "@collara/db";
 import { COMMAND_COPY, type VerifierEntry } from "@collara/domain";
+import { and, arrayOverlaps, desc, eq, isNull } from "drizzle-orm";
 
 export interface LedgerSubmitRequest {
   /** Deterministic per command record; reused on every resubmission (Canton deduplication). */
@@ -90,8 +95,26 @@ export function createDbProjectionReader(db: Db): ProjectionReader {
     contracts: (query) => visibleContracts(db, query),
     events: (query) => visibleEvents(db, query),
     checkpoints: () => ledgerCheckpoints(db),
-    // Registry templates are not projected yet; the next stage maps AssetPassport contracts here.
-    assetOwnerOrgId: async () => null,
+    // The owner of the asset's active AssetPassport (owner-only on the ledger, so only the owner's parties find it).
+    assetOwnerOrgId: async (assetRef, parties) => {
+      if (parties.length === 0) return null;
+      const [passport] = await db
+        .select({ payload: ledgerContracts.payload })
+        .from(ledgerContracts)
+        .where(
+          and(
+            eq(ledgerContracts.templateRef, TEMPLATES.AssetPassport),
+            eq(ledgerContracts.businessRef, assetRef),
+            isNull(ledgerContracts.archivedOffset),
+            arrayOverlaps(ledgerContracts.stakeholders, [...parties]),
+          ),
+        )
+        .orderBy(desc(ledgerContracts.createdOffset))
+        .limit(1);
+      if (!passport) return null;
+      const owner = payloads.decode.passport(payloads.obj(passport.payload)).owner;
+      return (await loadPartyDirectory(db)).orgOf(owner);
+    },
     verifierEntries: async () => [],
   };
 }

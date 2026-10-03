@@ -220,6 +220,19 @@ describe("field omission", () => {
     expect(VerificationRequestSchema.parse(vr).attestation?.ref).toBe("ATT-001");
   });
 
+  it("lets the owner request verification of a passport without a case (the Verification section follows the request)", () => {
+    const world = buildScenario({ now });
+    const cl001 = world.cases.find((c) => c.ref === "CL-001")!;
+    const fresh = { ...cl001.asset, verifications: [], attestations: [] };
+    const owner = presentAssetDetail(fresh, [], viewer("manufacturer-owner"), pctx)!;
+    expect(owner.verification).toBeNull();
+    expect(owner.allowedTabs).toEqual(["overview", "evidence", "activity"]);
+    expect(owner.allowedActions).toEqual(expect.arrayContaining(["evidence.upload", "verification.request", "case.create"]));
+    // Nobody else is related to a passport without a case or verification.
+    expect(presentAssetDetail(fresh, [], viewer("verifier-inspector"), pctx)).toBeNull();
+    expect(presentAssetDetail(fresh, [], viewer("lender-a-analyst"), pctx)).toBeNull();
+  });
+
   it("returns internal notes only to the lender organization", () => {
     const { cl001 } = advancedWorld();
     expect(presentReview(cl001, viewer("lender-a-analyst"), pctx)?.internalNotes).toBe(INTERNAL_NOTE);

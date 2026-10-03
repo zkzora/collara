@@ -13,6 +13,7 @@ import {
   type PersonaId,
   type PresentContext,
 } from "@collara/domain";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPgliteDatabase, type DbHandle } from "../client";
 import { importLocalnetState } from "../bindings";
@@ -300,6 +301,42 @@ describe("read model: dealer and auditor", () => {
     expect(facts.proposals).toEqual([]);
     expect(facts.asset.documents.map((d) => d.ref)).toEqual(["DOC-001"]);
     expect(presentProposal(facts, actor("dealer-contributor"), pctx)).toBeNull();
+  });
+
+  it("shows the invited dealer its case before it holds any contract of it (application record), without terms", async () => {
+    // CL-002: invited dealer, no ledger contract yet (the dealer has not contributed); a fresh asset.
+    await handle.db.insert(cases).values({
+      caseRef: "CL-002",
+      title: "Invited dealer case",
+      assetRef: "ASSET-DEMO-002",
+      borrowerOrgId: "demo-manufacturer",
+      dealerOrgId: "demo-cnc-dealer",
+      selectedLenderOrgId: "demo-lender-a",
+      requestedPrincipal: "100000.00",
+      requestedCurrency: "USD",
+      policyRef: "CP-2026-CNC-01",
+      createdByUserId: "user-manufacturer-owner",
+    });
+    try {
+      const dealer = { ...viewers.dealer, roles: ["DEALER"] };
+      const facts = await loadCaseFacts(handle.db, dealer, "CL-002", opts);
+      expect(facts).not.toBeNull();
+      if (!facts) return;
+      expect(facts).toMatchObject({ ref: "CL-002", dealerOrgId: "demo-cnc-dealer", borrowerOrgId: "demo-manufacturer", proposals: [], lock: null });
+      // No passport in the dealer's view, but a case exists only for a registered asset; the identity stays undisclosed.
+      expect(facts.asset).toMatchObject({ ref: "ASSET-DEMO-002", lifecycle: "REGISTERED", equipmentClass: "", serialNumber: "", registeredAt: null });
+      const detail = presentCaseDetail(facts, actor("dealer-contributor"), pctx);
+      expect(detail?.requestedPrincipal).toBeNull();
+      expect(detail?.allowedActions).toContain("evidence.upload");
+      expect(JSON.stringify(detail)).not.toContain("100000");
+      // Only the invited dealer: not the selected lender before a share, not Lender B, not the verifier, and not a
+      // viewer of the dealer organization without the dealer role.
+      for (const viewer of [{ ...viewers.lenderA, roles: ["LENDER_ANALYST"] }, { ...viewers.lenderB, roles: ["LENDER_APPROVER"] }, { ...viewers.verifier, roles: ["VERIFIER"] }, { ...viewers.dealer, roles: ["AUDITOR"] }]) {
+        expect(await loadCaseFacts(handle.db, viewer, "CL-002", opts), viewer.orgId).toBeNull();
+      }
+    } finally {
+      await handle.db.delete(cases).where(eq(cases.caseRef, "CL-002"));
+    }
   });
 
   it("gives the auditor the grantors' facts for the granted case; presenters keep only scopes every owner granted", async () => {

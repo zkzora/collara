@@ -15,7 +15,7 @@ import type { DbOrTx } from "../client";
 import { auditEvents, cases, evidenceDocuments, exportJobs, type AuditEventRow } from "../schema";
 import { T } from "../projection/templates";
 import { decode } from "./decode";
-import { discloseEquipmentIdentity } from "./disclosure";
+import { discloseEquipmentIdentity, discloseReviewedVersions } from "./disclosure";
 import type { MappedEvent } from "./events";
 import { buildGovernance } from "./governance";
 import { loadLedgerView, loadPartyDirectory, readLastSync, type LastSync, type LedgerView, type PartyDirectory, type VisibleContract } from "./ledger-view";
@@ -28,7 +28,7 @@ export { loadLedgerView, loadPartyDirectory, readLastSync } from "./ledger-view"
 export type { MappedEvent } from "./events";
 export { mapLedgerEvent } from "./events";
 export { buildGovernance } from "./governance";
-export { discloseEquipmentIdentity, equipmentEntitlements, type EquipmentIdentity } from "./disclosure";
+export { discloseEquipmentIdentity, discloseReviewedVersions, equipmentEntitlements, type EquipmentIdentity } from "./disclosure";
 export { buildWorld, documentTypeOf, type PendingRegistration, type WorldInput } from "./world";
 export { readViewerOf, type ReadOptions, type ReadViewer } from "./viewer";
 export * as payloads from "./decode";
@@ -50,14 +50,13 @@ export interface ReadWorld {
 
 async function appRecords(db: DbOrTx, viewer: ReadViewer, view: LedgerView) {
   const ledgerCaseRefs = [...new Set(view.contracts.map((c) => c.caseRef).filter((x): x is string => !!x))];
+  // The invited dealer's case is an application record it may open before it holds any contract of the case (it
+  // contributes its own records there); the presenters give it the dealer's slice only (no terms, no other documents).
+  const invited = !viewer.roles || viewer.roles.includes("DEALER") ? [eq(cases.dealerOrgId, viewer.orgId)] : [];
   const caseRows = await db
     .select()
     .from(cases)
-    .where(
-      ledgerCaseRefs.length
-        ? or(eq(cases.borrowerOrgId, viewer.orgId), inArray(cases.caseRef, ledgerCaseRefs))
-        : eq(cases.borrowerOrgId, viewer.orgId),
-    );
+    .where(or(eq(cases.borrowerOrgId, viewer.orgId), ...invited, ...(ledgerCaseRefs.length ? [inArray(cases.caseRef, ledgerCaseRefs)] : [])));
   const assetRefs = [
     ...new Set([...caseRows.map((r) => r.assetRef), ...view.contracts.map((c) => c.assetRef).filter((x): x is string => !!x)]),
   ];
@@ -88,7 +87,9 @@ export async function loadReadWorld(db: DbOrTx, viewer: ReadViewer, options: Rea
   const records = await appRecords(db, viewer, view);
   const built = buildWorld({ viewer, now, view, parties, ...records });
   // Equipment identity of shared, invited or assigned cases (application-level disclosure, disclosure.ts).
-  const disclosed = await discloseEquipmentIdentity(db, viewer, built, view, { now, ...(options.sources ? { sources: options.sources } : {}) });
+  const identified = await discloseEquipmentIdentity(db, viewer, built, view, { now, ...(options.sources ? { sources: options.sources } : {}) });
+  // The documents the verifier reviewed, for attestations disclosed to the viewer (disclosure.ts).
+  const disclosed = await discloseReviewedVersions(db, viewer, identified, view, options.sources ? { sources: options.sources } : {});
   let worldCases = disclosed.cases;
   let worldAssets = disclosed.assets;
 

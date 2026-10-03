@@ -263,6 +263,33 @@ describe("verification grants: attestation and end of access", () => {
     expect(found?.asset.attestations.find((a) => a.ref === "ATT-002")?.supportingVersions.map((e) => e.documentRef)).toEqual(["DOC-002", "DOC-003"]);
   });
 
+  it("the lender's disclosed copy lists the reviewed versions, not every entry of the package version", async () => {
+    const owner = await loadReadWorld(handle.db, viewers.borrower, opts);
+    const original = owner.view.contracts.find((c) => c.templateRef === T.VerificationAttestation && c.payload.attestationRef === "ATT-002");
+    expect(original).toBeDefined();
+    ledger.tx((tx) => {
+      tx.create(
+        T.AttestationDisclosure,
+        { verifier: P.verifier, owner: P.owner, recipient: P.lenderA, purpose: "LENDER_REVIEW", caseRef: "CL-001", attestationCid: original!.contractId, attestation: original!.payload, disclosedAt: NOW.toISOString() },
+        { signatories: [P.verifier, P.owner], observers: [P.lenderA] },
+      );
+    });
+    await project();
+    const lender = await loadCaseFacts(handle.db, viewers.lenderA, "CL-001", opts);
+    const supporting = (ref: string) => lender?.asset.attestations.find((a) => a.ref === ref)?.supportingVersions;
+    // The grant (revoked since) named DOC-002 v1 and DOC-003 v2; package v2 also holds DOC-001 and DOC-004.
+    expect(supporting("ATT-002")).toEqual([
+      { documentRef: "DOC-002", version: 1 },
+      { documentRef: "DOC-003", version: 2 },
+    ]);
+    // An attestation issued without a grant (the legacy ATT-001) keeps the package entries.
+    expect(supporting("ATT-001")?.map((e) => e.documentRef)).toEqual(["DOC-001", "DOC-002", "DOC-003", "DOC-004"]);
+    // The lender still sees no grant contract, and Lender B nothing at all.
+    const lenderWorld = await loadReadWorld(handle.db, viewers.lenderA, opts);
+    expect(lenderWorld.view.contracts.some((c) => c.templateRef === T.PackageShare && String(c.payload.purpose) === VERIFICATION_GRANT_PURPOSE)).toBe(false);
+    expect(await loadCaseFacts(handle.db, viewers.lenderB, "CL-001", opts)).toBeNull();
+  });
+
   it("an expired grant counts as gone", async () => {
     ledger.tx((tx) => {
       tx.create(

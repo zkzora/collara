@@ -58,7 +58,7 @@ function PermittedActions({ detail }: { detail: AssetDetail }) {
       label: "Add evidence",
       allowed: canUpload,
       reason: isOwner ? "Not available in the current passport state" : "Owner only",
-      action: documents.data ? <EvidenceUploadDialog detail={detail} me={me} documents={documents.data} size="sm" /> : null,
+      action: documents.data ? <EvidenceUploadDialog assetRef={detail.ref} me={me} documents={documents.data} size="sm" /> : null,
     },
     {
       label: "Request verification",
@@ -111,7 +111,16 @@ function OverviewTab() {
                 : <Undisclosed />,
             },
             { term: "Location scope", description: detail.locationScope || <Undisclosed /> },
-            { term: "Registered", description: <span className="font-mono">{detail.registeredAt ? formatUtcDateTime(detail.registeredAt) : "Not registered"}</span> },
+            {
+              term: "Registered",
+              description: detail.registeredAt ? (
+                <span className="font-mono">{formatUtcDateTime(detail.registeredAt)}</span>
+              ) : detail.lifecycle.value === "REGISTERED" ? (
+                <Undisclosed />
+              ) : (
+                <span className="font-mono">Not registered</span>
+              ),
+            },
             { term: "Last update", description: <span className="font-mono">{formatUtcDateTime(detail.updatedAt)}</span> },
           ]}
         />
@@ -250,7 +259,7 @@ function EvidenceTab() {
         <>
           {detail.allowedActions.includes("evidence.upload") ? (
             <div className="flex flex-wrap gap-2">
-              <EvidenceUploadDialog detail={detail} me={me} documents={evidence.data} />
+              <EvidenceUploadDialog assetRef={detail.ref} me={me} documents={evidence.data} />
             </div>
           ) : null}
           <EvidenceTable detail={detail} documents={evidence.data} />
