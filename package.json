@@ -26,6 +26,7 @@
     "infra:keycloak": "node scripts/infra/keycloak.mjs",
     "localnet:up": "node scripts/localnet/up.mjs",
     "localnet:up:3": "node scripts/localnet/up.mjs --participants=3",
+    "localnet:up:5": "node scripts/localnet/up.mjs --participants=5",
     "localnet:down": "node scripts/localnet/down.mjs",
     "localnet:status": "node scripts/localnet/status.mjs",
     "localnet:bootstrap": "node scripts/localnet/bootstrap.mjs",

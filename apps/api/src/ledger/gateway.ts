@@ -45,7 +45,7 @@ export class CantonLedgerGateway implements LedgerGateway {
 
   async submit(_command: CommandRow, request: LedgerSubmitRequest): Promise<LedgerSubmitOutcome> {
     try {
-      await this.#access.assertSameLedger(request.ledgerUserId);
+      await this.#access.assertSameLedger(request.ledgerUserId, request.source);
     } catch (error) {
       if (error instanceof LedgerResetError) return { kind: "failed", errorKind: "LEDGER_RESET", message: error.message };
       return outcomeOf(error);

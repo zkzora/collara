@@ -10,7 +10,7 @@ import { z } from "zod";
 export const LocalnetStateSchema = z.object({
   version: z.literal(1),
   bootstrappedAt: z.string(),
-  topology: z.enum(["sandbox-1-participant", "sandbox-3-participants"]),
+  topology: z.enum(["sandbox-1-participant", "sandbox-3-participants", "sandbox-5-participants"]),
   cantonVersion: z.string().optional(),
   /** Token audience the participants expect (the HMAC secret is never stored here). */
   audience: z.string(),

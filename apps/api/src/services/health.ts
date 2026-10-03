@@ -9,6 +9,7 @@ export type HealthCheck = SystemHealth["checks"][string];
 const TOPOLOGY_LABELS: Readonly<Record<LocalnetState["topology"], string>> = {
   "sandbox-1-participant": "1 participant",
   "sandbox-3-participants": "3 participants",
+  "sandbox-5-participants": "5 participants",
 };
 
 /** Exact topology wording (ADR-0001 §2.3): a dpm sandbox is not Splice LocalNet. */

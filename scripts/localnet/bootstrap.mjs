@@ -39,6 +39,7 @@ import {
   readPortsFile,
   sleep,
   stateFileFor,
+  topologyName,
   writeJsonAtomic,
 } from "./lib.mjs";
 
@@ -74,7 +75,9 @@ export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, pre
   }
 
   const packages = await uploadDars(participants, dars?.length ? dars.map((d) => resolve(d)) : findDefaultDars(config), log);
-  const parties = await allocateParties(participants, config, multi, log);
+  const placement = placementFor(config, participants);
+  const parties = await allocateParties(participants, config, placement, log);
+  warnReadAsAcrossParticipants(config, parties, log);
   if (multi) await waitForTopology(participants, parties);
   const users = await ensureUsers(participants, config, parties, log);
 
@@ -87,7 +90,7 @@ export async function bootstrap({ dars, configPath, jsonApiUrl: urlOverride, pre
     prefix: prefix || null,
     namespace: (sameLedger && typeof previous.namespace === "string" && previous.namespace) || namespaceFor(prefix),
     bootstrappedAt: new Date().toISOString(),
-    topology: multi ? "sandbox-3-participants" : "sandbox-1-participant",
+    topology: topologyName(participants.length),
     cantonVersion: primary.version,
     audience: authSettings().audience,
     jsonApiUrl: primary.jsonApiUrl,
@@ -127,6 +130,16 @@ function loadConfig(path) {
       if (!hints.has(extra)) throw new Error(`${path}: ${party.hint} readAs unknown party ${extra}`);
     }
   }
+  for (const [count, placement] of Object.entries(config.placements ?? {})) {
+    if (count.startsWith("$")) continue;
+    if (!/^\d+$/.test(count) || typeof placement !== "object" || placement === null) throw new Error(`${path}: placements.${count} must map party hints to participants`);
+    for (const hint of hints) {
+      if (typeof placement[hint] !== "string") throw new Error(`${path}: placements.${count} has no participant for ${hint}`);
+    }
+    for (const hint of Object.keys(placement)) {
+      if (!hint.startsWith("$") && !hints.has(hint)) throw new Error(`${path}: placements.${count} names unknown party ${hint}`);
+    }
+  }
   return config;
 }
 
@@ -143,16 +156,20 @@ function withPrefix(config, prefix) {
   };
 }
 
+/**
+ * The participants to bootstrap: --json-api-url (one participant) wins; otherwise every participant of the running
+ * sandbox (ports file). CANTON_JSON_API_URL (usually set in .env for the API) applies only when the ports file lists
+ * at most one participant, so a multi-participant sandbox is never bootstrapped as a single node.
+ */
 async function resolveParticipants(urlOverride) {
   let participants;
-  const override = urlOverride ?? process.env.CANTON_JSON_API_URL;
+  const ports = readPortsFile();
+  const fromPorts = ports ? participantsFromPorts(ports) : [];
+  const override = urlOverride ?? (fromPorts.length > 1 ? undefined : process.env.CANTON_JSON_API_URL);
   if (override) {
     participants = [{ name: "", jsonApiUrl: override.replace(/\/+$/, "") }];
   } else {
-    const ports = readPortsFile();
-    participants = ports
-      ? participantsFromPorts(ports)
-      : [{ name: "sandbox", jsonApiUrl: jsonApiUrl(PORTS.sandbox.jsonApi) }];
+    participants = fromPorts.length > 0 ? fromPorts : [{ name: "sandbox", jsonApiUrl: jsonApiUrl(PORTS.sandbox.jsonApi) }];
   }
   const deadline = Date.now() + 60_000;
   for (const p of participants) {
@@ -240,13 +257,45 @@ async function listParties(p) {
   return all;
 }
 
-async function allocateParties(participants, config, multi, log) {
+/**
+ * Participant of each party hint. One participant: all on it. Several: `placements["<count>"]` of the config
+ * when it exists (e.g. the 5-participant privacy topology), else each party's `participant` field (the
+ * original 3-participant proposal), else "sandbox".
+ */
+function placementFor(config, participants) {
+  const names = new Set(participants.map((p) => p.name));
+  const placement = {};
+  if (participants.length === 1) {
+    for (const entry of config.parties) placement[entry.hint] = participants[0].name;
+    return placement;
+  }
+  const byCount = config.placements?.[String(participants.length)];
+  for (const entry of config.parties) {
+    const host = byCount?.[entry.hint] ?? entry.participant ?? "sandbox";
+    if (!names.has(host)) throw new Error(`party ${entry.hint}: participant ${host} is not running`);
+    placement[entry.hint] = host;
+  }
+  return placement;
+}
+
+/** A user that reads as a party hosted on another participant gets nothing for that party there. */
+function warnReadAsAcrossParticipants(config, parties, log) {
+  for (const entry of config.parties) {
+    for (const extra of entry.readAs ?? []) {
+      const own = parties[entry.hint].participant;
+      const other = parties[extra].participant;
+      if (own !== other) log(`warning: ${entry.hint} (${own}) reads as ${extra}, which is hosted on ${other}: that party's contracts are not on ${own}`);
+    }
+  }
+}
+
+async function allocateParties(participants, config, placement, log) {
   const byName = new Map(participants.map((p) => [p.name, p]));
   const existing = new Map();
   for (const p of participants) existing.set(p.name, await listParties(p));
   const parties = {};
   for (const entry of config.parties) {
-    const host = multi ? (entry.participant ?? "sandbox") : participants[0].name;
+    const host = placement[entry.hint];
     const p = byName.get(host);
     if (!p) throw new Error(`party ${entry.hint}: participant ${host} is not running`);
     let party = existing
@@ -268,7 +317,7 @@ async function allocateParties(participants, config, multi, log) {
   return parties;
 }
 
-/** In 3-participant mode, waits until every participant knows every party (topology propagation). */
+/** With several participants, waits until every participant knows every party (topology propagation). */
 async function waitForTopology(participants, parties) {
   const deadline = Date.now() + 30_000;
   for (const p of participants) {

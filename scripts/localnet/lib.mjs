@@ -1,5 +1,5 @@
 // Shared helpers for the LocalNet scripts (plain Node 24, no dependencies, any shell).
-// The ledger is a Canton 3.5.19 `dpm sandbox` (1 or 3 participants), not Splice LocalNet.
+// The ledger is a Canton 3.5.19 `dpm sandbox` (1, 3 or 5 participants), not Splice LocalNet.
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -56,6 +56,7 @@ export function namespaceFor(prefix) {
 export const CONFIG_FILES = {
   auth: join(REPO_ROOT, "infra", "canton", "sandbox-auth.conf"),
   extraParticipants: join(REPO_ROOT, "infra", "canton", "extra-participants.conf"),
+  extraParticipants5: join(REPO_ROOT, "infra", "canton", "extra-participants-5.conf"),
   localnet: join(REPO_ROOT, "scripts", "localnet", "localnet.config.json"),
 };
 
@@ -64,7 +65,22 @@ export const PORTS = {
   sandbox: { jsonApi: 7575, ledgerApi: 6865, adminApi: 6866 },
   participant2: { jsonApi: 7576, ledgerApi: 6875, adminApi: 6876 },
   participant3: { jsonApi: 7577, ledgerApi: 6885, adminApi: 6886 },
+  participant4: { jsonApi: 7578, ledgerApi: 6895, adminApi: 6896 },
+  participant5: { jsonApi: 7579, ledgerApi: 6905, adminApi: 6906 },
 };
+
+/** Supported participant counts and the Canton config files each one loads (after sandbox-auth.conf). */
+export const TOPOLOGIES = {
+  1: { participants: ["sandbox"], configs: [] },
+  3: { participants: ["sandbox", "participant2", "participant3"], configs: [CONFIG_FILES.extraParticipants] },
+  5: {
+    participants: ["sandbox", "participant2", "participant3", "participant4", "participant5"],
+    configs: [CONFIG_FILES.extraParticipants, CONFIG_FILES.extraParticipants5],
+  },
+};
+
+/** State-file topology name for a participant count ("sandbox-1-participant", "sandbox-5-participants"). */
+export const topologyName = (count) => (count === 1 ? "sandbox-1-participant" : `sandbox-${count}-participants`);
 
 // Public placeholder, identical to infra/canton/sandbox-auth.conf. Dev only.
 const DEFAULT_SECRET = "collara-local-dev-secret-change-me";

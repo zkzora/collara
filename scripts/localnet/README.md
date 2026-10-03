@@ -6,7 +6,7 @@ Prerequisites: Daml SDK 3.5.12 installed with dpm 1.0.22 (`%APPDATA%\dpm`, or se
 
 | Script | What it does |
 |---|---|
-| `up.mjs [--participants=1\|3] [--timeout=240] [--bootstrap]` | Starts `dpm sandbox` detached with `JDK_JAVA_OPTIONS=-Xmx1g`, `-c infra/canton/sandbox-auth.conf` (plus `extra-participants.conf` for 3), `--json-api-port 7575`, `--canton-port-file`. Writes the pid, waits for the ports file and `/readyz` = 200 on every participant. Stops the sandbox again if it is not ready in time. Refuses to start if a port is already taken. `--bootstrap` runs `bootstrap.mjs` afterwards. |
+| `up.mjs [--participants=1\|3\|5] [--timeout=240] [--bootstrap]` | Starts `dpm sandbox` detached with `JDK_JAVA_OPTIONS=-Xmx1g`, `-c infra/canton/sandbox-auth.conf` (plus `extra-participants.conf` for 3, and also `extra-participants-5.conf` for 5), `--json-api-port 7575`, `--canton-port-file`. Writes the pid, waits for the ports file and `/readyz` = 200 on every participant. Stops the sandbox again if it is not ready in time. Refuses to start if a port is already taken. `--bootstrap` runs `bootstrap.mjs` afterwards. |
 | `down.mjs` | Kills the process tree (`taskkill /PID <pid> /T /F` on Windows) and removes the pid and ports files. Leaves `state.json` (see below). |
 | `status.mjs [--json]` | Process, readiness, Canton version, participant id and ledger end per participant, and whether `state.json` matches the running ledger. Exit code 0 when every participant is ready. |
 | `bootstrap.mjs [--dar <file>]... [--config <file>] [--json-api-url <url>]` | Uploads DARs (`vetAllPackages=true`), allocates parties, creates least-privilege ledger users and writes `.local/localnet/state.json`. Idempotent. |
@@ -33,6 +33,16 @@ node scripts/localnet/down.mjs
 
 ```bash
 node scripts/localnet/up.mjs --participants=3 --bootstrap
+```
+
+5-participant mode, the privacy topology (JSON APIs 7575 to 7579; see [Topologies](#topologies) and [`docs/privacy-verification.md`](../../docs/privacy-verification.md)):
+
+```powershell
+$env:LOCALNET_JDK_JAVA_OPTIONS = "-Xmx1536m"; node scripts/localnet/up.mjs --participants=5
+```
+
+```bash
+LOCALNET_JDK_JAVA_OPTIONS=-Xmx1536m node scripts/localnet/up.mjs --participants=5
 ```
 
 Build the Collara DARs first so `bootstrap.mjs` finds them: `dpm build --all` in `daml/collara` (see the root `CLAUDE.md` for the dpm PATH setup in each shell).
@@ -68,8 +78,19 @@ Configuration: [`localnet.config.json`](localnet.config.json).
 
 - `projector-svc` (worker): `CanReadAs` every party hosted on the participant. This is a privileged, read-only operator credential.
 - `collara-admin`: `ParticipantAdmin`. Bootstrap itself uses the built-in `participant_admin`.
-- **3-participant placement** (the `participant` field; ignored with one participant): `participant2` hosts DemoManufacturer and DemoCNCDealer; `participant3` hosts DemoLenderA and GovSeat1; `sandbox` hosts the rest. This placement is a proposal for privacy tests, not a decision. Each participant gets the DARs, its own `projector-svc` and `collara-admin`, and bootstrap waits until every participant knows every party.
+- **Placement** (ignored with one participant): `placements["<count>"]` in the config when it exists for the running participant count, else each party's `participant` field, else `sandbox`. Each participant gets the DARs, its own `projector-svc` (CanReadAs the parties it hosts) and `collara-admin`, every party is allocated on its own participant, each org user is created on its party's participant, and bootstrap waits until every participant knows every party. A user whose `readAs` party is hosted on another participant gets a warning: that participant has none of the party's contracts. See [Topologies](#topologies).
+- **Which participants.** `--json-api-url` bootstraps exactly that one participant. Otherwise bootstrap uses every participant in `ports.json` (the running sandbox). `CANTON_JSON_API_URL` (set in `.env` for the API) is used only when `ports.json` lists at most one participant, so a multi-participant sandbox is never bootstrapped as one node.
 - **Reset detection.** The sandbox gets a new participant id on every start. When the participant id differs from the one in `state.json`, bootstrap logs `ledger reset detected` and rebuilds everything; otherwise it only verifies. Party ids in `state.json` are valid only while `participantId` matches.
+
+## Topologies
+
+| Participants | Placement | Status |
+|---|---|---|
+| 1 (`sandbox`) | every party | Used by every LocalNet integration test, the demo and the seeds |
+| 3 (`sandbox`, `participant2`, `participant3`) | `participant` fields: `participant2` = DemoManufacturer + DemoCNCDealer; `participant3` = DemoLenderA + GovSeat1; `sandbox` = the rest | A proposal only; never used for a recorded test. GovSeat1 reads as CollaraGovernance, which is on `sandbox` (bootstrap warns) |
+| 5 (`sandbox`, `participant2` … `participant5`) | `placements["5"]`: `sandbox` = CollaraRegistrar, CollaraGovernance, GovSeat1–3; `participant2` = DemoManufacturer (borrower); `participant3` = DemoLenderA; `participant4` = DemoLenderB; `participant5` = DemoVerifier, DemoCNCDealer, DemoAuditor | The privacy topology: `PRIVACY_IT=1 pnpm --filter @collara/api test:privacy` ([`docs/privacy-verification.md`](../../docs/privacy-verification.md)) |
+
+Ports of the extra participants (ledger API / admin API / JSON API): `participant2` 6875/6876/7576, `participant3` 6885/6886/7577, `participant4` 6895/6896/7578, `participant5` 6905/6906/7579 (`infra/canton/extra-participants.conf`, `extra-participants-5.conf`). Memory observed for 5 participants with `-Xmx1536m`: java.exe working set about 1.6 GB right after start (ready in 41 to 54 s).
 
 `state.json` (abridged; no secrets):
 
@@ -97,11 +118,11 @@ Configuration: [`localnet.config.json`](localnet.config.json).
 | `LOCALNET_DIR` | `.local/localnet` | all scripts |
 | `CANTON_JWT_HMAC_SECRET` | dev placeholder | sandbox config and all scripts (must match) |
 | `CANTON_JWT_AUDIENCE` | `https://collara.local/ledger-api` | sandbox config and all scripts |
-| `CANTON_JSON_API_URL` | from `ports.json`, else `http://127.0.0.1:7575` | `bootstrap.mjs` (single participant) |
+| `CANTON_JSON_API_URL` | from `ports.json`, else `http://127.0.0.1:7575` | `bootstrap.mjs`, single participant only: ignored when `ports.json` lists several participants |
 
 ## Troubleshooting
 
-- **Port in use.** `up.mjs` refuses to start when 7575, 6865 or 6866 (and 7576/7577 and their gRPC ports in 3-participant mode) answer. Stop the other process, or run `down.mjs` if it was started by `up.mjs`.
+- **Port in use.** `up.mjs` refuses to start when 7575, 6865 or 6866 (and the JSON, ledger and admin ports of every extra participant in 3- or 5-participant mode) answer. Stop the other process, or run `down.mjs` if it was started by `up.mjs`.
 - **The sandbox disappears.** It is an ordinary `java.exe`; anything that kills Java processes stops it. `status.mjs` then shows the pid as not running. Run `up.mjs` again and re-bootstrap.
 - **Changed Daml, same package version.** After rebuilding a DAR with changed templates, restart the sandbox (or bump `version` in `daml.yaml`). A running participant should not be expected to accept a different package under the same name and version (Canton package-upgrade rules; not exercised here).
-- **Java heap.** If the 3-participant sandbox runs out of memory, use `LOCALNET_JDK_JAVA_OPTIONS=-Xmx1536m` (the research spike used that; `-Xmx1g` worked here).
+- **Java heap.** If the 3-participant sandbox runs out of memory, use `LOCALNET_JDK_JAVA_OPTIONS=-Xmx1536m` (the research spike used that; `-Xmx1g` worked here). The 5-participant runs used `-Xmx1536m`.

@@ -1,6 +1,6 @@
 # Canton configuration (local ledger)
 
-Collara's local ledger is a **Canton 3.5.19 open-source `dpm sandbox`** (Daml SDK 3.5.12, dpm 1.0.22) with 1 or 3 participant nodes on one synchronizer, in one JVM. It is not Splice LocalNet, which needs Docker. State is in memory: party ids, contract ids and offsets are new after every start.
+Collara's local ledger is a **Canton 3.5.19 open-source `dpm sandbox`** (Daml SDK 3.5.12, dpm 1.0.22) with 1, 3 or 5 participant nodes on one synchronizer, in one JVM. It is not Splice LocalNet, which needs Docker. State is in memory: party ids, contract ids and offsets are new after every start.
 
 Start and stop it with the scripts in [`scripts/localnet/`](../../scripts/localnet/README.md); they pass these files to `dpm sandbox -c`.
 
@@ -8,6 +8,7 @@ Start and stop it with the scripts in [`scripts/localnet/`](../../scripts/localn
 |---|---|
 | `sandbox-auth.conf` | JWT auth for the `sandbox` participant: `unsafe-jwt-hmac-256` with a fixed `target-audience`. |
 | `extra-participants.conf` | 3-participant mode: adds `participant2` and `participant3`, each with the same auth. Load it after `sandbox-auth.conf`. |
+| `extra-participants-5.conf` | 5-participant mode (privacy tests): adds `participant4` and `participant5` on top of `extra-participants.conf`. Load it after both. |
 
 ## Authentication (dev only)
 
@@ -29,6 +30,8 @@ All ports bind to `127.0.0.1`.
 | `sandbox` | 6865 | 6866 | **7575** |
 | `participant2` (3-participant mode) | 6875 | 6876 | **7576** |
 | `participant3` (3-participant mode) | 6885 | 6886 | **7577** |
+| `participant4` (5-participant mode) | 6895 | 6896 | **7578** |
+| `participant5` (5-participant mode) | 6905 | 6906 | **7579** |
 | `sequencer1` | 6867 public, 6868 admin | | |
 | `mediator1` | | 6869 admin | |
 
@@ -38,4 +41,5 @@ The synchronizer alias is `synchronizer-1` (protocol version 35). `up.mjs` write
 
 - Ready in 31 to 77 s (`/readyz` returns 503 until the participant is connected).
 - `JDK_JAVA_OPTIONS=-Xmx1g` (set by `up.mjs`) worked for both 1 and 3 participants.
+- 5 participants: started with `LOCALNET_JDK_JAVA_OPTIONS=-Xmx1536m`; ready in 41 to 54 s; java.exe working set about 1.6 GB right after start (2026-10-03).
 - The process tree is `dpm.exe` → `java.exe`. Stop it with `node scripts/localnet/down.mjs`, which runs `taskkill /PID <pid> /T /F`.

@@ -2,7 +2,7 @@
 // Starts the local Canton ledger (`dpm sandbox`, Canton 3.5.19) in the background with HMAC JWT
 // auth and waits until every participant's /readyz returns 200.
 //
-//   node scripts/localnet/up.mjs [--participants=1|3] [--timeout=240] [--bootstrap]
+//   node scripts/localnet/up.mjs [--participants=1|3|5] [--timeout=240] [--bootstrap]
 //
 // Writes .local/localnet/{sandbox.pid.json, ports.json, sandbox.out.log, canton.log}.
 // Stop it with `node scripts/localnet/down.mjs`. State is in memory and lost on stop.
@@ -14,6 +14,7 @@ import {
   FILES,
   LOCAL_DIR,
   PORTS,
+  TOPOLOGIES,
   fail,
   isMain,
   isPortOpen,
@@ -30,7 +31,8 @@ import {
 } from "./lib.mjs";
 
 export async function up({ participants = 1, timeoutSeconds = 240 } = {}) {
-  if (participants !== 1 && participants !== 3) throw new Error("--participants must be 1 or 3");
+  const topology = TOPOLOGIES[participants];
+  if (!topology) throw new Error(`--participants must be one of ${Object.keys(TOPOLOGIES).join(", ")}`);
 
   const previous = readJson(FILES.pid);
   if (previous && isProcessAlive(previous.pid)) {
@@ -48,7 +50,7 @@ export async function up({ participants = 1, timeoutSeconds = 240 } = {}) {
   }
   if (previous) removeFile(FILES.pid);
 
-  const wanted = participants === 3 ? Object.values(PORTS) : [PORTS.sandbox];
+  const wanted = topology.participants.map((name) => PORTS[name]);
   for (const p of wanted) {
     for (const port of [p.jsonApi, p.ledgerApi, p.adminApi]) {
       if (await isPortOpen(port)) {
@@ -66,8 +68,7 @@ export async function up({ participants = 1, timeoutSeconds = 240 } = {}) {
 
   mkdirSync(LOCAL_DIR, { recursive: true });
   removeFile(FILES.ports);
-  const configs = ["-c", CONFIG_FILES.auth];
-  if (participants === 3) configs.push("-c", CONFIG_FILES.extraParticipants);
+  const configs = ["-c", CONFIG_FILES.auth, ...topology.configs.flatMap((file) => ["-c", file])];
   const args = [
     "sandbox",
     ...configs,

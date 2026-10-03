@@ -89,11 +89,11 @@ export class LedgerAccess {
   }
 
   /**
-   * Throws LedgerResetError when the participant behind `ledgerUserId` is not the one the bootstrap state
-   * was written for (party ids would be invalid). Cached for `participantCheckTtlMs`.
+   * Throws LedgerResetError when the participant behind `ledgerUserId` (on `source`, default: the user's
+   * participant per the bootstrap state) is not the one the bootstrap state was written for (party ids would
+   * be invalid). Cached per participant for `participantCheckTtlMs`.
    */
-  async assertSameLedger(ledgerUserId: string): Promise<void> {
-    const source = this.sourceOf(ledgerUserId);
+  async assertSameLedger(ledgerUserId: string, source: string = this.sourceOf(ledgerUserId)): Promise<void> {
     const ttl = this.#options.participantCheckTtlMs ?? 30_000;
     const checked = this.#checkedAt.get(source);
     if (checked !== undefined && Date.now() - checked < ttl) return;
