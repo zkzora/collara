@@ -15,7 +15,7 @@
 # Runtime configuration, read per request on the server (one image for every environment):
 #   COLLARA_MODE          UI_MOCK (default) or LOCALNET
 #   API_INTERNAL_ORIGIN   where /api/* is proxied (default http://127.0.0.1:4000)
-#   PUBLIC_DEMO_STATUS    off (default) or localnet
+#   PUBLIC_DEMO_STATUS    off (default), ui_mock (with COLLARA_MODE=UI_MOCK) or localnet (with COLLARA_MODE=LOCALNET)
 
 ARG NODE_VERSION=24.21.0
 

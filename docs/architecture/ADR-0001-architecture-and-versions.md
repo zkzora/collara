@@ -40,7 +40,7 @@ docs/               Architecture, permissions, setup, demo, limitations
 - The mode is read **server-side at runtime** (`COLLARA_MODE`) and passed into the client provider; the mock client is code-split and only loaded in `UI_MOCK`.
 - In `LOCALNET`, a failed or unavailable ledger action is reported as such. There is **no fallback** to simulated success.
 - UI_MOCK ships synthetic fixtures to the browser; it is a UI mockup, not a privacy demonstration. Privacy is enforced and tested only in LOCALNET (server-side field omission, per-party projections).
-- The landing keeps the approved pre-build/pilot copy until the LOCALNET demo works end to end (`PUBLIC_DEMO_STATUS=off|localnet`, default `off`).
+- The landing keeps the approved pre-build/pilot copy until the LOCALNET demo works end to end (`PUBLIC_DEMO_STATUS=off|ui_mock|localnet`, default `off`). Amended 2026-10-03: `ui_mock` promotes the synthetic UI mockup demo with a no-ledger disclosure (used by the Vercel deployment); `localnet` remains reserved for a working LOCALNET demo.
 
 ### 2.3 Ledger and Daml
 
