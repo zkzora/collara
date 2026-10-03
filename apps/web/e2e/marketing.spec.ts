@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+// The same evidence record the /docs page renders, so the test cannot go stale when the facts change.
+import { EVIDENCE, passCount } from "../../../packages/domain/src/evidence";
 
 // Public site: navigation, public demo gating, /demo, /pilot validation, keyboard access, responsive overflow
 // and axe. Runs in both Playwright projects (desktop and the 390x844 mobile viewport).
@@ -250,7 +252,15 @@ test.describe("docs", () => {
     await expect(overview).toContainText("not Splice LocalNet");
     await expect(overview.getByRole("heading", { name: "Not verified" })).toBeVisible();
     // Status facts from the evidence record (packages/domain/src/evidence.ts), not stale literals.
-    for (const fact of ["381 unit tests", "run 37103384764", "71/71", "14/14", "80/80 checks", "10/10 checks"]) {
+    const facts = [
+      `${EVIDENCE.unitTests.total} unit tests`,
+      `run ${EVIDENCE.ci.runId}`,
+      passCount(EVIDENCE.localnetIntegration),
+      passCount(EVIDENCE.cleanStartBrowser),
+      `${passCount(EVIDENCE.privacy.checks)} checks`,
+      `${passCount(EVIDENCE.tierB.scriptedChecks)} checks`,
+    ];
+    for (const fact of facts) {
       await expect(overview).toContainText(fact);
     }
     await expect(overview).toContainText("one machine under one operator");
