@@ -1,21 +1,34 @@
+import { ENVIRONMENT_CHIPS } from "@collara/domain";
 import Link from "next/link";
-import { isPublicDemoLive } from "./runtime";
 import { BrandLink, Container } from "./primitives";
+import { getPublicDemo } from "./runtime";
 
 const FOOTER_DISCLAIMER =
   "Collara is in development. It is not a lender, custodian, legal lien registry, or provider of guaranteed financing.";
 
-/** Footer per synthesis §1.2.1. `Demo` appears only while the public demo gate is on (CR-04). */
+interface FooterLink {
+  label: string;
+  href: string;
+  /** Shown after the link, outside its name (keeps the approved label intact). */
+  tag?: string;
+}
+
+/**
+ * Footer per synthesis §1.2.1. `Demo` appears only while the public demo gate is on (CR-04); for the UI mockup demo
+ * it carries the `UI mockup` environment chip so the link never reads as a ledger-backed demo.
+ */
 export async function SiteFooter({ note }: { note?: string }) {
-  const demoLive = await isPublicDemoLive();
-  const columns: { title: string; links: { label: string; href: string }[] }[] = [
+  const demo = await getPublicDemo();
+  const demoLink: FooterLink[] =
+    demo === "off" ? [] : [{ label: "Demo", href: "/demo", tag: demo === "ui_mock" ? ENVIRONMENT_CHIPS.UI_MOCK : undefined }];
+  const columns: { title: string; links: FooterLink[] }[] = [
     {
       title: "Product",
       links: [
         { label: "Product", href: "/#product" },
         { label: "Workflow", href: "/#workflow" },
         { label: "For Lenders", href: "/#for-lenders" },
-        ...(demoLive ? [{ label: "Demo", href: "/demo" }] : []),
+        ...demoLink,
       ],
     },
     {
@@ -52,10 +65,15 @@ export async function SiteFooter({ note }: { note?: string }) {
               </h2>
               <ul className="flex flex-col gap-2.5">
                 {column.links.map((link) => (
-                  <li key={link.href}>
+                  <li key={link.href} className="flex flex-wrap items-baseline gap-x-2">
                     <Link href={link.href} className="rounded-sm text-fg-muted hover:text-fg">
                       {link.label}
                     </Link>
+                    {link.tag ? (
+                      <span className="rounded-[4px] border border-white/14 px-1.5 py-px font-mono text-[10.5px] tracking-[0.06em] text-fg-subtle uppercase">
+                        {link.tag}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

@@ -1,10 +1,11 @@
 import { PILOT_COPY } from "@collara/domain";
 import type { Metadata } from "next";
+import { PilotMockNotice } from "@/components/marketing/demo-content";
 import { PilotSteps } from "@/components/marketing/landing";
 import { MarketingPage } from "@/components/marketing/marketing-page";
 import { PilotForm } from "@/components/marketing/pilot-form";
 import { Container, Eyebrow, Lead } from "@/components/marketing/primitives";
-import { getRuntimeMode } from "@/components/marketing/runtime";
+import { getPublicDemo, getRuntimeMode } from "@/components/marketing/runtime";
 
 export const metadata: Metadata = {
   title: "Request a pilot",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PilotPage() {
-  const mode = await getRuntimeMode();
+  const [mode, demo] = await Promise.all([getRuntimeMode(), getPublicDemo()]);
   return (
     <MarketingPage current="pilot">
       <Container className="pt-[clamp(56px,7vw,96px)] pb-[clamp(80px,10vw,140px)]">
@@ -25,7 +26,12 @@ export default async function PilotPage() {
             <Lead>{PILOT_COPY.DESCRIPTION}</Lead>
             <PilotSteps className="mt-8 border-t border-white/7" />
           </div>
-          <PilotForm mode={mode} />
+          <div className="flex flex-col gap-5">
+            {/* In UI_MOCK the form submits nothing: say so before anyone fills it in. The demo link only appears
+                while the UI mockup demo is promoted (no /demo link while the gate is off, CR-04). */}
+            {mode === "UI_MOCK" ? <PilotMockNotice showDemoLink={demo === "ui_mock"} /> : null}
+            <PilotForm mode={mode} />
+          </div>
         </div>
       </Container>
     </MarketingPage>

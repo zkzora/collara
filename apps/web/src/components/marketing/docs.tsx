@@ -2,11 +2,13 @@ import {
   BOUNDARY_COPY,
   CAPABILITIES,
   CAPABILITY_STATUS_META,
+  EVIDENCE,
   buildScenario,
   capabilityById,
   clock,
   formatMoney,
   money,
+  passCount,
   type CapabilityStatus,
 } from "@collara/domain";
 import { Fragment, type ReactNode } from "react";
@@ -30,8 +32,9 @@ import { PermissionMatrix } from "./permission-matrix";
 // resolves a conflict: capability status and chips come from the domain config (CR-45), the matrix
 // from the domain policy (CR-21), principal USD 100,000.00 (CR-12), seed-relative dates (§1.6),
 // governance semantics without reject votes (CR-28), and #setup lists no unverified commands.
-// Status statements follow what was actually run (docs/verification.md, 2026-10-02). Copy written
-// for the post-pre-build state is marked INFERRED (pending approval) where it appears.
+// Status statements follow what was actually run: counts, dates and scopes come from EVIDENCE
+// (@collara/domain, packages/domain/src/evidence.ts), never from literals here. Copy written for the
+// post-pre-build state is marked INFERRED (pending approval) where it appears.
 
 export const DOCS_SECTIONS = [
   { id: "overview", label: "Overview" },
@@ -72,7 +75,7 @@ export function DocsStatusBanner({ prebuild }: { prebuild: boolean }) {
           {prebuild
             ? "This documentation describes a specification and interactive UI mockups. No running implementation, deployed contracts, API, or test suite exists yet."
             : // INFERRED copy (pending approval).
-              "Synthetic data only. Collara runs as a local demo on one machine, against a Canton 3.5.19 sandbox with one participant. Nothing is deployed, and nothing here is production-ready."}
+              `Synthetic data only. The LocalNet demo runs on one machine, against a Canton 3.5.19 sandbox with one participant. Only the web app is deployed, as a UI mockup on ${EVIDENCE.deployment.web.host}; the API, ledger and database are not, and nothing is deployed to a Canton Network. Nothing here is production-ready.`}
         </span>
       </div>
     </div>
@@ -112,23 +115,42 @@ export function DocsSidebar() {
   );
 }
 
-// INFERRED copy (pending approval): the local-demo status card. Facts and counts from docs/verification.md
-// and docs/PROGRESS.md (2026-10-02); keep them in step with those records.
-const RUN_LOCALLY = [
-  "60 Daml Script tests of the contract model: invariants, attack attempts and contract visibility",
-  "LocalNet integration tests through the API on the sandbox: 49 workflow tests, and an 8-test adversarial sweep over 44 routes",
-  "Playwright in UI mockup mode, and a LocalNet browser walkthrough of CL-001 with negative checks",
-  "285 unit tests",
+// INFERRED copy (pending approval): the local-demo status card. Every count, date and scope comes from EVIDENCE.
+const E = EVIDENCE;
+
+const RUN = [
+  `${E.damlTests.passed} Daml Script tests of the contract model: invariants, attack attempts and contract visibility`,
+  `LocalNet integration tests through the API on the sandbox with one participant: ${passCount(E.localnetIntegration)} in ${E.localnetIntegration.files} files, including an adversarial sweep over ${E.localnetIntegration.adversarialRoutes} routes`,
+  `A LocalNet browser walkthrough of CL-001 from a clean start: ${passCount(E.cleanStartBrowser)} tests`,
+  `Witness-level privacy on ${E.privacy.participants} participants: ${passCount(E.privacy.tests)} tests and ${passCount(E.privacy.checks)} checks, in ${E.privacy.runs} runs. All participants ran on one machine under one operator, so this does not show isolation between independent operators.`,
+  `Tier B governance with ${E.tierB.nodes} Decentralization Manager nodes and a decentralized governance party, run by scripts on a separate local topology under one operator: ${passCount(E.tierB.scriptedChecks)} checks. The workspace does not use it.`,
+  `${E.unitTests.total} unit tests (commit ${E.unitTests.commit})`,
+  `CI on GitHub Actions passed (run ${E.ci.runId}, commit ${E.ci.commit}): typecheck, lint, unit tests and build; Playwright in UI mockup mode (${E.ci.playwrightUiMock.passed} passed); the Daml build and tests`,
+] as const;
+
+const RUN_DATES = [
+  E.damlTests.date,
+  E.localnetIntegration.date,
+  E.cleanStartBrowser.date,
+  E.privacy.date,
+  E.tierB.date,
+  E.unitTests.date,
+  E.ci.date,
+].sort();
+const RUN_PERIOD = RUN_DATES[0] === RUN_DATES.at(-1) ? RUN_DATES[0] : `${RUN_DATES[0]} to ${RUN_DATES.at(-1)}`;
+
+const DEPLOYMENT = [
+  `Deployed: the web app in UI mockup mode, on ${E.deployment.web.host} (${E.deployment.web.date}). It holds synthetic data in the browser only.`,
+  "Not deployed: the API, the worker, PostgreSQL, document storage and the Canton ledger. Nothing is deployed to a Canton Network.",
 ] as const;
 
 const NOT_VERIFIED = [
-  "Witness-level privacy on three participants. With one participant, its operator sees every transaction.",
-  "Tier B governance in the workspace: Decentralization Manager nodes and a decentralized governance party (scripted local run only)",
+  "Independent operators: the privacy and Tier B runs each had one operator for every node",
+  "Tier B governance in the workspace: the API and UI still use Tier A",
   "Docker Compose and the container images",
   "Keycloak sign-in through a browser, and Secure cookies over HTTPS",
   "Ledger authentication with JWKS tokens for a real participant",
   "Persistence across sandbox restarts: the sandbox keeps ledger state in memory",
-  "A passing CI run: the first GitHub Actions run failed during setup, and the fix has not yet run green",
 ] as const;
 
 function RepoPath({ children }: { children: string }) {
@@ -139,19 +161,22 @@ function ProjectStatusCard() {
   return (
     <DocsCard filled titleAs="h2" title="Project status: local demo build">
       <p className="text-[14px] leading-[1.6] text-fg-muted">
-        What exists today runs on one machine with synthetic data. The public site and the workspace are one web app,
-        and the workspace has two modes. In UI mockup mode, state is projected locally in the browser and no ledger
-        transaction is submitted. In LocalNet mode, actions are Daml commands submitted through the API to a Canton
-        3.5.19 sandbox with one participant, with a projection worker, PostgreSQL and private evidence storage. That
-        sandbox is not Splice LocalNet, and nothing is deployed to a Canton Network. Nothing on this page is a claim of
-        production readiness or a security assurance.
+        Everything uses synthetic data. The public site and the workspace are one web app, and the workspace has two
+        modes. In UI mockup mode, state is projected locally in the browser and no ledger transaction is submitted;
+        it is the only mode deployed publicly. In LocalNet mode, actions are Daml commands submitted through the API
+        to a Canton 3.5.19 sandbox with one participant, with a projection worker, PostgreSQL and private evidence
+        storage; it runs only on the authoring machine. That sandbox is not Splice LocalNet, and nothing is deployed
+        to a Canton Network. Nothing on this page is a claim of production readiness or a security assurance.
       </p>
-      <h3 className="mt-2 text-[13.5px] font-medium">Run on the authoring machine (2026-10-02)</h3>
-      <DocsList small items={RUN_LOCALLY} />
+      <h3 className="mt-2 text-[13.5px] font-medium">What was run ({RUN_PERIOD})</h3>
+      <DocsList small items={RUN} />
+      <h3 className="mt-2 text-[13.5px] font-medium">Deployment</h3>
+      <DocsList small items={DEPLOYMENT} />
       <h3 className="mt-2 text-[13.5px] font-medium">Not verified</h3>
       <DocsList small items={NOT_VERIFIED} />
       <p className="mt-2 text-[13.5px] leading-[1.6] text-fg-muted">
-        Details, including runs that could not complete, are in <RepoPath>docs/verification.md</RepoPath> and{" "}
+        Details, including runs that could not complete, are in <RepoPath>docs/verification.md</RepoPath>,{" "}
+        <RepoPath>docs/privacy-verification.md</RepoPath>, <RepoPath>docs/governance-tier-b.md</RepoPath> and{" "}
         <RepoPath>docs/limitations.md</RepoPath> in the Collara source repository.
       </p>
     </DocsCard>
@@ -625,13 +650,13 @@ export function GovernanceSection({ now }: { now: Date }) {
   return (
     <DocsSection
       id="governance"
-      // INFERRED kicker and chip labels "Tier A implemented" / "Tier B planned" (pending approval).
+      // INFERRED kicker and chip labels "Tier A implemented" / "Tier B integration planned" (pending approval).
       kicker="05 · BitSafe governance"
       chips={
         <>
           <Chips
             statuses={statusesOf("governance")}
-            labels={{ IMPLEMENTED: "Tier A implemented", PLANNED: "Tier B planned" }}
+            labels={{ IMPLEMENTED: "Tier A implemented", PLANNED: "Tier B integration planned" }}
           />
           <StatusChip status="UI_MOCKUP" label="UI simulation" />
         </>
@@ -645,8 +670,8 @@ export function GovernanceSection({ now }: { now: Date }) {
         Tier A is implemented: Decentralization Manager governance contracts with three seats and a 2-of-3 threshold, on
         one local participant run by one operator, so it does not yet meet that aim. Tier B, a decentralized governance
         party on Decentralization Manager nodes, has been exercised only by scripts on a separate local three-node
-        topology run by one operator; the workspace does not use it. In UI mockup mode, the workspace simulates
-        governance in the browser.
+        topology run by one operator ({passCount(EVIDENCE.tierB.scriptedChecks)} checks passed); the workspace does not
+        use it. In UI mockup mode, the workspace simulates governance in the browser.
       </DocsLead>
       <Callout tone="info">{BOUNDARY_COPY.GOVERNANCE_SCOPE}</Callout>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] items-start gap-3.5">
@@ -741,7 +766,7 @@ const REPO_DOCS: readonly { title: string; path: string; body: string }[] = [
   {
     title: "Tests",
     path: "docs/verification.md",
-    body: "What was run on 2026-10-02 and what was observed: unit, Daml Script, LocalNet integration and adversarial tests, and Playwright in both modes. It also lists what was not verified.",
+    body: "What was run and what was observed: unit, Daml Script, LocalNet integration and adversarial tests, Playwright in both modes, and the scripted Tier B governance run. It also lists what was not verified.",
   },
   {
     title: "Demo script",
@@ -750,7 +775,13 @@ const REPO_DOCS: readonly { title: string; path: string; body: string }[] = [
   },
 ];
 
-const MORE_REPO_DOCS = ["README.md", "docs/limitations.md", "docs/governance.md"] as const;
+const MORE_REPO_DOCS = [
+  "README.md",
+  "docs/limitations.md",
+  "docs/governance.md",
+  "docs/governance-tier-b.md",
+  "docs/privacy-verification.md",
+] as const;
 
 export function SetupSection() {
   return (
@@ -758,8 +789,8 @@ export function SetupSection() {
       <DocsH2 id="setup-title">In the source repository, written from local runs</DocsH2>
       <DocsLead>
         Setup instructions, the API reference and the test record are kept in the Collara source repository, not on
-        this page. They were written from commands run on one Windows 11 machine against a Canton 3.5.19 sandbox with
-        one participant (not Splice LocalNet), with synthetic data only. Each one states what was not verified. None of
+        this page. They were written from commands run on one Windows 11 machine against a Canton 3.5.19 sandbox (one
+        participant; five for the privacy check), not Splice LocalNet, with synthetic data only. Each one states what was not verified. None of
         them is a production deployment guide or a security assurance.
       </DocsLead>
       <ul className="grid gap-3.5 site:grid-cols-2">

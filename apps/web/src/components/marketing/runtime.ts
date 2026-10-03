@@ -1,14 +1,11 @@
 import "server-only";
 import { RuntimeModeSchema, type RuntimeMode } from "@collara/domain";
 import { connection } from "next/server";
-import { z } from "zod";
+import { resolvePublicDemo, type PublicDemoStatus } from "./public-demo";
 
 // Both values are read at request time (ADR-0001 §2.2), so one build serves either mode and the
 // public demo gate can be switched without rebuilding. `connection()` opts the page out of
 // prerendering; without it the values would be frozen at build time.
-
-const PublicDemoStatusSchema = z.enum(["off", "localnet"]).catch("off");
-export type PublicDemoStatus = z.infer<typeof PublicDemoStatusSchema>;
 
 export async function getRuntimeMode(): Promise<RuntimeMode> {
   await connection();
@@ -16,12 +13,10 @@ export async function getRuntimeMode(): Promise<RuntimeMode> {
 }
 
 /**
- * Whether the public demo is promoted (synthesis §1.1, CR-03/CR-04). `Explore the demo`, the footer
- * `Demo` link and the LocalNet disclosure are true only when PUBLIC_DEMO_STATUS=localnet **and** the
- * app really runs in LOCALNET; any other combination keeps the approved pre-demo copy.
+ * Which public demo is promoted (synthesis §1.1, CR-03/CR-04): `Explore the demo`, the footer `Demo` link and the
+ * matching disclosure. PUBLIC_DEMO_STATUS=ui_mock counts only in UI_MOCK and =localnet only in LOCALNET; anything
+ * else is `off` and keeps the approved pre-demo copy (public-demo.ts).
  */
-export async function isPublicDemoLive(): Promise<boolean> {
-  await connection();
-  const status: PublicDemoStatus = PublicDemoStatusSchema.parse(process.env.PUBLIC_DEMO_STATUS?.trim().toLowerCase());
-  return status === "localnet" && (await getRuntimeMode()) === "LOCALNET";
+export async function getPublicDemo(): Promise<PublicDemoStatus> {
+  return resolvePublicDemo(process.env.PUBLIC_DEMO_STATUS, await getRuntimeMode());
 }

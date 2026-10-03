@@ -64,8 +64,13 @@ test("owner registers an asset, adds evidence and requests verification; the ver
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("Registered");
 
   // Evidence: wrong type is refused client-side; a PDF is hashed, versioned and marked not scanned.
-  await page.getByRole("navigation", { name: "Passport sections" }).getByRole("link", { name: "Evidence" }).click();
-  await main.getByRole("button", { name: "Add evidence" }).click();
+  // The Overview section has its own "Add evidence" button, so act inside the Evidence section only once it has
+  // rendered; a global lookup can hit the outgoing Overview button while the navigation is still in flight.
+  const sections = page.getByRole("navigation", { name: "Passport sections" });
+  await sections.getByRole("link", { name: "Evidence" }).click();
+  const evidenceSection = main.getByRole("region", { name: "Evidence", exact: true });
+  await expect(evidenceSection).toBeVisible();
+  await evidenceSection.getByRole("button", { name: "Add evidence" }).click();
   dialog = page.getByRole("alertdialog", { name: `Add evidence · ${assetRef}` });
   await expect(dialog).toContainText(NOT_SCANNED);
   await dialog.getByLabel("Document type").selectOption("DEALER_INVOICE");
@@ -84,10 +89,11 @@ test("owner registers an asset, adds evidence and requests verification; the ver
   await expect(main.getByText(NOT_SCANNED)).toBeVisible();
 
   // Request verification from the passport overview (the Verification section appears once a request exists).
-  const sections = page.getByRole("navigation", { name: "Passport sections" });
   await expect(sections.getByRole("link", { name: "Verification" })).toHaveCount(0);
   await sections.getByRole("link", { name: "Overview" }).click();
-  await main.getByRole("button", { name: "Request verification" }).click();
+  const overviewSection = main.getByRole("region", { name: "Overview", exact: true });
+  await expect(overviewSection).toBeVisible();
+  await overviewSection.getByRole("button", { name: "Request verification" }).click();
   dialog = page.getByRole("alertdialog", { name: `Request verification · ${assetRef}` });
   await expect(dialog.getByRole("checkbox", { name: /Dealer invoice/ })).toBeChecked();
   await dialog.getByRole("button", { name: "Request verification" }).click();

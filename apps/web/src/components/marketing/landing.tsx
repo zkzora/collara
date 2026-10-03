@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { HeroPreview } from "./hero-preview";
+import { UI_MOCK_DEMO_DISCLOSURE, type PublicDemoStatus } from "./public-demo";
 import {
   BrandMark,
   ButtonLink,
@@ -18,11 +19,11 @@ import {
 const sectionPad = "pt-[clamp(80px,10vw,140px)]";
 
 /**
- * Pre-demo vs demo-live CTAs (spec-content.md §b). `demoLive` is resolved on the server from
- * PUBLIC_DEMO_STATUS and the runtime mode, so no dead demo button can ship.
+ * Pre-demo vs demo-live CTAs (spec-content.md §b). `demo` is resolved on the server from
+ * PUBLIC_DEMO_STATUS and the runtime mode (public-demo.ts), so no dead demo button can ship.
  */
-function PrimaryCtas({ demoLive }: { demoLive: boolean }) {
-  return demoLive ? (
+function PrimaryCtas({ demo }: { demo: PublicDemoStatus }) {
+  return demo !== "off" ? (
     <>
       <ButtonLink href="/demo">Explore the demo</ButtonLink>
       <ButtonLink href="/pilot" variant="secondary">
@@ -39,7 +40,14 @@ function PrimaryCtas({ demoLive }: { demoLive: boolean }) {
   );
 }
 
-export function Hero({ demoLive }: { demoLive: boolean }) {
+/** The hero disclosure line: approved LocalNet and pre-demo strings; the UI mockup one is INFERRED (public-demo.ts). */
+const HERO_DISCLOSURE: Readonly<Record<PublicDemoStatus, string>> = {
+  off: "Collara is currently in development. We are seeking equipment-finance design partners.",
+  ui_mock: UI_MOCK_DEMO_DISCLOSURE,
+  localnet: "The demo uses synthetic data on LocalNet. No funds are transferred.",
+};
+
+export function Hero({ demo }: { demo: PublicDemoStatus }) {
   return (
     <section aria-labelledby="hero-title" className="relative pt-[clamp(72px,10vw,132px)]">
       <div
@@ -61,14 +69,10 @@ export function Hero({ demoLive }: { demoLive: boolean }) {
           relevant records with selected counterparties and track who can authorize each pledge and release.
         </p>
         <CtaRow className="mt-9">
-          <PrimaryCtas demoLive={demoLive} />
+          <PrimaryCtas demo={demo} />
         </CtaRow>
         <p className="mt-[26px] text-[13.5px] text-fg-subtle">Starting with used CNC financing. Built on Canton.</p>
-        <p className="mt-1.5 text-[13.5px] text-fg-subtle">
-          {demoLive
-            ? "The demo uses synthetic data on LocalNet. No funds are transferred."
-            : "Collara is currently in development. We are seeking equipment-finance design partners."}
-        </p>
+        <p className="mt-1.5 text-[13.5px] text-fg-subtle">{HERO_DISCLOSURE[demo]}</p>
       </Container>
       <HeroPreview />
     </section>
@@ -429,7 +433,21 @@ const FAQ = [
   },
 ] as const;
 
-export function FaqSection() {
+/**
+ * With the UI mockup promoted, the approved answer ("…synthetic records on LocalNet…") would describe a different
+ * demo than the one linked. INFERRED replacement for its middle sentence (pending approval); "No." and the last
+ * sentence stay approved.
+ */
+const FAQ_UI_MOCK_MONEY =
+  "No. The demo is a UI mockup with synthetic records and no ledger connection. Cash settlement and MainNet wallet payments are outside the initial scope.";
+
+function faqFor(demo: PublicDemoStatus): readonly { q: string; a: string }[] {
+  return demo === "ui_mock"
+    ? FAQ.map((item) => (item.q === "Does the demo move money?" ? { ...item, a: FAQ_UI_MOCK_MONEY } : item))
+    : FAQ;
+}
+
+export function FaqSection({ demo }: { demo: PublicDemoStatus }) {
   return (
     <section id="faq" aria-labelledby="faq-title" className={cn(sectionPad, "scroll-mt-16")}>
       <Container className="grid items-start gap-14 site:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
@@ -438,7 +456,7 @@ export function FaqSection() {
           <SectionTitle id="faq-title">Questions before you start</SectionTitle>
         </div>
         <div className="border-t border-line">
-          {FAQ.map((item, index) => (
+          {faqFor(demo).map((item, index) => (
             <details key={item.q} open={index === 0} className="group border-b border-line">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[17px] font-medium tracking-[-0.01em] text-fg-soft group-open:text-fg hover:text-fg [&::-webkit-details-marker]:hidden">
                 <span>{item.q}</span>
@@ -458,7 +476,7 @@ export function FaqSection() {
   );
 }
 
-export function FinalCta({ demoLive }: { demoLive: boolean }) {
+export function FinalCta({ demo }: { demo: PublicDemoStatus }) {
   return (
     <section
       aria-labelledby="final-cta-title"
@@ -480,8 +498,9 @@ export function FinalCta({ demoLive }: { demoLive: boolean }) {
           Explore the equipment evidence workflow, or help us test it with a focused lender team.
         </p>
         <CtaRow className="mt-[34px]">
-          <PrimaryCtas demoLive={demoLive} />
+          <PrimaryCtas demo={demo} />
         </CtaRow>
+        {demo === "ui_mock" ? <p className="mt-[22px] text-[13.5px] text-fg-subtle">{UI_MOCK_DEMO_DISCLOSURE}</p> : null}
       </Container>
     </section>
   );

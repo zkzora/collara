@@ -13,6 +13,7 @@ export * from "./dto";
 export * from "./presenters";
 export * from "./copy";
 export * from "./capabilities";
+export * from "./evidence";
 export * from "./fixtures";
 export * from "./actor-ref";
 export * from "./overview";

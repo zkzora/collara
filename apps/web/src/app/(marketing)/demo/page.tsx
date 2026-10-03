@@ -1,9 +1,10 @@
 import { MODE_BANNERS } from "@collara/domain";
 import type { Metadata } from "next";
+import { UiMockDemo } from "@/components/marketing/demo-content";
 import { StatusChip } from "@/components/marketing/docs-ui";
 import { MarketingPage } from "@/components/marketing/marketing-page";
 import { ButtonLink, CtaRow } from "@/components/marketing/primitives";
-import { isPublicDemoLive } from "@/components/marketing/runtime";
+import { getPublicDemo } from "@/components/marketing/runtime";
 import { SimplePage } from "@/components/marketing/simple-page";
 
 export const metadata: Metadata = {
@@ -14,14 +15,17 @@ export const metadata: Metadata = {
 /**
  * /demo is never linked while the public demo gate is off (CR-03/CR-04); visiting it directly shows
  * the pre-build state with approved copy instead of a broken page. When the gate is on, demo
- * sessions start from /login.
+ * sessions start from /login: the in-browser UI mockup (ui_mock) or the LocalNet demo (localnet),
+ * each with its own disclosure.
  */
 export default async function DemoPage() {
-  const demoLive = await isPublicDemoLive();
+  const demo = await getPublicDemo();
   return (
     <MarketingPage current="demo">
       <SimplePage eyebrow="Demo" title="One case, CL-001, modelled end to end">
-        {demoLive ? (
+        {demo === "ui_mock" ? (
+          <UiMockDemo />
+        ) : demo === "localnet" ? (
           <>
             <p className="text-[13px] text-fg-subtle">{MODE_BANNERS.LOCALNET}</p>
             <p>The demo uses synthetic data on LocalNet. No funds are transferred.</p>

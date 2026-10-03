@@ -197,8 +197,11 @@ async function expectNoText(scope: Locator, patterns: readonly (string | RegExp)
 
 /** Uploads one synthetic file through the passport's Add evidence dialog (intent → bytes → finalize). */
 async function addEvidence(page: Page, assetRef: string, file: SyntheticFile, replaces?: string) {
-  const main = page.locator("main");
-  await main.getByRole("button", { name: "Add evidence" }).first().click();
+  // Act inside the passport's Evidence section once it has rendered: the Overview section has its own
+  // "Add evidence" button, and a global lookup can catch a button that is about to be replaced.
+  const evidenceSection = page.locator("main").getByRole("region", { name: "Evidence", exact: true });
+  await expect(evidenceSection).toBeVisible();
+  await evidenceSection.getByRole("button", { name: "Add evidence" }).click();
   const dialog = page.getByRole("alertdialog", { name: `Add evidence · ${assetRef}` });
   if (replaces) await dialog.getByLabel("Document", { exact: true }).selectOption({ label: replaces });
   else {

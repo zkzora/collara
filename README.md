@@ -2,26 +2,28 @@
 
 Collara is a private coordination workflow for equipment collateral (used CNC machinery) between borrowers, dealers, verifiers, lenders and auditors, built on Canton. A borrower registers an asset passport and evidence, a verifier attests it, the selected lender reviews it and issues a proposal, and an accepted proposal activates a pledge that locks the asset's single control token on the ledger until the designated lender releases it. The MVP is a reproducible local demo with **synthetic data only**. Cash settlement, real-money transfers, lien registration and ownership transfer are out of scope (ADR-0001). It is not production-ready.
 
-## Status (2026-10-02)
+## Status (2026-10-03)
 
-Every check named below ran on one authoring machine (Windows 11) with synthetic data; [`docs/verification.md`](docs/verification.md) has the commands and results. "LocalNet" here is a Canton 3.5.19 `dpm sandbox` with **one participant**, not Splice LocalNet; nothing is deployed to a Canton Network. Nothing here is a production-readiness or security claim.
+Every check named below ran on one authoring machine (Windows 11) or in GitHub Actions, with synthetic data; [`docs/verification.md`](docs/verification.md) has the commands and results. "LocalNet" here is a Canton 3.5.19 `dpm sandbox` with **one participant**, not Splice LocalNet; nothing is deployed to a Canton Network. Nothing here is a production-readiness or security claim. The same facts feed the public `/docs` page from one typed record, [`packages/domain/src/evidence.ts`](packages/domain/src/evidence.ts); change both together.
 
 | Area | Status |
 |---|---|
-| `UI_MOCK` (web only, in-browser synthetic fixtures) | Implemented. Playwright UI_MOCK suite passed on desktop and mobile viewports (59 passed; the skips are viewport guards and LOCALNET-only tests); the full CL-001 walkthrough runs on desktop. Actions are simulated in the browser; no ledger transaction is submitted. |
-| `LOCALNET` (web → API → Canton 3.5.19 sandbox, worker projections, PostgreSQL, SeaweedFS) | Implemented: every workflow endpoint runs on the sandbox. 49 LOCALNET integration tests passed at commit `c9337d3`; the 8-test adversarial sweep (44 id routes) passed with S3 storage. The last full run (57 tests, in-memory storage) passed 55: the 2 failures assert presigned S3 URLs, which in-memory storage cannot produce; the full re-run with S3 is pending free disk space. A Playwright LOCALNET walkthrough of CL-001 and the negative checks passed in the browser (desktop). 285 unit tests passed. |
-| Daml model | Implemented: 60 invariant, attack and privacy tests + 4 script tests on the IDE ledger. |
+| `UI_MOCK` (web only, in-browser synthetic fixtures) | Implemented. Playwright UI_MOCK suite green in CI on desktop and mobile viewports (run 37103384764: 70 passed; the skips are viewport guards and LOCALNET-only tests); the full CL-001 walkthrough runs on desktop. Actions are simulated in the browser; no ledger transaction is submitted. |
+| `LOCALNET` (web → API → Canton 3.5.19 sandbox, worker projections, PostgreSQL, SeaweedFS) | Implemented: every workflow endpoint runs on the sandbox. LocalNet integration tests **71/71** (12 files, S3 storage, 2026-10-03), including the adversarial sweep over 44 id routes. Browser: the clean-start walkthrough of CL-001 **14/14** (46 steps) and the main-seed walkthrough and negatives 2/2 (desktop). Runs only on the authoring machine. |
+| Unit tests | **381** passed (canton 50, domain 68, api-client 32, db 62, web 50, api 112, worker 7) in CI run 37103384764 on `d1af714` (2026-10-03). |
+| Daml model | Implemented: 60 invariant, attack and privacy tests + 4 script tests (also in CI). |
+| Ledger privacy (witness level) | Checked on **five participants** of one sandbox: 7/7 tests, 80/80 checks, in two runs (2026-10-03, [`docs/privacy-verification.md`](docs/privacy-verification.md)). One machine, one JVM, one operator: this is not isolation between independent operators. The LOCALNET demo itself runs on one participant. |
 | Governance Tier A (DLC-link DM v1.12.0 `GovernanceRules`, 2-of-3 seats, one local participant) | Implemented and tested on the sandbox. The governance party is an ordinary local party: its credential could act without the seat quorum. |
 | Verifier suspension | Default policy `REQUIRE_ACTIVE_VERIFIER` (`CollaraConfig.suspensionPolicy`): a suspended verifier cannot accept assignments or issue attestations (the ledger checks the governance-signed accreditation). Its issued attestations are not revoked, but `Control_Activate` requires the registrar's `VerifierStatusMirror` for that verifier to be `ACTIVE`, so they cannot back a new activation once the registrar has synced the mirror (it can lag the suspension). Existing locks are unaffected. |
-| Governance Tier B (Decentralization Manager nodes, decentralized party) | Exercised by scripts only (`scripts/tierb/`, `docs/governance-tier-b.md`): 3 × DM v1.12.0 + Canton OSS 3.5.19 with 3 participants in WSL, one operator. Governance checks passed; the API and UI do not use it. |
-| CI (GitHub Actions) | **Green** on `main` since 2026-10-03 (run 37102909305): typecheck, lint, unit tests, generated-docs check, build; Playwright UI_MOCK e2e; Daml build and tests (SDK 3.5.12). The LocalNet IT workflow is manual and has not been run on GitHub. |
+| Governance Tier B (Decentralization Manager nodes, decentralized party) | Scripted proof done: **10/10** governance checks (`scripts/tierb/`, [`docs/governance-tier-b.md`](docs/governance-tier-b.md)) with 3 × DM v1.12.0 + Canton OSS 3.5.19 with 3 participants in WSL, one operator. **Application integration not done:** the API and UI use Tier A. |
+| CI (GitHub Actions) | **Green** on `main` (latest: run 37103384764 on `d1af714`, 2026-10-03): typecheck, lint, unit tests, generated-docs check, build; Playwright UI_MOCK e2e; Daml build and tests (SDK 3.5.12). The LocalNet IT workflow is manual and has not been run on GitHub. |
 | Container images, Compose `app`/`canton` profiles, hosting | Written; **untested** (no Docker on the authoring machine). |
-| Public web deployment | The web app only, in **UI mockup** mode, on Vercel: https://collara-coral.vercel.app (auto-deployed from `main`). Synthetic data in the browser; no API, ledger, database or document storage is deployed, and `/api/*` answers `not_available_in_ui_mockup`. |
+| Public web deployment | The web app only, in **UI mockup** mode, on Vercel: https://collara-coral.vercel.app (auto-deployed from `main`). Synthetic data in the browser; no API, ledger, database or document storage is deployed, and `/api/*` answers `not_available_in_ui_mockup`. Its pilot form submits nothing. `PUBLIC_DEMO_STATUS=ui_mock` promotes the mockup as the public demo (see Configuration). |
 | Demo sessions | The API refuses to start with `DEMO_SESSIONS_ENABLED=true` under `NODE_ENV=production` unless `DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true`. |
-| In progress (not done) | Verifier scoped evidence assignment; Create Case UI, overview per-currency totals and input contrast; persisted internal and release notes. |
-| Legal pages (BPD-1), INFERRED copy | Pending. The public deployment is a UI mockup whose pilot form submits nothing; any deployment that collects real data stays blocked until they are resolved. |
+| Not done | Dealer consent UI; case-linked verification requests in the UI; Tier B in the API/UI; a hosted LOCALNET stack. |
+| Legal pages (BPD-1), INFERRED copy | Pending. Any deployment that collects real data, including a working pilot form, stays blocked until they are resolved. |
 
-**Not verified:** independent operators (the five-participant privacy run and Tier B ran on one machine, one operator — see [`docs/privacy-verification.md`](docs/privacy-verification.md)), Tier B governance in the API/UI (only scripted), Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
+**Not verified:** independent operators (the five-participant privacy run and Tier B ran on one machine, one operator), Tier B governance in the API/UI (only scripted), Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
 
 Evidence: [`docs/verification.md`](docs/verification.md) (what was run and observed) and [`docs/PROGRESS.md`](docs/PROGRESS.md). Commits cited in older notes (`e320c59`, `5ca4faa`, `8384a2b`, `3a3dd85`) are the same trees as `c9337d3`, `ea4ebf2`, `bbd1548` and `25265d0` on `main`, before a history rewrite.
 
@@ -38,6 +40,8 @@ Evidence: [`docs/verification.md`](docs/verification.md) (what was run and obser
 | [`docs/permissions.md`](docs/permissions.md) | Permission matrix, authority chain, field-level disclosure (generated from `@collara/domain`) |
 | [`docs/api.md`](docs/api.md) | OpenAPI, authentication, CSRF, idempotency, error shape |
 | [`docs/verification.md`](docs/verification.md) | What was run, observed results, and what was not verified |
+| [`docs/privacy-verification.md`](docs/privacy-verification.md) | Witness-level ledger privacy on five participants: method, results, limits |
+| [`docs/governance-tier-b.md`](docs/governance-tier-b.md) | Tier B governance (DM nodes, decentralized party): scripted run, thresholds, what is not integrated |
 | [`docs/governance.md`](docs/governance.md) | Tier A governance, thresholds, Tier B and what a real deployment needs |
 | [`docs/limitations.md`](docs/limitations.md) | What Collara does not do or prove |
 | [`infra/deploy/README.md`](infra/deploy/README.md) | Deployment proposal and requirements (untested) |
@@ -120,6 +124,8 @@ pnpm --filter @collara/web test:e2e
 ## Configuration
 
 Run `pnpm env:init` to create `.env` at the root for the API, worker and infrastructure scripts (it copies `.env.example` and fills the empty dev-only secrets; if you copy it by hand, fill those secrets: the API does not start while `COLLARA_S3_ENDPOINT` is set without `COLLARA_S3_SECRET_KEY`). For the web app, copy `infra/env/web.env.example` to `apps/web/.env.local`. The web app reads `API_INTERNAL_ORIGIN` (default `http://127.0.0.1:4000`) at request time, so one build works against any API origin. `COLLARA_MODE` is `UI_MOCK` (default) or `LOCALNET`.
+
+`PUBLIC_DEMO_STATUS` (read per request) decides whether the public site promotes a demo: `off` (default; pre-demo copy, `/demo` linked nowhere), `ui_mock` (the in-browser UI mockup, honoured only with `COLLARA_MODE=UI_MOCK`, with a disclosure that it has no ledger connection) or `localnet` (honoured only with `COLLARA_MODE=LOCALNET`). Any other combination resolves to `off`. When running `marketing.spec.ts` against a server, give Playwright the same `PUBLIC_DEMO_STATUS`.
 
 Ports: web 3000, API 4000, worker health 4100.
 

@@ -1,8 +1,9 @@
 // Capability status for /docs (capability table + legend), Settings › integrations and Governance.
 // One typed config (synthesis §1.1, CR-45). An item flips to IMPLEMENTED only after verification
-// against the running system. Values below follow what was actually run on the authoring machine
-// (docs/verification.md, 2026-10-02): a Canton 3.5.19 `dpm sandbox` with one participant, synthetic data.
+// against the running system. Counts and scopes in the "Where" texts come from EVIDENCE (./evidence),
+// the record of what was actually run; synthetic data only.
 import { z } from "zod";
+import { EVIDENCE, passCount } from "./evidence";
 import type { BadgeTone } from "./states";
 
 export const CAPABILITY_STATUSES = ["UI_MOCKUP", "SPECIFIED", "PLANNED", "IMPLEMENTED", "NOT_AVAILABLE"] as const;
@@ -50,29 +51,34 @@ export const CAPABILITIES: readonly Capability[] = [
     id: "workspace",
     label:
       "Lender workspace: overview, case queue, case workspace, asset passport, collateral review, pledge and release, audit center",
-    // Two modes: LOCALNET (real ledger commands) and UI_MOCK (browser-local simulation).
+    // Two modes: LOCALNET (real ledger commands, local machine only) and UI_MOCK (browser-local simulation, the mode
+    // of the public web deployment).
     statuses: ["IMPLEMENTED", "UI_MOCKUP"],
-    where: { text: "LocalNet and UI mockup modes · ", link: { label: "Workspace", href: "/app" } },
+    where: { text: "LocalNet mode runs locally only; UI mockup mode is deployed · ", link: { label: "Workspace", href: "/app" } },
   },
   {
     id: "daml-model",
     label: "Daml contract model: passport, evidence package, verification, assessment, proposal, pledge control",
     statuses: ["IMPLEMENTED"],
-    where: { text: "60 Daml Script tests · ", link: { label: "Workflow", href: "#workflow" } },
+    where: { text: `${EVIDENCE.damlTests.passed} Daml Script tests · `, link: { label: "Workflow", href: "#workflow" } },
   },
   {
     id: "roles",
     label: "Roles, mandates, and scoped disclosure",
-    // Mandates are enforced by the API (off-ledger); ledger-level isolation across participants is untested.
+    // Mandates are enforced by the API (off-ledger) and tested on one participant. Ledger witness privacy was checked
+    // on five participants of one sandbox, all run by one operator; independent operators are untested.
     statuses: ["IMPLEMENTED"],
-    where: { text: "Tested on one participant only · ", link: { label: "Roles & permissions", href: "#roles" } },
+    where: {
+      text: `API tests on one participant; ledger privacy on ${EVIDENCE.privacy.participants} participants, one operator · `,
+      link: { label: "Roles & permissions", href: "#roles" },
+    },
   },
   {
     id: "localnet-demo",
     label: "LocalNet demo with access-denial and authorization tests",
     statuses: ["IMPLEMENTED"],
     where: {
-      text: "Canton 3.5.19 sandbox, one participant, not Splice LocalNet · ",
+      text: `Canton 3.5.19 sandbox, one participant, not Splice LocalNet; ${passCount(EVIDENCE.localnetIntegration)} integration tests · `,
       link: { label: "Synthetic demo scenario", href: "#demo" },
     },
   },
@@ -82,14 +88,17 @@ export const CAPABILITIES: readonly Capability[] = [
     // Tier A implemented (one local participant). Tier B (DM nodes, decentralized party) is exercised by scripts/tierb on a
     // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here.
     statuses: ["IMPLEMENTED", "PLANNED"],
-    where: { text: "Tier A on one participant; Tier B planned · ", link: { label: "BitSafe governance", href: "#governance" } },
+    where: {
+      text: `Tier A on one participant; Tier B scripted (${passCount(EVIDENCE.tierB.scriptedChecks)} checks), not in the app · `,
+      link: { label: "BitSafe governance", href: "#governance" },
+    },
   },
   {
     // statuses[0] also feeds GovernanceState.integration.capability (presenters.ts).
     id: "dm-integration",
     label: "Decentralization Manager integration",
     statuses: ["PLANNED"],
-    where: { text: "DM governance contracts used in Tier A; DM nodes not connected" },
+    where: { text: "DM governance contracts used in Tier A; DM nodes run only in the scripted Tier B check, not connected to the app" },
   },
   {
     id: "setup",
