@@ -1,0 +1,130 @@
+# Collara governance Tier B with Docker Compose: Canton open-source 3.5.19 (1 sequencer, 1 mediator, 3 participants
+# in one JVM) + three DLC-link Decentralization Manager v1.12.0 nodes.
+#
+# UNTESTED. NOTHING IN THIS FILE HAS BEEN RUN: the authoring machine has no Docker. The verified Tier B path is the
+# WSL one (infra/tierb/install.sh + ctl.sh, driven by scripts/tierb/*.mjs; docs/governance-tier-b.md). This file
+# mirrors that path (same Canton config, same DM environment, same ports) so the same Node scripts can drive it.
+# What remains unverified is listed in docs/submission/bitsafe-contribution-pool.md §6.
+#
+# DEV ONLY: unsafe HMAC ledger auth, DM `--insecure` (DECPM_INSECURE=true), in-memory Canton, preview commands on.
+# One operator runs every node: this shows the mechanism, not independent operators. Synthetic data only.
+#
+# Linux host with Docker Engine + Compose v2, amd64 (the DM image is amd64 only). `network_mode: host` is used so
+# that every service binds 127.0.0.1 exactly as in the WSL setup; Docker Desktop on macOS/Windows handles host
+# networking differently and is not a target of this draft.
+#
+# Do not call `docker compose` on this file directly; use the wrapper, which the Node scripts call through
+# infra/tierb/ctl.sh when TIERB_BACKEND=compose:
+#   TIERB_BACKEND=compose pnpm tierb:up        # fetch + verify Canton tarball, start canton, then dm-p1..dm-p3
+#   TIERB_BACKEND=compose pnpm tierb:onboard   # … scenario, topology, signing, summary, status, down
+# COLLARA_REPO (the absolute repo path) is set by infra/tierb/compose-ctl.sh; the repo is mounted at the same path
+# inside the containers so the scripts' absolute paths (Canton console scripts) resolve unchanged.
+name: collara-tierb
+
+x-dm: &dm
+  # Pinned by index digest (the same digest infra/tierb/install.sh verifies for the WSL path).
+  image: public.ecr.aws/dlc-link/decentralization-manager:v1.12.0@sha256:54ec6ce6783d7bc32f765f40e541b9584d32dd737a12434c8f426df381d7039d
+  platform: linux/amd64
+  network_mode: host
+  # The binary's path in the image (research-dm.md: the image's last layer holds /usr/local/bin/dec-party-manager).
+  # ASSUMPTION: the image's default entrypoint/user were not inspected; this overrides the entrypoint explicitly.
+  entrypoint: ["/usr/local/bin/dec-party-manager"]
+  command: ["-d", "/data", "serve"]
+  # ASSUMPTION: the image's user can write /data on a fresh named volume (not checked; the image also has a
+  # `-nonroot` variant, research-dm.md). The volume keeps DM's SQLite + Noise key across `restart` (DM loads peer
+  # keys only at startup); compose-ctl.sh `up` removes it, as ctl.sh `up` wipes the DM data dirs.
+  # dec-party-manager ignores SIGTERM (observed in WSL); do not wait long before SIGKILL.
+  stop_grace_period: 3s
+  restart: "no"
+  depends_on:
+    canton:
+      condition: service_healthy
+
+x-dm-env: &dm-env
+  RUST_LOG: dec_party_manager=info,tokio_noise=error,hyper_noise=error
+  DECPM_HOST: 127.0.0.1
+  DECPM_LISTEN_ADDRESS: 127.0.0.1
+  DECPM_PUBLIC_ADDRESS: 127.0.0.1
+  DECPM_CANTON_ADMIN_HOST: 127.0.0.1
+  DECPM_CANTON_LEDGER_HOST: 127.0.0.1
+  DECPM_CANTON_SYNCHRONIZER: global
+  DECPM_CANTON_NETWORK: devnet
+  DECPM_CANTON_HMAC_SECRET: ${TIERB_HMAC_SECRET:-collara-tierb-dev-secret}
+  DECPM_CANTON_HMAC_AUDIENCE: ${TIERB_HMAC_AUDIENCE:-https://collara.local/tierb-ledger-api}
+  DECPM_CANTON_HMAC_SUBJECT: ledger-api-user
+  DECPM_INSECURE: "true"
+  DECPM_LOG_FORMAT: text
+  DECPM_TOPOLOGY_PROPAGATION_DELAY_SECS: "3"
+  DECPM_PEER_WAIT_POLL_DELAY_MS: "500"
+  DECPM_REWARD_AUTOMATION_INTERVAL_SECS: "3600"
+
+services:
+  canton:
+    # Tag only, NOT digest-pinned (no registry access was used to resolve it). Pin a digest before relying on it.
+    image: eclipse-temurin:21-jre
+    network_mode: host
+    working_dir: /work
+    environment:
+      TIERB_HMAC_SECRET: ${TIERB_HMAC_SECRET:-collara-tierb-dev-secret}
+      TIERB_HMAC_AUDIENCE: ${TIERB_HMAC_AUDIENCE:-https://collara.local/tierb-ledger-api}
+      TIERB_PORTS_FILE: /work/canton-ports.json
+    volumes:
+      - ${COLLARA_REPO:?set by infra/tierb/compose-ctl.sh}:${COLLARA_REPO}:ro
+      # Extracted, sha256-verified Canton 3.5.19 tarball (compose-ctl.sh fetch-canton).
+      - ${COLLARA_REPO}/.local/tierb/canton:/opt/canton:ro
+      - ${COLLARA_REPO}/.local/tierb/compose-run:/work
+    # stdout is also written to /work/canton.out so the health check can wait for bootstrap.canton's TIERB_READY.
+    entrypoint: ["bash", "-c"]
+    command:
+      - >-
+        rm -f /work/canton.out /work/canton-ports.json;
+        exec java -Xmx${TIERB_CANTON_HEAP:-2g} -XX:+UseG1GC -Dfile.encoding=UTF-8 -Djava.net.preferIPv4Stack=true
+        -jar /opt/canton/canton-open-source-3.5.19/lib/canton-open-source-3.5.19.jar daemon
+        -c ${COLLARA_REPO}/infra/tierb/canton/tierb.conf
+        --bootstrap ${COLLARA_REPO}/infra/tierb/canton/bootstrap.canton
+        --log-file-name /work/canton.log --log-level-canton=INFO
+        > >(tee /work/canton.out) 2>&1
+    healthcheck:
+      test: ["CMD", "grep", "-q", "TIERB_READY", "/work/canton.out"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  dm-p1:
+    <<: *dm
+    volumes: ["dm-p1-data:/data"]
+    environment:
+      <<: *dm-env
+      DECPM_PORT: "8081"
+      DECPM_NOISE_PORT: "9001"
+      DECPM_METRICS_PORT: "9464"
+      DECPM_CANTON_ADMIN_PORT: "5002"
+      DECPM_CANTON_LEDGER_PORT: "5001"
+
+  dm-p2:
+    <<: *dm
+    volumes: ["dm-p2-data:/data"]
+    environment:
+      <<: *dm-env
+      DECPM_PORT: "8082"
+      DECPM_NOISE_PORT: "9002"
+      DECPM_METRICS_PORT: "9465"
+      DECPM_CANTON_ADMIN_PORT: "5012"
+      DECPM_CANTON_LEDGER_PORT: "5011"
+
+  dm-p3:
+    <<: *dm
+    volumes: ["dm-p3-data:/data"]
+    environment:
+      <<: *dm-env
+      DECPM_PORT: "8083"
+      DECPM_NOISE_PORT: "9003"
+      DECPM_METRICS_PORT: "9466"
+      DECPM_CANTON_ADMIN_PORT: "5022"
+      DECPM_CANTON_LEDGER_PORT: "5021"
+
+volumes:
+  dm-p1-data:
+  dm-p2-data:
+  dm-p3-data:

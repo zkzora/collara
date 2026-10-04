@@ -123,7 +123,8 @@ const RUN = [
   `LocalNet integration tests through the API on the sandbox with one participant: ${passCount(E.localnetIntegration)} in ${E.localnetIntegration.files} files, including an adversarial sweep over ${E.localnetIntegration.adversarialRoutes} routes, before the contract change that closed the revocation race; after it, the activation tests pass ${passCount(E.localnetIntegration.afterContracts020.activationSuites)} and the full suite has not yet been re-run with document storage`,
   `A LocalNet browser walkthrough of CL-001 from a clean start: ${passCount(E.cleanStartBrowser)} tests`,
   `Witness-level privacy on ${E.privacy.participants} participants: ${passCount(E.privacy.tests)} tests and ${passCount(E.privacy.checks)} checks, in ${E.privacy.runs} runs. All participants ran on one machine under one operator, so this does not show isolation between independent operators.`,
-  `Tier B governance with ${E.tierB.nodes} Decentralization Manager nodes and a decentralized governance party, run by scripts on a separate local topology under one operator: ${passCount(E.tierB.scriptedChecks)} checks. The workspace does not use it.`,
+  `Tier A governance (Decentralization Manager governance contracts, ${E.governance.tierA.localnet.threshold.required} of ${E.governance.tierA.localnet.threshold.of} seats, no decentralized party) on the sandbox with one participant: ${passCount(E.governance.tierA.localnet.integrationTests)} integration tests. The workspace uses it.`,
+  `Tier B governance with ${E.governance.tierB.localnet.nodes} Decentralization Manager nodes and a decentralized governance party, run by scripts on a separate local topology under one operator: ${passCount(E.governance.tierB.localnet.scriptedChecks)} checks. The workspace does not use it.`,
   `${E.unitTests.total} unit tests (commit ${E.unitTests.commit})`,
   `CI on GitHub Actions passed (run ${E.ci.runId}, commit ${E.ci.commit}): typecheck, lint, unit tests and build; Playwright in UI mockup mode (${E.ci.playwrightUiMock.passed} passed); the Daml build and tests`,
 ] as const;
@@ -133,7 +134,8 @@ const RUN_DATES = [
   E.localnetIntegration.date,
   E.cleanStartBrowser.date,
   E.privacy.date,
-  E.tierB.date,
+  E.governance.tierA.localnet.date,
+  E.governance.tierB.localnet.date,
   E.unitTests.date,
   E.ci.date,
 ].sort();
@@ -142,6 +144,7 @@ const RUN_PERIOD = RUN_DATES[0] === RUN_DATES.at(-1) ? RUN_DATES[0] : `${RUN_DAT
 const DEPLOYMENT = [
   `Deployed: the web app in UI mockup mode, on ${E.deployment.web.host} (${E.deployment.web.date}). It holds synthetic data in the browser only.`,
   "Not deployed: the API, the worker, PostgreSQL, document storage and the Canton ledger. Nothing is deployed to a Canton Network.",
+  `Canton DevNet: ${E.devnet.status}. Governance there would be Tier A only (${E.governance.tierA.devnet.status}); Tier B on DevNet: ${E.governance.tierB.devnet.status}.`,
 ] as const;
 
 const NOT_VERIFIED = [
@@ -670,8 +673,10 @@ export function GovernanceSection({ now }: { now: Date }) {
         Tier A is implemented: Decentralization Manager governance contracts with three seats and a 2-of-3 threshold, on
         one local participant run by one operator, so it does not yet meet that aim. Tier B, a decentralized governance
         party on Decentralization Manager nodes, has been exercised only by scripts on a separate local three-node
-        topology run by one operator ({passCount(EVIDENCE.tierB.scriptedChecks)} checks passed); the workspace does not
-        use it. In UI mockup mode, the workspace simulates governance in the browser.
+        topology run by one operator ({passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks passed); the
+        workspace does not use it. Neither tier has run on Canton DevNet: there, governance would be Tier A only, and
+        Tier B was not attempted because the shared DevNet participant cannot host decentralized parties. In UI mockup
+        mode, the workspace simulates governance in the browser.
       </DocsLead>
       <Callout tone="info">{BOUNDARY_COPY.GOVERNANCE_SCOPE}</Callout>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] items-start gap-3.5">

@@ -86,10 +86,11 @@ export const CAPABILITIES: readonly Capability[] = [
     id: "governance",
     label: "BitSafe governance for the verifier registry",
     // Tier A implemented (one local participant). Tier B (DM nodes, decentralized party) is exercised by scripts/tierb on a
-    // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here.
+    // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here. Neither
+    // tier has run on DevNet, and Tier B cannot run on the shared DevNet participant (EVIDENCE.governance).
     statuses: ["IMPLEMENTED", "PLANNED"],
     where: {
-      text: `Tier A on one participant; Tier B scripted (${passCount(EVIDENCE.tierB.scriptedChecks)} checks), not in the app · `,
+      text: `Tier A on one local participant; Tier B scripted on a local topology with one operator (${passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks), not in the app; neither tier on DevNet · `,
       link: { label: "BitSafe governance", href: "#governance" },
     },
   },

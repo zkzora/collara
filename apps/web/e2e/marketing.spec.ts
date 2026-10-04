@@ -258,7 +258,9 @@ test.describe("docs", () => {
       passCount(EVIDENCE.localnetIntegration),
       passCount(EVIDENCE.cleanStartBrowser),
       `${passCount(EVIDENCE.privacy.checks)} checks`,
-      `${passCount(EVIDENCE.tierB.scriptedChecks)} checks`,
+      `${passCount(EVIDENCE.governance.tierA.localnet.integrationTests)} integration tests`,
+      `${passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks`,
+      `Canton DevNet: ${EVIDENCE.devnet.status}`,
     ];
     for (const fact of facts) {
       await expect(overview).toContainText(fact);
@@ -278,6 +280,8 @@ test.describe("docs", () => {
     // Governance: Tier A only, with the suspension policy stated precisely.
     const governance = page.locator("section#governance");
     await expect(governance).toContainText("Tier B integration planned");
+    // Governance evidence is split by tier and network: nothing may read as decentralized governance on DevNet.
+    await expect(governance).toContainText("Neither tier has run on Canton DevNet");
     await expect(governance).not.toContainText("Tier B planned");
     await expect(governance).toContainText("REQUIRE_ACTIVE_VERIFIER");
     await expect(governance).not.toContainText("attestations already issued remain valid");

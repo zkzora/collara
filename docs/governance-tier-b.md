@@ -8,6 +8,10 @@ Integration label for this topology (synthesis §1.1; INFERRED copy, pending app
 
 Evidence: [`docs/evidence/tierb-summary.json`](evidence/tierb-summary.json). Full DM responses and ledger receipts are in `.local/tierb/receipts/` (git-ignored).
 
+**Where this ran, and where it did not.** This document is `EVIDENCE.governance.tierB.localnet` in [`packages/domain/src/evidence.ts`](../packages/domain/src/evidence.ts): local WSL only. **Tier B has not run on Canton DevNet and was not attempted there** (`tierB.devnet`): the shared HackCanton DevNet participant is not set up to host teams' Decentralized Parties ([hackcanton-submission.md](hackcanton-submission.md)). The planned DevNet bootstrap would create **Tier A** governance only (`tierA.devnet`, not run yet; [devnet-evidence.md](devnet-evidence.md)).
+
+**Contract version.** The run used `collara-contracts` **0.1.0** (package `66efe1ca…`, `onboarding.darsVetted` in the summary). The repository has since moved to `collara-contracts` **0.2.0** (package `1c0e5e62…`, [devnet/upload-manifest.md](devnet/upload-manifest.md)), and `scripts/tierb/onboard.mjs` now distributes the 0.2.0 DAR. **Tier B was not re-run with 0.2.0.**
+
 ## 1. Topology
 
 ```
@@ -42,7 +46,7 @@ Parties:
 | Java (WSL) | OpenJDK **21.0.12.1** (`openjdk-21-jre-headless` 21.0.12.1+1-1~24.04.4, apt) | |
 | DM | `public.ecr.aws/dlc-link/decentralization-manager:v1.12.0@sha256:54ec6ce6783d7bc32f765f40e541b9584d32dd737a12434c8f426df381d7039d` | The installer checks the image index digest, the linux/amd64 manifest `sha256:563f1ae14b0d779270813dffee4bcc23c8a899ef4546a75a131d4047629eb030` and the binary layer `sha256:4f06a12e7e9663f30b8472fcdf77a504064e9606b777e6502c186d23bc024e6b`. Pulled anonymously with `curl`; no Docker. The extracted binary's sha256 is `971f9e51b003682a8dddef603e32df7c9926897db9133c08f197cb1f401329c7`, and `ldd` finds every library on Ubuntu 24.04. |
 | DM governance DARs | `governance-action-v1` `48acd500…`, `governance-core-v1` `361d1f28…` | The same vendored files as Tier A (`daml/collara/vendor-dars/SHA256SUMS`). |
-| Collara DARs | `collara-governance` `16cb6e82…`, `collara-contracts` `66efe1ca…` | Built by `dpm build --all` (`daml/collara/*/.daml/dist/`). |
+| Collara DARs | `collara-governance` `16cb6e82…`, `collara-contracts` `66efe1ca…` (0.1.0, before the 0.2.0 change) | Built by `dpm build --all` (`daml/collara/*/.daml/dist/`). Not re-run with `collara-contracts` 0.2.0. |
 
 Vetted on all three participants after `/dars/distribute`: `governance-action-v1`, `governance-core-v1`, `collara-governance`, `collara-contracts` (`onboarding.darsVetted` in the summary).
 
@@ -175,6 +179,9 @@ Tier A pledge activation avoids this coupling by reading the registrar's `Verifi
 - **Persistence.** Canton runs in memory; `down` discards the topology. Restarts with existing state were not tried.
 - **Canton 3.5.8** (DM's CI target). It was not needed, because 3.5.19 worked.
 - **Collara API, worker and UI on Tier B** (§9).
+- **`collara-contracts` 0.2.0 on Tier B.** The recorded run used 0.1.0; the scripts now point at 0.2.0 and have not been run with it.
+- **Any network other than this local one.** Tier B was not attempted on DevNet (the shared participant cannot host Decentralized Parties) or anywhere else.
+- **Docker / Docker Compose.** The run used WSL processes, no containers. A Compose path is drafted in [`infra/tierb/compose.yaml`](../infra/tierb/compose.yaml) and is **untested** ([submission/bitsafe-contribution-pool.md](submission/bitsafe-contribution-pool.md) §6).
 - **Mediator and participant timeouts.** Canton defaults were used. The about 30 s failure time is a consequence of those defaults, not a tuned value.
 
 ## 7. Resource use and cleanup

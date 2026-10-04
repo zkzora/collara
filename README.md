@@ -13,19 +13,36 @@ Every check named below ran on one authoring machine (Windows 11) or in GitHub A
 | Unit tests | **410** passed (canton 50, domain 72, api-client 32, db 66, web 55, api 128, worker 7; api also skips 4 opt-in PostgreSQL concurrency tests) in CI run 37108297524 on `4eff547` (2026-10-03). |
 | Daml model | Implemented (`collara-contracts` 0.2.0): 68 invariant, attack, privacy and revocation tests + 4 script tests (also in CI). Activation depends on a live disclosure, so a revocation committed first makes the ledger reject it. |
 | Ledger privacy (witness level) | Checked on **five participants** of one sandbox: 8/8 tests, 87/87 checks, in two runs with contracts 0.2.0 (2026-10-03, [`docs/privacy-verification.md`](docs/privacy-verification.md)). One machine, one JVM, one operator: this is not isolation between independent operators. The LOCALNET demo itself runs on one participant. |
-| Governance Tier A (DLC-link DM v1.12.0 `GovernanceRules`, 2-of-3 seats, one local participant) | Implemented and tested on the sandbox. The governance party is an ordinary local party: its credential could act without the seat quorum. |
+| Governance Tier A on LocalNet (`EVIDENCE.governance.tierA.localnet`: DLC-link DM v1.12.0 `GovernanceRules`, 2-of-3 seats, one local participant) | **Done.** Implemented and tested on the sandbox (LocalNet integration tests 10/10, part of the 71/71 run); the API and UI use it. The governance party is an ordinary local party: its credential could act without the seat quorum. |
 | Verifier suspension | Default policy `REQUIRE_ACTIVE_VERIFIER` (`CollaraConfig.suspensionPolicy`): a suspended verifier cannot accept assignments or issue attestations (the ledger checks the governance-signed accreditation). Its issued attestations are not revoked, but `Control_Activate` requires the registrar's `VerifierStatusMirror` for that verifier to be `ACTIVE`, so they cannot back a new activation once the registrar has synced the mirror (it can lag the suspension). Existing locks are unaffected. |
-| Governance Tier B (Decentralization Manager nodes, decentralized party) | Scripted proof done: **10/10** governance checks (`scripts/tierb/`, [`docs/governance-tier-b.md`](docs/governance-tier-b.md)) with 3 × DM v1.12.0 + Canton OSS 3.5.19 with 3 participants in WSL, one operator. **Application integration not done:** the API and UI use Tier A. |
+| Governance Tier B on LocalNet (`EVIDENCE.governance.tierB.localnet`: Decentralization Manager nodes, decentralized party) | **Scripted, one operator, not in the app:** **10/10** governance checks (`scripts/tierb/`, [`docs/governance-tier-b.md`](docs/governance-tier-b.md)) with 3 × DM v1.12.0 + Canton OSS 3.5.19 with 3 participants in WSL; every node run by one operator (not independent). The API and UI use Tier A. Ran with `collara-contracts` 0.1.0; not re-run with 0.2.0. |
+| Governance on DevNet (`EVIDENCE.governance.tierA.devnet`, `tierB.devnet`) | **Tier A: not run** (the DevNet bootstrap B2–B6 would create Tier A `GovernanceRules` and the governed verifier registry on the shared NODERS participant). **Tier B: not attempted** — the shared DevNet participant cannot host teams' Decentralized Parties. Nothing in this repository is decentralized governance on DevNet. |
+| Canton DevNet (shared NODERS participant) | `COLLARA_MODE=DEVNET` code ready; **not yet run on DevNet** (only unauthenticated public GETs: [`docs/devnet-evidence.md`](docs/devnet-evidence.md), [`docs/devnet.md`](docs/devnet.md)). |
 | CI (GitHub Actions) | **Green** on `main` (latest: run 37103384764 on `d1af714`, 2026-10-03): typecheck, lint, unit tests, generated-docs check, build; Playwright UI_MOCK e2e; Daml build and tests (SDK 3.5.12). The LocalNet IT workflow is manual and has not been run on GitHub. |
-| Container images, Compose `app`/`canton` profiles, hosting | Written; **untested** (no Docker on the authoring machine). |
+| Container images, Compose `app`/`canton` profiles, the Tier B Compose draft (`infra/tierb/compose.yaml`), hosting | Written; **untested** (no Docker on the authoring machine). |
 | Public web deployment | The web app only, in **UI mockup** mode, on Vercel: https://collara-coral.vercel.app (auto-deployed from `main`). Synthetic data in the browser; no API, ledger, database or document storage is deployed, and `/api/*` answers `not_available_in_ui_mockup`. Its pilot form submits nothing. `PUBLIC_DEMO_STATUS=ui_mock` promotes the mockup as the public demo (see Configuration). |
 | Demo sessions | The API refuses to start with `DEMO_SESSIONS_ENABLED=true` under `NODE_ENV=production` unless `DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true`. |
-| Not done | Dealer consent UI; case-linked verification requests in the UI; Tier B in the API/UI; a hosted LOCALNET stack. |
+| Not done | Tier B in the API/UI; any run on DevNet; a hosted LOCALNET stack. |
 | Legal pages (BPD-1), INFERRED copy | Pending. Any deployment that collects real data, including a working pilot form, stays blocked until they are resolved. |
 
 **Not verified:** independent operators (the five-participant privacy run and Tier B ran on one machine, one operator), Tier B governance in the API/UI (only scripted), Docker/Compose, Keycloak OIDC through a browser, Secure cookies over HTTPS, JWKS ledger auth for a real participant, persistence across sandbox restarts (the sandbox keeps state in memory).
 
 Evidence: [`docs/verification.md`](docs/verification.md) (what was run and observed) and [`docs/PROGRESS.md`](docs/PROGRESS.md). Commits cited in older notes (`e320c59`, `5ca4faa`, `8384a2b`, `3a3dd85`) are the same trees as `c9337d3`, `ea4ebf2`, `bbd1548` and `25265d0` on `main`, before a history rewrite.
+
+## HackCanton submission
+
+HackCanton Season 3, track "Real-World Assets (RWA) & Business Workflows", deadline 2026-10-09 23:59 UTC. The rules and what they mean for Collara are in [`docs/hackcanton-submission.md`](docs/hackcanton-submission.md). These are drafts; text outside approved copy is INFERRED and pending approval.
+
+| Document | Contents |
+|---|---|
+| [`docs/submission/project-page.md`](docs/submission/project-page.md) | Platform text: problem, solution, how Canton is used, what is real vs mockup vs not done, links |
+| [`docs/submission/pitch.md`](docs/submission/pitch.md) | Deck outline; validation evidence (interviews, metrics) is listed as a gap, not invented |
+| [`docs/submission/demo-script.md`](docs/submission/demo-script.md) | Video script with timestamps: DevNet (only after a real DevNet run), LocalNet fallback, UI-mockup last resort |
+| [`docs/submission/checklist.md`](docs/submission/checklist.md) | Mandatory items with status and owner, including a private-window link check |
+| [`docs/submission/ai-disclosure.md`](docs/submission/ai-disclosure.md) | AI-assisted tooling statement (draft for the team to edit) |
+| [`docs/submission/bitsafe-contribution-pool.md`](docs/submission/bitsafe-contribution-pool.md) | BitSafe Contribution Pool entry: DM `GovernableAction` modules + the Tier B LocalNet demo, evidence map, reproduction (WSL tested; Docker Compose draft untested) |
+
+**Public repository: pending the owner's decision.** The rules require a public repository with all code and this README; `zkzora/collara` is private as of 2026-10-04. Until it is public, the repository counts as missing for judging.
 
 ## Documentation
 

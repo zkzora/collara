@@ -12,6 +12,9 @@
 # Everything runs as root under $TIERB_RUNTIME (default /opt/collara-tierb) and binds 127.0.0.1 only.
 set -euo pipefail
 
+# UNTESTED alternative backend: Docker Compose (infra/tierb/compose.yaml). Off unless TIERB_BACKEND=compose.
+if [ "${TIERB_BACKEND:-}" = "compose" ]; then exec bash "$(dirname "${BASH_SOURCE[0]}")/compose-ctl.sh" "$@"; fi
+
 RUNTIME="${TIERB_RUNTIME:-/opt/collara-tierb}"
 REPO_WSL="${REPO_WSL:?REPO_WSL must be set}"
 CANTON_VERSION="${CANTON_VERSION:-3.5.19}"

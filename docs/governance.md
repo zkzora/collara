@@ -1,6 +1,17 @@
 # Governance (verifier registry)
 
-Status, 2026-10-03: **Tier A is implemented and tested on a local Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet); the Collara API and UI use it. Tier B (three Decentralization Manager nodes and a decentralized governance party on a separate local 3-participant Canton in WSL, one operator) now runs through scripts and its governance checks pass, but it is not wired into the API: see [governance-tier-b.md](governance-tier-b.md).** Everything here uses synthetic organizations and one local operator. Tier A uses DLC-link Decentralization Manager v1.12.0 `GovernanceRules` contracts with 2-of-3 seats, but the governance party is an ordinary local party: whoever holds its credential could act without the seat quorum (§4). Nothing here is a production-readiness or security claim.
+Status, 2026-10-04: **Tier A is implemented and tested on a local Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet); the Collara API and UI use it. Tier B (three Decentralization Manager nodes and a decentralized governance party on a separate local 3-participant Canton in WSL, one operator) runs through scripts and its governance checks pass, but it is not wired into the API: see [governance-tier-b.md](governance-tier-b.md). Neither tier has run on Canton DevNet.** Everything here uses synthetic organizations and one local operator. Tier A uses DLC-link Decentralization Manager v1.12.0 `GovernanceRules` contracts with 2-of-3 seats, but the governance party is an ordinary local party: whoever holds its credential could act without the seat quorum (§4). Nothing here is a production-readiness or security claim.
+
+## Evidence by tier and network
+
+Four separate records in [`packages/domain/src/evidence.ts`](../packages/domain/src/evidence.ts) (`EVIDENCE.governance`), which also feed `/docs` and the README. Nothing here is decentralized governance on DevNet.
+
+| Record (`EVIDENCE.governance.…`) | Status | What exists |
+|---|---|---|
+| `tierA.localnet` | **Done**, 2026-10-03 | DM v1.12.0 `GovernanceRules`, 2 of 3 seats, on the Canton 3.5.19 `dpm sandbox` with **one participant, one operator**; ordinary (not decentralized) governance party. LocalNet integration tests 10/10 (`governance.it.test.ts`, part of the 71/71 run). Used by the API and UI. |
+| `tierA.devnet` | **Not run** | The DevNet bootstrap (B2–B6: `GovernanceRules`, genesis registry proposal, two confirmations, execute) would create Tier A governance and the governed verifier registry on the shared NODERS participant, as ordinary parties of one tenant ledger user. Nothing has been submitted ([devnet-evidence.md](devnet-evidence.md)). |
+| `tierB.localnet` | **Scripted**, 2026-10-03 | 3 DM v1.12.0 nodes + Canton OSS 3.5.19 with 3 participants in WSL and a DM-onboarded decentralized governance party: 10/10 checks. **One operator runs every node** (not independent). **Not in the app.** Ran with `collara-contracts` 0.1.0; not re-run with 0.2.0. |
+| `tierB.devnet` | **Not attempted** | The shared HackCanton DevNet participant "isn't set up to host teams' Decentralized Parties" (BitSafe rules, read 2026-10-04, [hackcanton-submission.md](hackcanton-submission.md)). It would need our own node. |
 
 Governance in Collara administers the **verifier registry only**: adding a verifier and suspending one. It never touches collateral. The domain copy states it (`packages/domain/src/copy.ts`, `BOUNDARY_COPY.GOVERNANCE_SCOPE`):
 
@@ -85,7 +96,7 @@ What passed, with confirms and executes going through each member's own DM node:
 
 Limits:
 
-- It is a separate topology run by one operator.
+- It is a separate local topology run by one operator. It has not run on DevNet or any other network, and it ran with `collara-contracts` 0.1.0, not 0.2.0.
 - The Collara API, worker and UI still run Tier A (governance-tier-b.md §9).
 - The attestation workflow must share the governance party's synchronizer, and on Tier B an accreditation fetch needs two governance member participants online.
 

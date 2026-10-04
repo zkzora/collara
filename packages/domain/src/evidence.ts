@@ -67,15 +67,69 @@ export const EVIDENCE = {
     date: "2026-10-03",
     record: "docs/privacy-verification.md",
   },
-  tierB: {
-    // Decentralization Manager v1.12.0 nodes and a decentralized governance party, run by scripts (scripts/tierb)
-    // on a separate three-participant topology in WSL. The Collara API and UI still use Tier A.
-    scriptedChecks: { passed: 10, total: 10 },
-    nodes: 3,
-    operators: 1,
-    integratedInApp: false,
-    date: "2026-10-03",
-    record: "docs/governance-tier-b.md",
+  // Governance of the verifier registry, one record per tier and network. Kept apart so that no statement built
+  // from it can read as "decentralized governance on DevNet": Tier A is DM GovernanceRules with an ordinary
+  // governance party; Tier B adds Decentralization Manager nodes and a decentralized party. Only tierA.localnet is
+  // used by the app today.
+  governance: {
+    tierA: {
+      localnet: {
+        // DM v1.12.0 GovernanceRules, 2-of-3 seats, on the Canton 3.5.19 sandbox with one participant. The governance
+        // party is an ordinary local party: its credential could act without the seat quorum. Used by the API and UI.
+        status: "implemented on the local sandbox",
+        run: true,
+        // apps/api/test/localnet/governance.it.test.ts, part of the 71/71 LocalNet run (before contracts 0.2.0).
+        integrationTests: { passed: 10, total: 10 },
+        participants: 1,
+        operators: 1,
+        threshold: { required: 2, of: 3 },
+        decentralizedParty: false,
+        integratedInApp: true,
+        date: "2026-10-03",
+        record: "docs/governance.md",
+      },
+      devnet: {
+        // The DevNet bootstrap (B2–B6) would create the same Tier A GovernanceRules and the governed verifier
+        // registry on the shared NODERS participant, as ordinary parties of one tenant ledger user. Not run yet.
+        status: "not yet run on DevNet",
+        run: false,
+        participants: 1,
+        decentralizedParty: false,
+        firstGovernedExecuteUpdateId: null,
+        date: "2026-10-04",
+        record: "docs/devnet-evidence.md",
+      },
+    },
+    tierB: {
+      localnet: {
+        // Decentralization Manager v1.12.0 nodes and a decentralized governance party, run by scripts (scripts/tierb)
+        // on a separate three-participant Canton OSS 3.5.19 topology in WSL. One operator runs every node. The run
+        // used collara-contracts 0.1.0 (package 66efe1ca…); it was not re-run with 0.2.0.
+        status: "scripted on a separate local topology, one operator, not in the app",
+        run: true,
+        scriptedChecks: { passed: 10, total: 10 },
+        nodes: 3,
+        participants: 3,
+        operators: 1,
+        independentOperators: false,
+        threshold: { required: 2, of: 3 },
+        decentralizedParty: true,
+        integratedInApp: false,
+        collaraContractsVersion: "0.1.0",
+        rerunWithContracts020: false,
+        date: "2026-10-03",
+        record: "docs/governance-tier-b.md",
+      },
+      devnet: {
+        // Not attempted. The shared HackCanton DevNet participant (NODERS) is not set up to host teams'
+        // Decentralized Parties (BitSafe challenge rules, read 2026-10-04); it would need our own node.
+        status: "not attempted: the shared DevNet participant cannot host Decentralized Parties",
+        run: false,
+        attempted: false,
+        date: "2026-10-04",
+        record: "docs/hackcanton-submission.md",
+      },
+    },
   },
   deployment: {
     // Only the web app, in UI_MOCK mode. No API, worker, database, document storage or ledger is deployed.
@@ -94,6 +148,8 @@ export const EVIDENCE = {
     // The participant's /docs/openapi matched the committed spec byte for byte (unauthenticated GET).
     openApiIdentical: true,
     firstCommittedUpdateId: null,
+    // Governance on DevNet would be Tier A only (see governance.tierA.devnet / governance.tierB.devnet).
+    governanceTier: "A",
     date: "2026-10-04",
     record: "docs/devnet-evidence.md",
   },

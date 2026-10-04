@@ -4,6 +4,8 @@ What was actually run against the HackCanton shared DevNet participant (NODERS).
 
 Status: **code ready; not yet run on DevNet** (no credential used, nothing uploaded, allocated or submitted).
 
+**Governance on DevNet is Tier A only, and it has not run.** The owner's bootstrap (section 2, step f3) includes B2–B6: Tier A `GovernanceRules` and the governed verifier registry with `VER-001`, created by ordinary parties of the one tenant ledger user on the shared NODERS participant (no decentralized party; the tenant credential can act as the governance party without the seat quorum, `docs/devnet.md` §3). **Tier B (Decentralization Manager nodes, decentralized party) was not attempted on DevNet**: the shared participant is not set up to host teams' Decentralized Parties. Tier B ran only on a local WSL topology with one operator ([governance-tier-b.md](governance-tier-b.md)). The records are `EVIDENCE.governance.tierA.devnet` and `EVIDENCE.governance.tierB.devnet` in `packages/domain/src/evidence.ts`; set `tierA.devnet.run` only from a committed B6 execute recorded below (section 3b).
+
 ## 1. Public checks without credentials (run 2026-10-04, by the builder)
 
 `node scripts/devnet/preflight.mjs` from the repository root, no `.env.devnet`, 2026-10-04T14:16:38Z:
@@ -48,6 +50,17 @@ Also observed (unauthenticated GETs): the OIDC discovery document lists `issuer`
 | AssetRegistry contract id | |
 | CollaraConfig contract id | |
 | Seen in the Console | |
+
+## 3b. Tier A governance bootstrap on DevNet (B2–B6)
+
+| Field | Value |
+|---|---|
+| Date / run by | |
+| B2 `GovernanceRules` contract id | |
+| B6 execute updateId / offset | |
+| `VerifierAccreditation` VER-001 contract id | |
+
+Tier A only: an ordinary governance party, no decentralized party, one shared participant.
 
 ## 4. Optional
 
