@@ -33,8 +33,9 @@ COPY packages/db/package.json packages/db/package.json
 COPY packages/domain/package.json packages/domain/package.json
 
 # Production dependencies of the API and its workspace packages (tsx is a runtime dependency).
-RUN --mount=type=cache,id=collara-pnpm-store,target=/pnpm-store \
-    pnpm install --frozen-lockfile --prod --filter "@collara/api..." --store-dir /pnpm-store
+# No BuildKit cache mount: Render requires its own cache-id prefix, so the store is a temp dir removed in-layer.
+RUN pnpm install --frozen-lockfile --prod --filter "@collara/api..." --store-dir /tmp/pnpm-store \
+    && rm -rf /tmp/pnpm-store
 
 # Internal packages export TypeScript source; tsx compiles it at start-up.
 COPY packages/domain packages/domain

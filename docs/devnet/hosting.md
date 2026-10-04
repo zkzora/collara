@@ -37,3 +37,5 @@ Sources: Render — https://frontdeskreview.com/software/managed-postgres/render
 2. Deploy API and one worker with `COLLARA_MODE=DEVNET`; run `scripts/devnet/login.mjs` once against that database; `preflight`, `import-bindings`, `bootstrap`.
 3. Point a **separate Vercel preview/environment** at the API (`API_INTERNAL_ORIGIN`, `COLLARA_MODE=DEVNET`) and run the full walkthrough there.
 4. Only after it passes with no mock fallback: switch production (or the demo link) to that environment. Rollback = restore the UI mockup environment variables and redeploy.
+
+Runbook for Option A (Render + R2): [deploy-render.md](deploy-render.md), with the Blueprint in [`render.yaml`](../../render.yaml).

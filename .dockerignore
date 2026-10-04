@@ -1,0 +1,25 @@
+# Root ignore file for builders that do not read <Dockerfile>.dockerignore (e.g. Render). Same rules as
+# apps/api/Dockerfile.dockerignore; keep them in sync. UNTESTED (no Docker on the authoring machine).
+**/node_modules
+**/.next*
+**/dist
+**/build
+**/out
+**/coverage
+**/playwright-report
+**/test-results
+**/blob-report
+**/*.tsbuildinfo
+**/*.log
+.git
+.github
+.local
+.vendor
+.spike
+.env
+.env.*
+!.env.example
+**/.env.local
+Collara Website
+docs
+daml/**/.daml

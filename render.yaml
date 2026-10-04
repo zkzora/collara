@@ -1,0 +1,147 @@
+# Render Blueprint for the Collara DevNet demo (API + worker + PostgreSQL). Runbook: docs/devnet/deploy-render.md.
+# UNTESTED: never applied to Render, and the images have never been built (no Docker on the authoring machine).
+# Synthetic demo data only; not a production-ready deployment and no security assurance.
+#
+# Region: oregon for every resource. The web front end stays on Vercel, whose functions default to iad1 (US East);
+# Oregon keeps the Vercel -> API hop inside the US and is Render's default region. The NODERS DevNet participant's
+# location is not documented, so it did not drive the choice. If the team and judges are in Asia, change all three
+# `region` values to singapore together (a database must share the services' region for the internal URL).
+#
+# Plans use the Blueprint spec's instance names: 0.5c-512mb = "Starter" (web and worker), 0.1c-256mb =
+# PostgreSQL "Basic-256mb". Secrets are `sync: false`: Render asks for them on the first Blueprint apply and never
+# reads them from this file.
+
+services:
+  - type: web
+    name: collara-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: 0.5c-512mb
+    numInstances: 1
+    healthCheckPath: /api/system/health
+    # Release job: committed SQL migrations, never on boot (infra/deploy/README.md §1). Runs in /repo/apps/api.
+    preDeployCommand: node --import tsx scripts/db.ts migrate
+    autoDeployTrigger: "off"
+    envVars:
+      - key: COLLARA_MODE
+        value: DEVNET
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: collara-devnet-db
+          property: connectionString
+      # Browser-facing origin = the Vercel PREVIEW deployment's https URL (CSRF origin check, OIDC redirects).
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      # Render's edge terminates TLS and reaches the container from a private address; trust only private ranges
+      # (proxy-addr names) so request.protocol is https and Secure session cookies are saved. Not verified on Render.
+      - key: TRUST_PROXY
+        value: loopback,uniquelocal
+      - key: SESSION_SECRET
+        sync: false
+      # Synthetic demo personas for the DevNet walkthrough (the API refuses them with NODE_ENV=production unless
+      # the second flag is set). Set both to "false" if the owner decides against demo sessions.
+      - key: DEMO_SESSIONS_ENABLED
+        value: "true"
+      - key: DEMO_SESSIONS_ALLOW_IN_PRODUCTION
+        value: "true"
+      # --- DEVNET ledger access (infra/env/devnet.env.example) ---
+      - key: DEVNET_CREDENTIAL_KEY_ID
+        sync: false
+      - key: DEVNET_CREDENTIAL_KEY
+        sync: false
+      - key: DEVNET_LEDGER_USER_ID
+        sync: false
+      - key: CANTON_DEVNET_JSON_API_URL
+        value: https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services
+      - key: DEVNET_OIDC_ISSUER
+        value: https://keycloak.naas.noders.services/realms/noders-appsfactory
+      - key: DEVNET_OIDC_CLIENT_ID
+        value: web-app-ui-hackcanton-01-devnet
+      - key: DEVNET_OIDC_SCOPE
+        value: openid daml_ledger_api offline_access
+      - key: DEVNET_LEDGER_AUDIENCE
+        value: https://hackcanton-01.devnet.naas.noders.services
+      # state.json from scripts/devnet/import-bindings.mjs, uploaded as a Render Secret File named devnet-state.json.
+      - key: COLLARA_DEVNET_STATE
+        value: /etc/secrets/devnet-state.json
+      # --- Cloudflare R2 (private bucket; the S3 clients always use path-style addressing) ---
+      - key: COLLARA_S3_ENDPOINT
+        sync: false # https://<account id>.r2.cloudflarestorage.com
+      - key: COLLARA_S3_BUCKET
+        value: collara-devnet-evidence
+      - key: COLLARA_S3_REGION
+        value: auto
+      - key: COLLARA_S3_ACCESS_KEY
+        sync: false
+      - key: COLLARA_S3_SECRET_KEY
+        sync: false
+
+  - type: worker
+    name: collara-worker
+    runtime: docker
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: 0.5c-512mb
+    # Exactly one: concurrent projection loops for the same source were never tested. Never scale this up.
+    numInstances: 1
+    autoDeployTrigger: "off"
+    envVars:
+      - key: COLLARA_MODE
+        value: DEVNET
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: collara-devnet-db
+          property: connectionString
+      - key: DEVNET_CREDENTIAL_KEY_ID
+        sync: false
+      - key: DEVNET_CREDENTIAL_KEY
+        sync: false
+      - key: DEVNET_LEDGER_USER_ID
+        sync: false
+      - key: CANTON_DEVNET_JSON_API_URL
+        value: https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services
+      - key: DEVNET_OIDC_ISSUER
+        value: https://keycloak.naas.noders.services/realms/noders-appsfactory
+      - key: DEVNET_OIDC_CLIENT_ID
+        value: web-app-ui-hackcanton-01-devnet
+      - key: DEVNET_OIDC_SCOPE
+        value: openid daml_ledger_api offline_access
+      - key: DEVNET_LEDGER_AUDIENCE
+        value: https://hackcanton-01.devnet.naas.noders.services
+      - key: COLLARA_DEVNET_STATE
+        value: /etc/secrets/devnet-state.json
+      - key: COLLARA_S3_ENDPOINT
+        sync: false
+      - key: COLLARA_S3_BUCKET
+        value: collara-devnet-evidence
+      - key: COLLARA_S3_REGION
+        value: auto
+      - key: COLLARA_S3_ACCESS_KEY
+        sync: false
+      - key: COLLARA_S3_SECRET_KEY
+        sync: false
+
+databases:
+  - name: collara-devnet-db
+    region: oregon
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    # DEVNET refuses any database whose name does not contain "devnet".
+    databaseName: collara_devnet
+    user: collara
+    # External access only for the owner's machine (login.mjs, preflight, import-bindings, bootstrap). Replace with
+    # the owner's public IP /32 before applying; an empty list blocks all external connections.
+    ipAllowList: []
