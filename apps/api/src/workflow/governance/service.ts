@@ -15,7 +15,7 @@ import { and, eq } from "drizzle-orm";
 import { problems } from "../../errors";
 import { ledgerCommands as L } from "../../ledger/builders";
 import { VerifierAccreditationSchema } from "../../ledger/contracts";
-import { LEDGER_ENVIRONMENT, requireIdentity, type WorkflowActor } from "../actors";
+import { ledgerEnvironment, requireIdentity, type WorkflowActor } from "../actors";
 import type { WorkflowServices } from "../context";
 import { must } from "../preconditions";
 import { workflowProblems } from "../problems";
@@ -275,7 +275,7 @@ export class GovernanceService {
       .from(organizations)
       .innerJoin(
         partyBindings,
-        and(eq(partyBindings.orgId, organizations.id), eq(partyBindings.kind, "business"), eq(partyBindings.state, "ACTIVE"), eq(partyBindings.environment, LEDGER_ENVIRONMENT)),
+        and(eq(partyBindings.orgId, organizations.id), eq(partyBindings.kind, "business"), eq(partyBindings.state, "ACTIVE"), eq(partyBindings.environment, ledgerEnvironment())),
       )
       .where(and(eq(organizations.type, "VERIFIER"), eq(organizations.state, "ACTIVE")));
     const wanted = orgName.trim().toLowerCase();

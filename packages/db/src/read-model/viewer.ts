@@ -19,7 +19,7 @@ export interface ReadOptions {
   readonly now?: Date;
   /** Restrict to these participant sources (default: all). */
   readonly sources?: readonly string[];
-  /** party_bindings environment (default "LOCALNET"). */
+  /** party_bindings environment (default: currentLedgerEnvironment(), i.e. "LOCALNET" unless COLLARA_MODE=DEVNET). */
   readonly environment?: string;
 }
 

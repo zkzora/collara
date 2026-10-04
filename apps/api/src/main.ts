@@ -5,8 +5,8 @@ import { loadConfig } from "./config";
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const config = loadConfig();
-if (config.COLLARA_MODE === "LOCALNET" && !config.DATABASE_URL) {
-  console.error("COLLARA_MODE=LOCALNET needs DATABASE_URL (PostgreSQL). See .env.example.");
+if (config.COLLARA_MODE !== "UI_MOCK" && !config.DATABASE_URL) {
+  console.error(`COLLARA_MODE=${config.COLLARA_MODE} needs DATABASE_URL (PostgreSQL). See .env.example.`);
   process.exit(1);
 }
 

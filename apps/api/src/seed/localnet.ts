@@ -13,13 +13,15 @@
 import { createHash } from "node:crypto";
 import { rename, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
-import { allocateRef, cases, commands as commandsTable, evidenceDocuments, type DbHandle } from "@collara/db";
+import { DevnetEnvSchema, devnetGuardIssues } from "@collara/canton";
+import { allocateRef, cases, commands as commandsTable, currentLedgerEnvironment, evidenceDocuments, type DbHandle } from "@collara/db";
 import { CL001_CHECKS, CREDIT_POLICY_REF, DEMO_ORG_IDS, DEMO_PERSONAS, type PersonaId } from "@collara/domain";
 import { and, eq } from "drizzle-orm";
 import { buildApp, type CollaraApp } from "../app";
 import { loadConfig, sessionCookieName, type Config } from "../config";
 import { AcsReader } from "../ledger/acs";
 import { DEV_HMAC_SECRET, LedgerAccess } from "../ledger/access";
+import { assertDevnetState, devnetTokenProvider, tenantOnly, type DevnetLedgerEnv } from "../ledger/devnet";
 import { LEDGER_DOC_TYPES, ledgerCommands as L, manifestHashOf, type ManifestEntryInput, type SharedDocumentInput } from "../ledger/builders";
 import { CantonLedgerGateway, type CantonGatewayOptions } from "../ledger/gateway";
 import { ledgerStatePath, loadLedgerState, type LedgerState } from "../ledger/state";
@@ -44,7 +46,10 @@ export interface SeedLocalnetOptions {
   readonly skipDocuments?: boolean;
   /** When the namespace already has a registry this database did not seed, move to a fresh namespace. */
   readonly forceNewNamespace?: boolean;
-  /** S3 settings, Canton auth (CANTON_JWT_HMAC_SECRET / CANTON_JWT_AUDIENCE). Default process.env. */
+  /**
+   * S3 settings, Canton auth (LOCALNET: CANTON_JWT_HMAC_SECRET / CANTON_JWT_AUDIENCE; DEVNET: DEVNET_* and the
+   * refresh token in ledger_credentials). Default process.env.
+   */
   readonly env?: NodeJS.ProcessEnv;
   readonly log?: (line: string) => void;
   /** Reuse an existing database handle (harness); otherwise the seed opens and closes its own. */
@@ -115,8 +120,22 @@ export async function seedLocalnet(options: SeedLocalnetOptions): Promise<SeedRe
   const statePath = options.statePath ?? ledgerStatePath(options.prefix);
   let state = await loadLedgerState(statePath);
   if (!state) throw new SeedRefusedError(`no bootstrap state at ${statePath}: run node scripts/localnet/bootstrap.mjs${options.prefix ? ` --prefix ${options.prefix}` : ""}`);
+  const devnet = state.topology === "devnet-shared-participant";
+  let devnetEnv: DevnetLedgerEnv | null = null;
+  if (devnet) {
+    // DEVNET: the env must already select DEVNET (party bindings and actors read that environment), with its own database.
+    if (currentLedgerEnvironment(env) !== "DEVNET") throw new SeedRefusedError("a DevNet state is seeded only with COLLARA_MODE=DEVNET (use node scripts/devnet/bootstrap.mjs)");
+    const parsed = DevnetEnvSchema.safeParse(Object.fromEntries(Object.entries(env).filter(([, v]) => v !== "")));
+    if (!parsed.success) throw new SeedRefusedError(`invalid DEVNET settings: ${parsed.error.message}`);
+    const issues = devnetGuardIssues({ ...parsed.data, DATABASE_URL: options.databaseUrl, COLLARA_LOCALNET_STATE: env.COLLARA_LOCALNET_STATE, CANTON_JWT_HMAC_SECRET: env.CANTON_JWT_HMAC_SECRET });
+    if (issues.length) throw new SeedRefusedError(issues.map((i) => `${i.path}: ${i.message}`).join("; "));
+    devnetEnv = parsed.data;
+    assertDevnetState(state, devnetEnv);
+  } else if (currentLedgerEnvironment(env) === "DEVNET") {
+    throw new SeedRefusedError(`COLLARA_MODE=DEVNET refuses the LocalNet state ${statePath}`);
+  }
 
-  const prepared = options.db ? null : await prepareDatabase(options.databaseUrl, state);
+  const prepared = options.db ? null : await prepareDatabase(options.databaseUrl, state, { environment: currentLedgerEnvironment(env) });
   const handle = options.db ?? prepared?.handle;
   if (!handle) throw new Error("no database handle");
   if (prepared) log(`database ${redactUrl(options.databaseUrl)}${prepared.created ? " (created)" : ""}: ${prepared.bindings.bindings} party bindings`);
@@ -125,7 +144,10 @@ export async function seedLocalnet(options: SeedLocalnetOptions): Promise<SeedRe
   try {
     const secret = env.CANTON_JWT_HMAC_SECRET || DEV_HMAC_SECRET;
     const audience = env.CANTON_JWT_AUDIENCE || undefined;
-    const accessFor = (s: LedgerState) => new LedgerAccess({ state: s, secret, ...(audience ? { audience } : {}) });
+    // DEVNET: one OIDC provider for the tenant user for the whole run (shares the refresh lock with the API/worker).
+    const tokenProviderFor = devnetEnv ? tenantOnly(devnetTokenProvider(devnetEnv, db)) : null;
+    const accessFor = (s: LedgerState) =>
+      tokenProviderFor ? new LedgerAccess({ state: s, tokenProviderFor }) : new LedgerAccess({ state: s, secret, ...(audience ? { audience } : {}) });
     let access = accessFor(state);
 
     // Guard: never reseed a namespace another database (or the lead's demo) already seeded.
@@ -352,10 +374,10 @@ export async function seedLocalnet(options: SeedLocalnetOptions): Promise<SeedRe
       // Documents (application records + private storage, server-computed SHA-256).
       const files = cl001Files();
       const docs = options.skipDocuments ? syntheticDocs() : await (async () => {
-        const storage = options.storage === undefined ? createS3Storage(seedConfig(env, options.databaseUrl, statePath)) : options.storage;
+        const storage = options.storage === undefined ? createS3Storage(seedConfig(env, options.databaseUrl, statePath, devnet)) : options.storage;
         if (!storage) throw new SeedRefusedError("object storage is not configured (COLLARA_S3_*): start SeaweedFS or pass --skip-documents");
         app = await buildApp({
-          config: seedConfig(env, options.databaseUrl, statePath),
+          config: seedConfig(env, options.databaseUrl, statePath, devnet),
           db: handle,
           storage,
           ledger: gateway,
@@ -703,15 +725,15 @@ async function writeStateAtomic(path: string, state: LedgerState): Promise<void>
   await rename(tmp, path);
 }
 
-function seedConfig(env: NodeJS.ProcessEnv, databaseUrl: string, statePath: string): Config {
+function seedConfig(env: NodeJS.ProcessEnv, databaseUrl: string, statePath: string, devnet = false): Config {
   return loadConfig({
     ...env,
     NODE_ENV: env.NODE_ENV === "production" ? "production" : "development",
-    COLLARA_MODE: "LOCALNET",
+    COLLARA_MODE: devnet ? "DEVNET" : "LOCALNET",
     DEMO_SESSIONS_ENABLED: "true",
     LOG_LEVEL: "silent",
     DATABASE_URL: databaseUrl,
-    COLLARA_LOCALNET_STATE: statePath,
+    ...(devnet ? { COLLARA_DEVNET_STATE: statePath, COLLARA_LOCALNET_STATE: "" } : { COLLARA_LOCALNET_STATE: statePath }),
   });
 }
 

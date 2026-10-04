@@ -4,6 +4,7 @@
 // Restart-safe: all progress is in PostgreSQL; SIGINT/SIGTERM stop the loops, then close the pool.
 import { createRequire } from "node:module";
 import { once } from "node:events";
+import { CREDENTIAL_LOG_KEYS } from "@collara/canton";
 import { createPgDatabase, toLogSafeError, type DbHandle } from "@collara/db";
 import pino, { type LoggerOptions } from "pino";
 import packageJson from "../package.json" with { type: "json" };
@@ -20,6 +21,8 @@ const config = loadConfig();
 const logOptions: LoggerOptions = {
   level: config.LOG_LEVEL,
   base: { service: "worker" },
+  // Ledger credentials (DEVNET refresh/access tokens, HMAC secret, database URLs) never reach logs.
+  redact: { paths: [...CREDENTIAL_LOG_KEYS, ...CREDENTIAL_LOG_KEYS.map((key) => `*.${key}`)], censor: "[redacted]" },
   // Database errors carry bound parameters (user data); keep only SQL text and diagnostic codes.
   serializers: { err: (err: unknown) => pino.stdSerializers.err(toLogSafeError(err) as Error) },
 };
@@ -33,8 +36,9 @@ let dbHandle: DbHandle | null = null;
 let runtime: WorkerRuntime | null = null;
 let startupProblem: string | null = null;
 
+const ledgerMode = config.COLLARA_MODE === "LOCALNET" || config.COLLARA_MODE === "DEVNET";
 const details =
-  config.COLLARA_MODE === "LOCALNET"
+  ledgerMode
     ? async (): Promise<HealthDetails> => (runtime ? runtime.health() : { degraded: true, phase: "starting", error: startupProblem })
     : undefined;
 const server = createHealthServer({ mode: config.COLLARA_MODE, version: packageJson.version, ...(details ? { details } : {}) });
@@ -77,7 +81,7 @@ const health = `http://${config.WORKER_HEALTH_HOST}:${config.WORKER_HEALTH_PORT}
 async function connectWithRetry(): Promise<WorkerLedger | null> {
   while (!controller.signal.aborted) {
     try {
-      return await connectLedger(config);
+      return await connectLedger(config, dbHandle?.db);
     } catch (error) {
       if (!(error instanceof LedgerNotBootstrappedError)) throw error;
       startupProblem = error.message;
@@ -91,9 +95,9 @@ async function connectWithRetry(): Promise<WorkerLedger | null> {
   return null;
 }
 
-if (config.COLLARA_MODE === "LOCALNET") {
+if (ledgerMode) {
   try {
-    // DATABASE_URL is required in LOCALNET (config validation).
+    // DATABASE_URL is required in LOCALNET and DEVNET (config validation).
     dbHandle = createPgDatabase({ url: config.DATABASE_URL ?? "", max: 5, applicationName: "collara-worker" });
     if (config.WORKER_MIGRATE) {
       await dbHandle.migrate();

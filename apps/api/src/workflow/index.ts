@@ -2,7 +2,7 @@
 export {
   businessPartyOfOrg,
   ensureSystemUsers,
-  LEDGER_ENVIRONMENT,
+  ledgerEnvironment,
   loadMemberActor,
   orgOfParty,
   readableParties,

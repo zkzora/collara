@@ -40,6 +40,7 @@ docs/               Architecture, permissions, setup, demo, limitations
 - The mode is read **server-side at runtime** (`COLLARA_MODE`) and passed into the client provider; the mock client is code-split and only loaded in `UI_MOCK`.
 - In `LOCALNET`, a failed or unavailable ledger action is reported as such. There is **no fallback** to simulated success.
 - UI_MOCK ships synthetic fixtures to the browser; it is a UI mockup, not a privacy demonstration. Privacy is enforced and tested only in LOCALNET (server-side field omission, per-party projections).
+- Amended 2026-10-04: a third mode, `DEVNET`, targets the HackCanton shared DevNet participant (NODERS): same data path as `LOCALNET`, banner `Synthetic demo data — Canton DevNet.` (INFERRED), its own env file, state file and database, OIDC refresh-token ledger auth and one tenant ledger user (a privileged project-operator credential). No HMAC and no LocalNet state or database. Code ready; not yet run on DevNet. See `docs/devnet.md`.
 - The landing keeps the approved pre-build/pilot copy until the LOCALNET demo works end to end (`PUBLIC_DEMO_STATUS=off|ui_mock|localnet`, default `off`). Amended 2026-10-03: `ui_mock` promotes the synthetic UI mockup demo with a no-ledger disclosure (used by the Vercel deployment); `localnet` remains reserved for a working LOCALNET demo.
 
 ### 2.3 Ledger and Daml

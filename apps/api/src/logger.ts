@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { CREDENTIAL_LOG_KEYS } from "@collara/canton";
 import { toLogSafeError } from "@collara/db";
 import { stdSerializers, type LoggerOptions } from "pino";
 import type { Config } from "./config";
@@ -25,6 +26,8 @@ const SENSITIVE_KEYS = [
   "SESSION_SECRET",
   "COLLARA_OIDC_CLIENT_SECRET",
   "COLLARA_S3_SECRET_KEY",
+  // ledger credentials (LOCALNET HMAC secret, DEVNET refresh/access tokens, database URLs with passwords)
+  ...CREDENTIAL_LOG_KEYS,
   // financing terms (borrower and selected lender only)
   "principal",
   "requestedPrincipal",
@@ -48,7 +51,7 @@ export const REDACTED_PATHS = [
   "headers.authorization",
   "headers.cookie",
   'headers["set-cookie"]',
-  ...SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`]),
+  ...new Set(SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`])),
 ];
 
 /** Query parameters redacted from logged URLs (OIDC callback codes and state). */

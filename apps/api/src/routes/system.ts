@@ -1,6 +1,6 @@
 import type { DbHandle } from "@collara/db";
 import { ledgerCheckpoints } from "@collara/db";
-import { SystemHealthSchema, type SystemHealth } from "@collara/domain";
+import { isLedgerMode, SystemHealthSchema, type SystemHealth } from "@collara/domain";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import type { CollaraMode } from "../config";
 import { databaseCheck, storageCheck, workerCheck, type HealthCheck } from "../services/health";
@@ -31,7 +31,7 @@ export const systemRoutes: FastifyPluginAsyncZod<SystemRoutesOptions> = async (a
     },
     async () => {
       const checks: Record<string, HealthCheck> = {};
-      const localnet = opts.mode === "LOCALNET";
+      const localnet = isLedgerMode(opts.mode);
       if (opts.db) checks.database = await databaseCheck(opts.db);
       if (localnet || opts.storage) checks.storage = await storageCheck(opts.storage);
       if (localnet) {

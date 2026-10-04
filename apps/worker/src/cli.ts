@@ -23,10 +23,10 @@ async function main() {
   });
   const command = positionals[0];
   if (!command || !["status", "once", "reset"].includes(command)) throw new Error(USAGE);
-  const config = loadConfig({ ...process.env, COLLARA_MODE: "LOCALNET" });
+  const config = loadConfig({ ...process.env, COLLARA_MODE: process.env.COLLARA_MODE === "DEVNET" ? "DEVNET" : "LOCALNET" });
   const handle = createPgDatabase({ url: config.DATABASE_URL ?? "", max: 2, applicationName: "collara-worker-cli" });
   try {
-    const ledger = await connectLedger(config);
+    const ledger = await connectLedger(config, handle.db);
     const wanted = ledger.sources.filter((s) => !values.source || s.config.source === values.source);
     if (values.source && wanted.length === 0) throw new Error(`unknown source ${values.source}; known: ${ledger.sources.map((s) => s.config.source).join(", ")}`);
 

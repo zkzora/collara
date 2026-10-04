@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { DevnetEnvSchema, devnetGuardIssues } from "@collara/canton";
 import { z } from "zod";
 
 const bool = z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1");
@@ -15,7 +16,7 @@ export const DEV_HMAC_SECRET = "collara-local-dev-secret-change-me";
 const ConfigSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    COLLARA_MODE: z.enum(["UI_MOCK", "LOCALNET"]).default("UI_MOCK"),
+    COLLARA_MODE: z.enum(["UI_MOCK", "LOCALNET", "DEVNET"]).default("UI_MOCK"),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     WORKER_HEALTH_HOST: z.string().min(1).default("127.0.0.1"),
     /** WORKER_PORT is accepted as an alias (and wins when both are set). */
@@ -47,8 +48,16 @@ const ConfigSchema = z
     JOB_POLL_INTERVAL_MS: z.coerce.number().int().min(100).max(600_000).default(2_000),
     JOB_LEASE_SECONDS: z.coerce.number().int().min(5).max(3_600).default(120),
     JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
+
+    // --- DEVNET only (docs/devnet.md): the shared participant through the tenant user's OIDC refresh token ----------
+    ...DevnetEnvSchema.shape,
   })
   .superRefine((config, ctx) => {
+    if (config.COLLARA_MODE === "DEVNET") {
+      for (const issue of devnetGuardIssues(config)) ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
+      if (!config.DEVNET_LEDGER_USER_ID) ctx.addIssue({ code: "custom", path: ["DEVNET_LEDGER_USER_ID"], message: "DEVNET_LEDGER_USER_ID is required in DEVNET" });
+      return;
+    }
     if (config.COLLARA_MODE !== "LOCALNET") return;
     if (!config.DATABASE_URL) ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "DATABASE_URL is required in LOCALNET" });
     if (config.NODE_ENV === "production" && !config.CANTON_JWT_HMAC_SECRET) {

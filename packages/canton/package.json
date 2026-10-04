@@ -5,7 +5,8 @@
   "description": "Collara Canton adapter: typed JSON Ledger API v2 client, token provider, template ids, command helpers (server only)",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/mock-oidc-issuer.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

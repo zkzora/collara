@@ -12,8 +12,10 @@ export {
 } from "./client";
 export { seedDemoIdentities, type SeedSummary } from "./seed";
 export {
+  currentLedgerEnvironment,
   GOVERNANCE_PARTY_HINT,
   importLocalnetState,
+  type LedgerEnvironment,
   type BindingImportSummary,
   type LocalnetBindingSource,
 } from "./bindings";
@@ -49,6 +51,13 @@ export {
   type PendingNoteInput,
 } from "./notes";
 export { toLogSafeError } from "./log-safety";
+export {
+  PgRefreshTokenStore,
+  type CredentialStatus,
+  type CredentialUpdate,
+  type StoredCredential,
+  type StoredCredentialStatus,
+} from "./credentials";
 // Worker projection (ledger updates → ledger_* tables) and the stakeholder-filtered read model.
 export * from "./projection";
 export * from "./read-model";

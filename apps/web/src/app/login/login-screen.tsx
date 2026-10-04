@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@collara/api-client";
-import { DEFAULT_PERSONA_ID, type PersonaId, type RuntimeMode } from "@collara/domain";
+import { DEFAULT_PERSONA_ID, isLedgerMode, type PersonaId, type RuntimeMode } from "@collara/domain";
 import { useQuery } from "@tanstack/react-query";
 import { LogInIcon } from "lucide-react";
 import Image from "next/image";
@@ -83,7 +83,7 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
   const demo = useQuery({
     queryKey: ["demo", "personas"],
     queryFn: ({ signal }) => client.demo.personas({ signal }),
-    enabled: mode === "LOCALNET",
+    enabled: isLedgerMode(mode),
     staleTime: Infinity,
     retry: false,
   });
@@ -125,7 +125,7 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
   );
 }
 
-/** /login: OIDC in LOCALNET (plus demo sessions when the API enables them); persona choice in UI_MOCK. */
+/** /login: OIDC in LOCALNET/DEVNET (plus demo sessions when the API enables them); persona choice in UI_MOCK. */
 export function LoginScreen({ mode }: { mode: RuntimeMode }) {
   return (
     <div data-surface="app" className="flex min-h-dvh flex-col bg-surface-page text-fg">

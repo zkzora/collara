@@ -15,6 +15,8 @@ export {
   SubmitRequestSchema,
   type CallOptions,
   type CommandCompletion,
+  type ConnectedSynchronizer,
+  type VettedPackages,
   type LedgerClientOptions,
   type LedgerRight,
   type LedgerUser,
@@ -42,6 +44,7 @@ export {
   type TemplateId,
 } from "./commands";
 export {
+  classifyCredentialFailure,
   classifyLedgerError,
   isLedgerError,
   JsCantonErrorSchema,
@@ -66,12 +69,47 @@ export {
   type LedgerUpdate,
 } from "./events";
 export {
+  defaultDevnetStatePath,
   defaultLocalnetStatePath,
+  isLocalnetStatePath,
   loadLocalnetState,
   localnetParty,
   LocalnetStateSchema,
   type LocalnetPartyRef,
   type LocalnetState,
 } from "./localnet-state";
+export {
+  ACCEPTED_TOKEN_ALGORITHMS,
+  CREDENTIAL_LOG_KEYS,
+  decodeJwtSubject,
+  DEVNET_LOGIN_COMMAND,
+  devnetCredentialId,
+  LedgerCredentialError,
+  MemoryRefreshTokenStore,
+  OidcLedgerSettingsSchema,
+  OidcRefreshTokenProvider,
+  parseOidcLedgerSettings,
+  remoteJwks,
+  requestToken,
+  validateLedgerAccessToken,
+  type LedgerCredentialErrorCode,
+  type LedgerCredentialUpdate,
+  type OidcLedgerSettings,
+  type OidcRefreshTokenProviderOptions,
+  type RefreshTokenStore,
+  type StoredLedgerCredential,
+  type TokenResponse,
+  type ValidatedAccessToken,
+} from "./oidc";
+export {
+  DEVNET_DEFAULTS,
+  DevnetEnvSchema,
+  devnetGuardIssues,
+  devnetOidcSettings,
+  devnetStatePath,
+  LOCALNET_DATABASE_NAMES,
+  type DevnetEnv,
+  type DevnetGuardInput,
+} from "./devnet-config";
 export * as damlValue from "./values";
 export type { DamlJson } from "./values";

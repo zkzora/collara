@@ -1,0 +1,36 @@
+# Draft message to NODERS (NOT SENT)
+
+Use only if, after creating the parties in the Console (owner checklist step b), `node scripts/devnet/preflight.mjs` or `import-bindings.mjs` shows that the team's ledger user lacks `CanActAs` / `CanReadAs` on them, and the Console offers no way to grant those rights. Fill in the placeholders; do not include any password or token.
+
+---
+
+**Subject:** HackCanton DevNet (hackcanton-01): CanActAs/CanReadAs for our Console-created parties
+
+Hello NODERS team,
+
+We are team **<team name>** on the HackCanton shared DevNet participant (`hackcanton-01`). Our ledger user id (JWT `sub`) is **`<DEVNET_LEDGER_USER_ID>`**; its onboarding primary party is **`<primary party id>`**.
+
+We created these 11 parties in the Console for our project (synthetic demo data only):
+
+```
+<prefix>-CollaraRegistrar::1220…
+<prefix>-CollaraGovernance::1220…
+<prefix>-GovSeat1::1220…
+<prefix>-GovSeat2::1220…
+<prefix>-GovSeat3::1220…
+<prefix>-DemoManufacturer::1220…
+<prefix>-DemoCNCDealer::1220…
+<prefix>-DemoVerifier::1220…
+<prefix>-DemoLenderA::1220…
+<prefix>-DemoLenderB::1220…
+<prefix>-DemoAuditor::1220…
+```
+
+`GET /v2/users/<DEVNET_LEDGER_USER_ID>/rights` currently lists: **<paste the rights table from preflight.mjs>**.
+
+Our application submits each organisation's commands as that organisation's party through our single tenant ledger user, so the user needs **CanActAs** (and CanReadAs) on each of the 11 parties above, and nothing else. Could you grant these rights, or tell us how to do it ourselves in the Console?
+
+We do not call any admin endpoint on the shared node; parties and DARs were created and uploaded through the Console only.
+
+Thank you,
+<name>

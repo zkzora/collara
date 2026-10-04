@@ -4,6 +4,7 @@
 // stakeholder of the contract they act on.
 import { and, arrayOverlaps, asc, eq, inArray, sql } from "drizzle-orm";
 import type { DbOrTx } from "../client";
+import { currentLedgerEnvironment } from "../bindings";
 import { ledgerContracts, ledgerEvents, ledgerSources, partyBindings } from "../schema";
 import { obj, type Json } from "./decode";
 import type { ReadViewer } from "./viewer";
@@ -170,7 +171,7 @@ export interface PartyDirectory {
   readonly governanceParties: ReadonlySet<string>;
 }
 
-export async function loadPartyDirectory(db: DbOrTx, environment = "LOCALNET"): Promise<PartyDirectory> {
+export async function loadPartyDirectory(db: DbOrTx, environment: string = currentLedgerEnvironment()): Promise<PartyDirectory> {
   const rows = await db
     .select()
     .from(partyBindings)

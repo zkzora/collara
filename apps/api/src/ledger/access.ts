@@ -1,7 +1,8 @@
-// Ledger connections for the API: one LedgerClient per least-privilege ledger user (HMAC tokens minted
-// per user), the participant each user lives on, and reset detection (party ids are only valid while
-// the running participant id equals the one in the bootstrap state).
-import { createHmacTokenProviders, LedgerClient, type HmacTokenSettings } from "@collara/canton";
+// Ledger connections for the API: one LedgerClient per ledger user, the participant each user lives on, and reset
+// detection (party ids are only valid while the running participant id equals the one in the bootstrap state).
+// Tokens: LOCALNET mints HS256 tokens per least-privilege user (sandbox only); DEVNET passes `tokenProviderFor`
+// (the tenant user's OIDC refresh-token provider) and never uses HMAC.
+import { createHmacTokenProviders, LedgerClient, type HmacTokenSettings, type LedgerTokenProvider } from "@collara/canton";
 import { loadLedgerState, namespaceOf, type LedgerState } from "./state";
 
 /** Public dev placeholder of infra/canton/sandbox-auth.conf (also the default of scripts/localnet). */
@@ -9,8 +10,10 @@ export const DEV_HMAC_SECRET = "collara-local-dev-secret-change-me";
 
 export interface LedgerAccessOptions {
   readonly state: LedgerState;
-  /** HS256 secret of the sandbox's unsafe-jwt-hmac-256 auth (dev only). */
-  readonly secret: string;
+  /** HS256 secret of the sandbox's unsafe-jwt-hmac-256 auth (LOCALNET dev only; refused for a DevNet state). */
+  readonly secret?: string;
+  /** Token provider per ledger user (DEVNET: the tenant's OIDC provider). Takes precedence over `secret`. */
+  readonly tokenProviderFor?: (ledgerUserId: string) => LedgerTokenProvider;
   /** Token audience; defaults to the one recorded in the bootstrap state. */
   readonly audience?: string;
   readonly timeoutMs?: number;
@@ -31,7 +34,7 @@ export class LedgerResetError extends Error {
 export class LedgerAccess {
   readonly state: LedgerState;
   readonly namespace: string;
-  readonly #tokens: ReturnType<typeof createHmacTokenProviders>;
+  readonly #tokens: (ledgerUserId: string) => LedgerTokenProvider;
   readonly #clients = new Map<string, LedgerClient>();
   readonly #options: LedgerAccessOptions;
   #checkedAt = new Map<string, number>();
@@ -40,8 +43,14 @@ export class LedgerAccess {
     this.#options = options;
     this.state = options.state;
     this.namespace = namespaceOf(options.state);
-    const settings: HmacTokenSettings = { secret: options.secret, audience: options.audience ?? options.state.audience };
-    this.#tokens = createHmacTokenProviders(settings);
+    if (options.tokenProviderFor) {
+      this.#tokens = options.tokenProviderFor;
+    } else {
+      if (options.state.topology === "devnet-shared-participant") throw new Error("a DevNet state needs the OIDC token provider; HMAC tokens are LOCALNET only");
+      if (!options.secret) throw new Error("LedgerAccess needs an HMAC secret (LOCALNET) or tokenProviderFor");
+      const settings: HmacTokenSettings = { secret: options.secret, audience: options.audience ?? options.state.audience };
+      this.#tokens = createHmacTokenProviders(settings);
+    }
   }
 
   /** Loads the bootstrap state file; null when it does not exist (no LocalNet bootstrap yet). */
@@ -75,9 +84,14 @@ export class LedgerAccess {
     return client;
   }
 
-  /** Ledger user of an organisation party (role "org" in the bootstrap state), or null. */
+  /**
+   * Ledger user that acts for an organisation party, or null: the party's own org user (LOCALNET), else the DEVNET
+   * tenant user when it holds CanActAs for the party.
+   */
   userOfParty(partyId: string): { id: string; participant: string } | null {
-    const user = this.state.users.find((u) => u.role === "org" && u.primaryParty === partyId);
+    const user =
+      this.state.users.find((u) => u.role === "org" && u.primaryParty === partyId) ??
+      this.state.users.find((u) => u.role === "tenant" && u.actAs.includes(partyId));
     return user ? { id: user.id, participant: user.participant } : null;
   }
 

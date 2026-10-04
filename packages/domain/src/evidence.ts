@@ -84,6 +84,19 @@ export const EVIDENCE = {
     cantonNetwork: false,
     record: "docs/PROGRESS.md (Stage 7)",
   },
+  devnet: {
+    // DEVNET mode against the HackCanton shared DevNet participant (NODERS, Canton 3.5.19). The code, scripts and
+    // owner checklist exist; nothing has been uploaded, allocated or submitted there yet. Fill in only from a real
+    // run recorded in docs/devnet-evidence.md.
+    status: "code ready; not yet run on DevNet",
+    run: false,
+    cantonVersion: "3.5.19",
+    // The participant's /docs/openapi matched the committed spec byte for byte (unauthenticated GET).
+    openApiIdentical: true,
+    firstCommittedUpdateId: null,
+    date: "2026-10-04",
+    record: "docs/devnet-evidence.md",
+  },
 } as const;
 
 /** "71/71" */

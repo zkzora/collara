@@ -1,0 +1,63 @@
+{
+  "generatedBy": "scripts/devnet/build-dars.mjs",
+  "dars": [
+    {
+      "order": 1,
+      "file": "governance-core-v1-0.1.0.dar",
+      "source": "daml/collara/vendor-dars/governance-core-v1-0.1.0.dar",
+      "sizeBytes": 718817,
+      "sha256": "b8d05903e63288d4114632f41386491cea215e177183514ea032fe35d24a9544",
+      "mainPackageId": "361d1f2857f833f8094caf86ecdd5daaa3e2075c22dafe2bf18cde63ee98d488",
+      "name": "governance-core-v1",
+      "version": "0.1.0",
+      "sdkVersion": "3.4.11",
+      "embeds": [
+        {
+          "name": "governance-action-v1",
+          "version": "0.1.0",
+          "packageId": "48acd500fc0bc9e4f00d52270122a104a68157f6d5561328f059f5eb6a63fd61"
+        },
+        {
+          "name": "governance-core-v1",
+          "version": "0.1.0",
+          "packageId": "361d1f2857f833f8094caf86ecdd5daaa3e2075c22dafe2bf18cde63ee98d488"
+        },
+        {
+          "name": "splice-util",
+          "version": "0.1.4",
+          "packageId": "b7356fbb2cf8a3b22194d8c743c3c216d9c7527b257c8c38b257eb22942be358"
+        }
+      ],
+      "why": "DM GovernanceRules (Tier A governance of the verifier registry); not embedded in the contracts DAR"
+    },
+    {
+      "order": 2,
+      "file": "collara-contracts-0.2.0.dar",
+      "source": "daml/collara/contracts/.daml/dist/collara-contracts-0.2.0.dar",
+      "sizeBytes": 1283308,
+      "sha256": "28321658f8004a13d222b6e8fbd74bd0f652c6fdabff7a5762a503c5ef7f9dd6",
+      "mainPackageId": "1c0e5e6235212312c10657e211accf55c459808b6401eefdb57a3800c340503c",
+      "name": "collara-contracts",
+      "version": "0.2.0",
+      "sdkVersion": "3.5.12",
+      "embeds": [
+        {
+          "name": "collara-contracts",
+          "version": "0.2.0",
+          "packageId": "1c0e5e6235212312c10657e211accf55c459808b6401eefdb57a3800c340503c"
+        },
+        {
+          "name": "collara-governance",
+          "version": "0.1.0",
+          "packageId": "16cb6e82174e020290c7eba779951d25309fd2a23009f09d1ef4154b9bac2d7b"
+        },
+        {
+          "name": "governance-action-v1",
+          "version": "0.1.0",
+          "packageId": "48acd500fc0bc9e4f00d52270122a104a68157f6d5561328f059f5eb6a63fd61"
+        }
+      ],
+      "why": "Collara contracts; embeds collara-governance 0.1.0 and governance-action-v1 0.1.0"
+    }
+  ]
+}

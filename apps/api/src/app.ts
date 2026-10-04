@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import { isLedgerError } from "@collara/canton";
+import { devnetStatePath, isLedgerError } from "@collara/canton";
 import type { DbHandle } from "@collara/db";
 import { COMMAND_COPY, ERROR_COPY } from "@collara/domain";
 import Fastify, { type FastifyServerOptions } from "fastify";
@@ -28,11 +28,12 @@ import { pilotRoutes } from "./routes/pilot";
 import { demoRoutes, meRoutes } from "./routes/session";
 import { systemRoutes } from "./routes/system";
 import { CommandService } from "./services/commands";
-import { probeLedger, type HealthCheck } from "./services/health";
+import { devnetCredentialStatus, probeLedger, type HealthCheck } from "./services/health";
 import { createDbProjectionReader, unavailableLedgerGateway, type LedgerGateway, type ProjectionReader } from "./services/ledger";
 import { createOidcService, type OidcService } from "./services/oidc";
 import { createS3Storage, type StorageService } from "./services/storage";
 import { CantonLedgerGateway, DEV_HMAC_SECRET, LedgerAccess } from "./ledger";
+import { devnetLedgerAccess } from "./ledger/devnet";
 import { workflowRoutes } from "./routes/workflow";
 import { directoryRoutes } from "./routes/directory";
 import { overviewRoutes } from "./routes/overview";
@@ -79,12 +80,16 @@ export interface AppServices {
 }
 
 /**
- * LOCALNET wiring: the Canton gateway over the bootstrap state; UI_MOCK, tests (unless injected) and a
+ * LOCALNET / DEVNET wiring: the Canton gateway over the bootstrap state; UI_MOCK, tests (unless injected) and a
  * missing state file keep the unavailable gateway, so nothing is ever simulated as committed.
  */
-async function resolveLedger(options: BuildAppOptions, log: { warn(msg: string): void }): Promise<{ gateway: LedgerGateway; access: LedgerAccess | null }> {
+async function resolveLedger(options: BuildAppOptions, db: DbHandle, log: { warn(msg: string): void }): Promise<{ gateway: LedgerGateway; access: LedgerAccess | null }> {
   const { config } = options;
   let access = options.ledgerAccess ?? null;
+  if (options.ledgerAccess === undefined && config.COLLARA_MODE === "DEVNET" && config.NODE_ENV !== "test") {
+    access = await devnetLedgerAccess({ env: config, db: db.db, submitTimeoutMs: config.CANTON_SUBMIT_TIMEOUT_MS });
+    if (!access) log.warn("DEVNET without a DevNet state: ledger commands are recorded as FAILED (run node scripts/devnet/import-bindings.mjs)");
+  }
   if (options.ledgerAccess === undefined && config.COLLARA_MODE === "LOCALNET" && config.NODE_ENV !== "test") {
     access = await LedgerAccess.fromStateFile({
       ...(config.COLLARA_LOCALNET_STATE ? { path: config.COLLARA_LOCALNET_STATE } : {}),
@@ -195,7 +200,11 @@ export async function buildApp(options: BuildAppOptions) {
     version: API_VERSION,
     db,
     storage,
-    probeLedger: options.probeLedger ?? (() => probeLedger({ statePath: config.COLLARA_LOCALNET_STATE })),
+    probeLedger:
+      options.probeLedger ??
+      (config.COLLARA_MODE === "DEVNET"
+        ? () => probeLedger({ statePath: devnetStatePath(config), credentialStatus: db ? () => devnetCredentialStatus(config, db.db) : undefined })
+        : () => probeLedger({ statePath: config.COLLARA_LOCALNET_STATE })),
     workerStaleAfterSeconds: config.WORKER_STALE_AFTER_SECONDS,
     clock,
   });
@@ -206,7 +215,7 @@ export async function buildApp(options: BuildAppOptions) {
     return app;
   }
 
-  const { gateway: ledger, access } = await resolveLedger(options, app.log);
+  const { gateway: ledger, access } = await resolveLedger(options, db, app.log);
   const projections = options.projections ?? createDbProjectionReader(db.db);
   const commands = new CommandService(db.db, ledger, clock);
   const oidc = options.oidc === undefined ? createOidcService(config) : options.oidc;

@@ -101,6 +101,13 @@ export const CAPABILITIES: readonly Capability[] = [
     where: { text: "DM governance contracts used in Tier A; DM nodes run only in the scripted Tier B check, not connected to the app" },
   },
   {
+    // INFERRED label and text (pending approval). Code for the shared DevNet participant exists; it has not run there.
+    id: "devnet",
+    label: "Canton DevNet (shared participant)",
+    statuses: ["PLANNED"],
+    where: { text: `DevNet mode: ${EVIDENCE.devnet.status}` },
+  },
+  {
     id: "setup",
     label: "Setup instructions, API reference, test commands",
     statuses: ["IMPLEMENTED"],

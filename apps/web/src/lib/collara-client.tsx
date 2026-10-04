@@ -4,7 +4,7 @@
 // HTTP; UI_MOCK code-splits the in-memory mock client so it never ships in LOCALNET bundles.
 import { createHttpClient, type CollaraClient } from "@collara/api-client";
 import type { MockCollaraClient } from "@collara/api-client/mock";
-import { DEFAULT_PERSONA_ID, PersonaIdSchema, type PersonaId, type RuntimeMode } from "@collara/domain";
+import { DEFAULT_PERSONA_ID, isLedgerMode, PersonaIdSchema, type PersonaId, type RuntimeMode } from "@collara/domain";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -68,7 +68,7 @@ export function CollaraClientProvider({
   client?: CollaraClient;
 }) {
   const queryClient = useQueryClient();
-  const [httpClient] = useState(() => (mode === "LOCALNET" && !injected ? createHttpClient() : null));
+  const [httpClient] = useState(() => (isLedgerMode(mode) && !injected ? createHttpClient() : null));
   const [loadedMock, setLoadedMock] = useState<MockCollaraClient | null>(null);
   const [sessionEpoch, setSessionEpoch] = useState(0);
 

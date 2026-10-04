@@ -1,15 +1,20 @@
 // Actor → ledger identities. Authority comes only from the server session → membership → mandate → party
-// bindings (src/plugins/actor.ts); this adds the least-privilege ledger user of each bound party from
-// ledger_users (imported from the bootstrap state, prefix-aware because the state file is). Browser
-// values are never read. Registrar/governance service actors are explicit system users.
-import { ledgerUsers, loadUserAuthority, partyBindings, users, type Db } from "@collara/db";
+// bindings (src/plugins/actor.ts); this adds the ledger user that holds CanActAs for each bound party from
+// ledger_users (imported from the bootstrap state, prefix-aware because the state file is): the org's own
+// least-privilege user in LOCALNET, the single tenant user in DEVNET (a privileged project-operator credential;
+// the party in actAs/readAs is still exactly the actor's bound party). Browser values are never read.
+// Registrar/governance service actors are explicit system users.
+import { currentLedgerEnvironment, ledgerUsers, loadUserAuthority, partyBindings, users, type Db } from "@collara/db";
 import { DEMO_ORG_IDS } from "@collara/domain";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, arrayOverlaps, eq, inArray, or } from "drizzle-orm";
 import { workflowProblems } from "./problems";
 import { actorRefFor } from "../ledger/builders";
 import { actorFromAuthority, type ResolvedActor } from "../plugins/actor";
 
-export const LEDGER_ENVIRONMENT = "LOCALNET";
+/** party_bindings / ledger_users environment of this process ("DEVNET" when COLLARA_MODE=DEVNET, else "LOCALNET"). */
+export function ledgerEnvironment(): string {
+  return currentLedgerEnvironment();
+}
 
 /** One party the actor may submit as, with the ledger user that holds CanActAs for it. */
 export interface LedgerIdentity {
@@ -51,13 +56,32 @@ export function readableParties(actor: Pick<ResolvedActor, "parties"> | Pick<Wor
   return "readableParties" in actor ? [...actor.readableParties] : [...actor.parties.readAs];
 }
 
+/**
+ * Ledger user per party: the org user whose primary party it is, else a tenant user holding CanActAs for it
+ * (DEVNET). Only parties passed in are mapped, so a tenant user never widens what an actor can act as.
+ */
 async function ledgerUsersByParty(db: Db, parties: readonly string[]): Promise<Map<string, { id: string; source: string }>> {
   if (parties.length === 0) return new Map();
   const rows = await db
-    .select({ party: ledgerUsers.primaryParty, id: ledgerUsers.ledgerUserId, source: ledgerUsers.source })
+    .select({ role: ledgerUsers.role, party: ledgerUsers.primaryParty, actAs: ledgerUsers.actAs, id: ledgerUsers.ledgerUserId, source: ledgerUsers.source })
     .from(ledgerUsers)
-    .where(and(eq(ledgerUsers.environment, LEDGER_ENVIRONMENT), eq(ledgerUsers.role, "org"), inArray(ledgerUsers.primaryParty, [...parties])));
-  return new Map(rows.flatMap((row) => (row.party ? [[row.party, { id: row.id, source: row.source }] as const] : [])));
+    .where(
+      and(
+        eq(ledgerUsers.environment, ledgerEnvironment()),
+        or(
+          and(eq(ledgerUsers.role, "org"), inArray(ledgerUsers.primaryParty, [...parties])),
+          and(eq(ledgerUsers.role, "tenant"), arrayOverlaps(ledgerUsers.actAs, [...parties])),
+        ),
+      ),
+    );
+  const byParty = new Map<string, { id: string; source: string }>();
+  for (const party of parties) {
+    const own = rows.find((row) => row.role === "org" && row.party === party);
+    const tenant = rows.find((row) => row.role === "tenant" && row.actAs.includes(party));
+    const user = own ?? tenant;
+    if (user) byParty.set(party, { id: user.id, source: user.source });
+  }
+  return byParty;
 }
 
 /** Ledger identities of an authenticated member (from the request's ResolvedActor). */
@@ -107,7 +131,7 @@ export async function resolveSystemActor(db: Db, kind: SystemActorKind): Promise
     .from(partyBindings)
     .where(
       and(
-        eq(partyBindings.environment, LEDGER_ENVIRONMENT),
+        eq(partyBindings.environment, ledgerEnvironment()),
         eq(partyBindings.state, "ACTIVE"),
         eq(partyBindings.orgId, DEMO_ORG_IDS.collara),
         eq(partyBindings.kind, kind === "registrar" ? "business" : "governance"),
@@ -139,7 +163,7 @@ export async function businessPartyOfOrg(db: Db, orgId: string): Promise<string 
   const [row] = await db
     .select({ partyId: partyBindings.partyId })
     .from(partyBindings)
-    .where(and(eq(partyBindings.environment, LEDGER_ENVIRONMENT), eq(partyBindings.state, "ACTIVE"), eq(partyBindings.orgId, orgId), eq(partyBindings.kind, "business")))
+    .where(and(eq(partyBindings.environment, ledgerEnvironment()), eq(partyBindings.state, "ACTIVE"), eq(partyBindings.orgId, orgId), eq(partyBindings.kind, "business")))
     .limit(1);
   return row?.partyId ?? null;
 }
@@ -149,7 +173,7 @@ export async function orgOfParty(db: Db, partyId: string): Promise<string | null
   const [row] = await db
     .select({ orgId: partyBindings.orgId })
     .from(partyBindings)
-    .where(and(eq(partyBindings.environment, LEDGER_ENVIRONMENT), eq(partyBindings.partyId, partyId)))
+    .where(and(eq(partyBindings.environment, ledgerEnvironment()), eq(partyBindings.partyId, partyId)))
     .limit(1);
   return row?.orgId ?? null;
 }

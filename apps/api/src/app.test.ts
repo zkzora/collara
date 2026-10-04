@@ -121,6 +121,20 @@ describe("config", () => {
     expect(loadConfig({ NODE_ENV: "production", DEMO_SESSIONS_ENABLED: "true", DEMO_SESSIONS_ALLOW_IN_PRODUCTION: "true" }).DEMO_SESSIONS_ENABLED).toBe(true);
     expect(loadConfig({ NODE_ENV: "development", DEMO_SESSIONS_ENABLED: "true" }).DEMO_SESSIONS_ENABLED).toBe(true);
   });
+
+  it("DEVNET: own database and state, tenant user required, no HMAC, no LocalNet state", () => {
+    const devnet = { COLLARA_MODE: "DEVNET", DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara_devnet", DEVNET_LEDGER_USER_ID: "c2ede6f6-team" };
+    const config = loadConfig(devnet);
+    expect(config.COLLARA_MODE).toBe("DEVNET");
+    expect(config.DEVNET_OIDC_CLIENT_ID).toBe("web-app-ui-hackcanton-01-devnet");
+    expect(config.DEVNET_LEDGER_AUDIENCE).toBe("https://hackcanton-01.devnet.naas.noders.services");
+    expect(() => loadConfig({ ...devnet, DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara" })).toThrow(/refuses database "collara"/);
+    expect(() => loadConfig({ ...devnet, COLLARA_LOCALNET_STATE: ".local/localnet/state.json" })).toThrow(/COLLARA_LOCALNET_STATE/);
+    expect(() => loadConfig({ ...devnet, CANTON_JWT_HMAC_SECRET: "collara-local-dev-secret-change-me" })).toThrow(/refuses HMAC/);
+    expect(() => loadConfig({ ...devnet, DEVNET_LEDGER_USER_ID: "" })).toThrow(/DEVNET_LEDGER_USER_ID is required/);
+    // LOCALNET is unaffected by the DEVNET guards.
+    expect(loadConfig({ COLLARA_MODE: "LOCALNET", DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara" }).COLLARA_MODE).toBe("LOCALNET");
+  });
 });
 
 describe("logger", () => {
@@ -138,8 +152,9 @@ describe("logger", () => {
       res: { headers: { "set-cookie": ["__Host-collara_sid=def"] } },
     });
     log.info({ tokens: { id_token: "eyJhbGciOi.secret.sig", access_token: "secret-access" }, proposal: { principal: "100000.00" } });
+    log.info({ credential: { refresh_token: "rt-secret-refresh", refreshToken: "rt-secret-camel" }, DATABASE_URL: "postgres://collara:db-password@h/collara_devnet" });
     const output = lines.join("");
-    expect(output).not.toMatch(/secret-token|collara_sid=|secret-code|secret-state|eyJhbGciOi|secret-access|100000\.00/);
+    expect(output).not.toMatch(/secret-token|collara_sid=|secret-code|secret-state|eyJhbGciOi|secret-access|100000\.00|rt-secret|db-password/);
     expect(output).toContain("[redacted]");
   });
 

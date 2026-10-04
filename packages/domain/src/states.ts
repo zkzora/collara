@@ -41,9 +41,17 @@ export function badgeSchema<S extends z.ZodType<string>>(valueSchema: S) {
 
 // --- Runtime mode and data provenance -------------------------------------------------------
 
-export const RUNTIME_MODES = ["UI_MOCK", "LOCALNET"] as const;
+export const RUNTIME_MODES = ["UI_MOCK", "LOCALNET", "DEVNET"] as const;
 export const RuntimeModeSchema = z.enum(RUNTIME_MODES);
 export type RuntimeMode = z.infer<typeof RuntimeModeSchema>;
+
+/** Modes that submit to a real Canton participant (LOCALNET: local sandbox; DEVNET: a shared DevNet participant). */
+export type LedgerMode = Exclude<RuntimeMode, "UI_MOCK">;
+
+/** True when the mode talks to a real ledger through the API (never simulated success). */
+export function isLedgerMode(mode: RuntimeMode): mode is LedgerMode {
+  return mode !== "UI_MOCK";
+}
 
 export const dataSources = defineVocabulary(["LEDGER_COMMITTED", "APPLICATION_RECORD"], {
   LEDGER_COMMITTED: { label: "Ledger-committed", tone: "success" },

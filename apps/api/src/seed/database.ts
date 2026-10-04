@@ -49,14 +49,14 @@ export interface PreparedDatabase {
 }
 
 /** ensureDatabase → migrate → demo identities → system users → party bindings from the state file. */
-export async function prepareDatabase(url: string, state: LedgerState, options: { applicationName?: string } = {}): Promise<PreparedDatabase> {
+export async function prepareDatabase(url: string, state: LedgerState, options: { applicationName?: string; environment?: string } = {}): Promise<PreparedDatabase> {
   const created = await ensureDatabase(url);
   const handle = createPgDatabase({ url, max: 5, applicationName: options.applicationName ?? "collara-seed" });
   try {
     await handle.migrate();
     await seedDemoIdentities(handle.db);
     await ensureSystemUsers(handle.db);
-    const bindings = await importLocalnetState(handle.db, state);
+    const bindings = await importLocalnetState(handle.db, state, options.environment ? { environment: options.environment } : {});
     return { handle, created, bindings };
   } catch (error) {
     await handle.close();

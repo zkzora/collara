@@ -19,6 +19,7 @@ const MAX_POLLS = 40;
 export const PENDING_COPY: Readonly<Record<RuntimeMode, string>> = {
   UI_MOCK: "Recording in the UI mockup…",
   LOCALNET: COMMAND_COPY.SUBMITTED,
+  DEVNET: COMMAND_COPY.SUBMITTED,
 };
 
 const STATE_COPY: Partial<Record<CommandState, string>> = {

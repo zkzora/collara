@@ -36,7 +36,8 @@
                       "type": "string",
                       "enum": [
                         "UI_MOCK",
-                        "LOCALNET"
+                        "LOCALNET",
+                        "DEVNET"
                       ]
                     },
                     "version": {
@@ -337,7 +338,8 @@
                       "type": "string",
                       "enum": [
                         "UI_MOCK",
-                        "LOCALNET"
+                        "LOCALNET",
+                        "DEVNET"
                       ]
                     },
                     "personaId": {
@@ -673,7 +675,8 @@
                       "type": "string",
                       "enum": [
                         "UI_MOCK",
-                        "LOCALNET"
+                        "LOCALNET",
+                        "DEVNET"
                       ]
                     },
                     "personaId": {
@@ -4185,6 +4188,19 @@
                             "state"
                           ],
                           "additionalProperties": false
+                        },
+                        "review": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "ref"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -4192,7 +4208,8 @@
                         "attestation",
                         "package",
                         "proposal",
-                        "pledge"
+                        "pledge",
+                        "review"
                       ],
                       "additionalProperties": false
                     },
@@ -6119,7 +6136,8 @@
                         "type": "string",
                         "enum": [
                           "evidence.upload",
-                          "verification.request"
+                          "verification.request",
+                          "case.create"
                         ]
                       }
                     },
@@ -6970,6 +6988,28 @@
                               "pattern": "^DOC-(\\d{3,})$"
                             }
                           },
+                          "assignedVersions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "documentId": {
+                                  "type": "string",
+                                  "pattern": "^DOC-(\\d{3,})$"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "documentId",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "dueAt": {
                             "nullable": true,
                             "type": "string",
@@ -7425,6 +7465,28 @@
                       "items": {
                         "type": "string",
                         "pattern": "^DOC-(\\d{3,})$"
+                      }
+                    },
+                    "assignedVersions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "documentId": {
+                            "type": "string",
+                            "pattern": "^DOC-(\\d{3,})$"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "documentId",
+                          "version"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "dueAt": {
@@ -9084,10 +9146,31 @@
     },
     "/api/verifications/{id}/evidence-submissions": {
       "post": {
-        "summary": "Resubmit a new evidence version after a change request (owner)",
+        "summary": "Resubmit a new evidence version after a change request (owner); grants the selected documents at that version to the assigned verifier",
         "tags": [
           "verifications"
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentIds": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^DOC-(\\d{3,})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -9302,6 +9385,278 @@
                   },
                   "required": [
                     "command"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/verification-consent": {
+      "post": {
+        "summary": "Consent to the owner's verification grant requests for the dealer's own documents (invited dealer)",
+        "tags": [
+          "verifications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^CL-(\\d{3,})$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "grantIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "grantIds"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "grantIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "grantIds"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "result"
                   ],
                   "additionalProperties": false
                 }
@@ -13949,6 +14304,60 @@
                                     "reason"
                                   ],
                                   "additionalProperties": false
+                                },
+                                "thread": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "NOTE",
+                                          "QUESTION",
+                                          "RESPONSE"
+                                        ]
+                                      },
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "author": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "by": {
+                                        "nullable": true,
+                                        "type": "string"
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "body",
+                                      "author",
+                                      "by",
+                                      "at"
+                                    ],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -13961,7 +14370,8 @@
                                 "requestedBy",
                                 "requestedAt",
                                 "informationRequest",
-                                "decision"
+                                "decision",
+                                "thread"
                               ],
                               "additionalProperties": false
                             }
@@ -14450,6 +14860,60 @@
                               "reason"
                             ],
                             "additionalProperties": false
+                          },
+                          "thread": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "NOTE",
+                                    "QUESTION",
+                                    "RESPONSE"
+                                  ]
+                                },
+                                "body": {
+                                  "type": "string"
+                                },
+                                "author": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "by": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "body",
+                                "author",
+                                "by",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -14462,7 +14926,8 @@
                           "requestedBy",
                           "requestedAt",
                           "informationRequest",
-                          "decision"
+                          "decision",
+                          "thread"
                         ],
                         "additionalProperties": false
                       }
@@ -15295,6 +15760,60 @@
                         "reason"
                       ],
                       "additionalProperties": false
+                    },
+                    "thread": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "NOTE",
+                              "QUESTION",
+                              "RESPONSE"
+                            ]
+                          },
+                          "body": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "by": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "body",
+                          "author",
+                          "by",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -15307,7 +15826,8 @@
                     "requestedBy",
                     "requestedAt",
                     "informationRequest",
-                    "decision"
+                    "decision",
+                    "thread"
                   ],
                   "additionalProperties": false
                 }
@@ -16851,6 +17371,800 @@
                   "required": [
                     "command",
                     "result"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent-requests": {
+      "get": {
+        "summary": "Dealer consent requests: the invited dealer's own (to decide), or every dealer's for the owner",
+        "tags": [
+          "access"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^CL-(\\d{3,})$"
+            },
+            "in": "query",
+            "name": "caseId",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "caseId": {
+                            "type": "string",
+                            "pattern": "^CL-(\\d{3,})$"
+                          },
+                          "purpose": {
+                            "type": "string",
+                            "enum": [
+                              "LENDER_REVIEW",
+                              "VERIFICATION"
+                            ]
+                          },
+                          "purposeLabel": {
+                            "type": "string"
+                          },
+                          "recipient": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "requestedBy": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "dealer": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "verificationRef": {
+                            "nullable": true,
+                            "type": "string",
+                            "pattern": "^VR-(\\d{3,})$"
+                          },
+                          "evidencePackage": {
+                            "type": "object",
+                            "properties": {
+                              "ref": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "ref",
+                              "version"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "documentId": {
+                                  "type": "string",
+                                  "pattern": "^DOC-(\\d{3,})$"
+                                },
+                                "type": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "DEALER_INVOICE",
+                                    "EQUIPMENT_PHOTOS",
+                                    "INSPECTION_REPORT",
+                                    "MAINTENANCE_SUMMARY",
+                                    "PURCHASE_AGREEMENT",
+                                    "OTHER"
+                                  ]
+                                },
+                                "title": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "exclusiveMinimum": true,
+                                  "maximum": 9007199254740991
+                                },
+                                "sha256": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "documentId",
+                                "type",
+                                "title",
+                                "version",
+                                "sha256"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "permission": {
+                            "type": "string",
+                            "enum": [
+                              "VIEW",
+                              "VIEW_DOWNLOAD"
+                            ]
+                          },
+                          "state": {
+                            "type": "object",
+                            "properties": {
+                              "value": {
+                                "type": "string",
+                                "enum": [
+                                  "PENDING",
+                                  "GRANTED",
+                                  "DECLINED",
+                                  "WITHDRAWN",
+                                  "REVOKED",
+                                  "EXPIRED",
+                                  "CANCELLED"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "tone": {
+                                "type": "string",
+                                "enum": [
+                                  "success",
+                                  "warning",
+                                  "danger",
+                                  "info",
+                                  "neutral",
+                                  "pending"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "value",
+                              "label",
+                              "tone"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "decidedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "allowedActions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "consent.grant",
+                                "consent.decline",
+                                "consent.withdraw"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "caseId",
+                          "purpose",
+                          "purposeLabel",
+                          "recipient",
+                          "requestedBy",
+                          "dealer",
+                          "verificationRef",
+                          "evidencePackage",
+                          "documents",
+                          "permission",
+                          "state",
+                          "requestedAt",
+                          "decidedAt",
+                          "expiresAt",
+                          "allowedActions"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent-requests/{id}/decision": {
+      "post": {
+        "summary": "Grant (Consent_Grant) or decline (Consent_Decline) a consent request for the dealer's own documents",
+        "tags": [
+          "access"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "GRANT",
+                      "DECLINE"
+                    ]
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent-requests/{id}/withdraw": {
+      "post": {
+        "summary": "Withdraw granted consent (Share_WithdrawConsent); limits future access only",
+        "tags": [
+          "access"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "object",
+                      "properties": {
+                        "commandId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "LEDGER",
+                            "APPLICATION"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PREPARED",
+                            "SUBMITTED",
+                            "COMMITTED",
+                            "PROJECTED",
+                            "REJECTED",
+                            "FAILED",
+                            "UNKNOWN_OUTCOME",
+                            "PROJECTION_DELAYED"
+                          ]
+                        },
+                        "simulated": {
+                          "type": "boolean"
+                        },
+                        "updateId": {
+                          "type": "string"
+                        },
+                        "completionOffset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "commandId",
+                        "operation",
+                        "target",
+                        "state",
+                        "simulated",
+                        "message",
+                        "submittedAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "command"
                   ],
                   "additionalProperties": false
                 }
@@ -20695,6 +22009,320 @@
                   },
                   "required": [
                     "command"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/directory/lenders": {
+      "get": {
+        "summary": "Onboarded lender organizations (id and display name only)",
+        "tags": [
+          "directory"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/directory/dealers": {
+      "get": {
+        "summary": "Onboarded dealer organizations (id and display name only)",
+        "tags": [
+          "directory"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/overview/": {
+      "get": {
+        "summary": "Recorded financing principal and collateral valuation per currency, for the signed-in organisation's own scope",
+        "tags": [
+          "overview"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "principal": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "totals": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "total": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {},
+                                  "currency": {
+                                    "type": "string",
+                                    "pattern": "^[A-Z]{3}$"
+                                  }
+                                },
+                                "required": [
+                                  "amount",
+                                  "currency"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "count"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "coverage": {
+                          "type": "object",
+                          "properties": {
+                            "included": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "of": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "included",
+                            "of"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "dates": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "earliest": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "latest": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            }
+                          },
+                          "required": [
+                            "earliest",
+                            "latest"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "totals",
+                        "coverage",
+                        "source",
+                        "dates"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "valuation": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "totals": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "total": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {},
+                                  "currency": {
+                                    "type": "string",
+                                    "pattern": "^[A-Z]{3}$"
+                                  }
+                                },
+                                "required": [
+                                  "amount",
+                                  "currency"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "count"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "coverage": {
+                          "type": "object",
+                          "properties": {
+                            "included": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "of": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "included",
+                            "of"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "dates": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "earliest": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "latest": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            }
+                          },
+                          "required": [
+                            "earliest",
+                            "latest"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "totals",
+                        "coverage",
+                        "source",
+                        "dates"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "lastSync": {
+                      "type": "object",
+                      "properties": {
+                        "offset": {
+                          "nullable": true,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        }
+                      },
+                      "required": [
+                        "offset",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "principal",
+                    "valuation",
+                    "lastSync"
                   ],
                   "additionalProperties": false
                 }

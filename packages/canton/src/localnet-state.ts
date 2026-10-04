@@ -10,7 +10,8 @@ import { z } from "zod";
 export const LocalnetStateSchema = z.object({
   version: z.literal(1),
   bootstrappedAt: z.string(),
-  topology: z.enum(["sandbox-1-participant", "sandbox-3-participants", "sandbox-5-participants"]),
+  /** devnet-shared-participant: .local/devnet/state.json, written by scripts/devnet/import-bindings.mjs. */
+  topology: z.enum(["sandbox-1-participant", "sandbox-3-participants", "sandbox-5-participants", "devnet-shared-participant"]),
   cantonVersion: z.string().optional(),
   /** Token audience the participants expect (the HMAC secret is never stored here). */
   audience: z.string(),
@@ -27,7 +28,8 @@ export const LocalnetStateSchema = z.object({
     z.object({
       id: z.string(),
       participant: z.string(),
-      role: z.enum(["org", "projector", "admin"]),
+      /** tenant: DEVNET's single ledger user, acting for every project party (a privileged operator credential). */
+      role: z.enum(["org", "projector", "admin", "tenant"]),
       party: z.string().optional(),
       primaryParty: z.string().optional(),
       actAs: z.array(z.string()),
@@ -72,4 +74,14 @@ export function localnetParty(state: LocalnetState, hint: string): LocalnetParty
   const participant = entry ? state.participants[entry.participant] : undefined;
   if (!entry || !participant) throw new Error(`party ${hint} is not in the LocalNet state`);
   return { party: entry.party, userId: entry.user, jsonApiUrl: participant.jsonApiUrl, participantId: participant.participantId };
+}
+
+/** <repo>/.local/devnet/state.json (override with COLLARA_DEVNET_STATE). DEVNET never reads the LocalNet state. */
+export function defaultDevnetStatePath(): string {
+  return process.env.COLLARA_DEVNET_STATE ?? fileURLToPath(new URL("../../../.local/devnet/state.json", import.meta.url));
+}
+
+/** True for a path that names a LocalNet state file (.local/localnet/state*.json); DEVNET refuses those. */
+export function isLocalnetStatePath(path: string): boolean {
+  return /(^|[\\/])\.local[\\/]localnet[\\/]state[^\\/]*\.json$/i.test(path.trim());
 }

@@ -17,12 +17,23 @@ export interface LocalnetBindingSource {
   readonly users: readonly {
     readonly id: string;
     readonly participant: string;
-    readonly role: "org" | "projector" | "admin";
+    readonly role: "org" | "projector" | "admin" | "tenant";
     readonly party?: string;
     readonly primaryParty?: string;
     readonly actAs: readonly string[];
     readonly readAs: readonly string[];
   }[];
+}
+
+/** party_bindings / ledger_users environment of each ledger mode. */
+export type LedgerEnvironment = "LOCALNET" | "DEVNET";
+
+/**
+ * The ledger environment of this process, from COLLARA_MODE (DEVNET → "DEVNET", anything else → "LOCALNET").
+ * DEVNET runs on its own database, so its bindings never mix with LocalNet's; the column keeps them apart anyway.
+ */
+export function currentLedgerEnvironment(env: NodeJS.ProcessEnv = process.env): LedgerEnvironment {
+  return env.COLLARA_MODE?.trim() === "DEVNET" ? "DEVNET" : "LOCALNET";
 }
 
 /** Party hints that are not an organization's business party. */
@@ -43,7 +54,7 @@ export async function importLocalnetState(
   state: LocalnetBindingSource,
   options: { environment?: string; now?: Date } = {},
 ): Promise<BindingImportSummary> {
-  const environment = options.environment ?? "LOCALNET";
+  const environment = options.environment ?? currentLedgerEnvironment();
   const now = options.now ?? new Date();
   const orgByHint = new Map(Object.values(DEMO_ORGANIZATIONS).map((org) => [org.partyHint, org.id]));
 

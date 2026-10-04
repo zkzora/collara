@@ -1,6 +1,7 @@
+import { DevnetEnvSchema, devnetGuardIssues } from "@collara/canton";
 import { z } from "zod";
 
-export const CollaraModeSchema = z.enum(["UI_MOCK", "LOCALNET"]);
+export const CollaraModeSchema = z.enum(["UI_MOCK", "LOCALNET", "DEVNET"]);
 export type CollaraMode = z.infer<typeof CollaraModeSchema>;
 
 /** "true"/"false"/"1"/"0" (env vars are strings). */
@@ -78,6 +79,9 @@ const ConfigSchema = z
     CANTON_JWT_AUDIENCE: z.string().min(1).optional(),
     // submit-and-wait timeout; a timeout is UNKNOWN_OUTCOME (resubmitted with the same command id), never a failure.
     CANTON_SUBMIT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(60_000),
+    // DEVNET (shared DevNet participant, OIDC refresh-token auth; docs/devnet.md): CANTON_DEVNET_JSON_API_URL,
+    // DEVNET_OIDC_*, DEVNET_LEDGER_AUDIENCE, DEVNET_LEDGER_USER_ID, COLLARA_DEVNET_STATE (see DevnetEnvSchema).
+    ...DevnetEnvSchema.shape,
     // Health: a projection checkpoint older than this is reported as degraded.
     WORKER_STALE_AFTER_SECONDS: z.coerce.number().int().min(5).default(120),
 
@@ -100,6 +104,13 @@ const ConfigSchema = z
         path: ["DEMO_SESSIONS_ENABLED"],
         message: "DEMO_SESSIONS_ENABLED is refused in production unless DEMO_SESSIONS_ALLOW_IN_PRODUCTION=true (synthetic demo deployments only)",
       });
+    }
+    if (config.COLLARA_MODE === "DEVNET") {
+      // Its own database and state file, never LocalNet's; OIDC refresh tokens only, never HMAC.
+      for (const issue of devnetGuardIssues(config)) ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
+      if (!config.DEVNET_LEDGER_USER_ID) {
+        ctx.addIssue({ code: "custom", path: ["DEVNET_LEDGER_USER_ID"], message: "DEVNET_LEDGER_USER_ID is required (printed by node scripts/devnet/login.mjs)" });
+      }
     }
     if (config.COLLARA_S3_ENDPOINT && !(config.COLLARA_S3_ACCESS_KEY && config.COLLARA_S3_SECRET_KEY)) {
       // SeaweedFS without credentials serves the bucket anonymously; never run storage that way.

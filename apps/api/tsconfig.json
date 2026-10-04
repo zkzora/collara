@@ -11,6 +11,7 @@
     "test",
     "vitest.config.ts",
     "vitest.localnet.config.ts",
-    "vitest.privacy.config.ts"
+    "vitest.privacy.config.ts",
+    "vitest.devnet.config.ts"
   ]
 }

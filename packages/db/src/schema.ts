@@ -715,6 +715,36 @@ export const notifications = pgTable(
   (t) => [index("notifications_recipient_idx").on(t.recipientOrgId, t.recipientUserId, t.createdAt)],
 );
 
+// --- Ledger credentials (DEVNET) -----------------------------------------------------------------------
+
+/**
+ * The rotating OIDC refresh token of DEVNET's tenant ledger user (one row per credential id, "devnet:<user>").
+ * SECRET: `refresh_token` is a live credential. It is written only by scripts/devnet/login.mjs and by the token
+ * provider (inside SELECT … FOR UPDATE, so one refresh token is never used twice across the API and the worker),
+ * never logged and never returned by an API route. Access tokens are not stored.
+ */
+export const ledgerCredentials = pgTable(
+  "ledger_credentials",
+  {
+    id: text("id").primaryKey(),
+    environment: text("environment").notNull().default("DEVNET"),
+    ledgerUserId: text("ledger_user_id").notNull(),
+    issuer: text("issuer").notNull(),
+    clientId: text("client_id").notNull(),
+    refreshToken: text("refresh_token"),
+    /** ACTIVE | REAUTH_REQUIRED (the identity provider rejected the refresh token: run the login script). */
+    status: text("status").notNull().default("ACTIVE"),
+    accessTokenExpiresAt: tsz("access_token_expires_at"),
+    rotatedAt: tsz("rotated_at"),
+    rotationCount: integer("rotation_count").notNull().default(0),
+    /** Operator-facing reason of the last rejection; never contains a token. */
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("ledger_credentials_status", sql`${t.status} in ('ACTIVE', 'REAUTH_REQUIRED')`)],
+);
+
 export type OrganizationRow = typeof organizations.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type MembershipRow = typeof memberships.$inferSelect;
@@ -735,3 +765,4 @@ export type LedgerUpdateRow = typeof ledgerUpdates.$inferSelect;
 export type AuditEventRow = typeof auditEvents.$inferSelect;
 export type ExportJobRow = typeof exportJobs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
+export type LedgerCredentialRow = typeof ledgerCredentials.$inferSelect;

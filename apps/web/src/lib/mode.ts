@@ -8,6 +8,6 @@ export function parseRuntimeMode(value: string | undefined): RuntimeMode {
   const trimmed = value?.trim();
   if (!trimmed) return "UI_MOCK";
   const parsed = RuntimeModeSchema.safeParse(trimmed);
-  if (!parsed.success) throw new Error(`COLLARA_MODE must be UI_MOCK or LOCALNET (got "${trimmed}").`);
+  if (!parsed.success) throw new Error(`COLLARA_MODE must be UI_MOCK, LOCALNET or DEVNET (got "${trimmed}").`);
   return parsed.data;
 }

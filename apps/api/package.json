@@ -16,7 +16,8 @@
     "openapi:export": "tsx scripts/export-openapi.ts",
     "seed:localnet": "tsx --env-file-if-exists=../../.env src/seed/cli.ts",
     "test:localnet": "vitest run --config vitest.localnet.config.ts",
-    "test:privacy": "vitest run --config vitest.privacy.config.ts"
+    "test:privacy": "vitest run --config vitest.privacy.config.ts",
+    "test:devnet": "vitest run --config vitest.devnet.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

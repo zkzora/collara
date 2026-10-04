@@ -9,18 +9,22 @@ import type { RuntimeMode } from "./states";
 export const MODE_BANNERS: Readonly<Record<RuntimeMode, string>> = {
   UI_MOCK: "Synthetic demo data — UI mockup.",
   LOCALNET: "Synthetic demo data — Canton LocalNet.",
+  /** INFERRED (needs copy approval): follows the pattern of the approved banners. */
+  DEVNET: "Synthetic demo data — Canton DevNet.",
 };
 
 /** Header environment chip, matching the real connection (S L542; `UI mockup` value INFERRED). */
 export const ENVIRONMENT_CHIPS: Readonly<Record<RuntimeMode, string>> = {
   UI_MOCK: "UI mockup",
   LOCALNET: "LocalNet",
+  /** INFERRED (needs copy approval). */
+  DEVNET: "DevNet",
 };
 
 /** Command lifecycle copy (S §18.2 L1125–1136). */
 export const COMMAND_COPY = {
   SUBMITTED: "Submitted. Waiting for ledger confirmation.",
-  /** LOCALNET only, and only with an update id. */
+  /** Ledger modes only (LOCALNET, DEVNET), and only with an update id. */
   COMMITTED: "Confirmed on the ledger.",
   PROJECTION_DELAYED: "The action is confirmed. This view is still synchronizing.",
   UNKNOWN_OUTCOME: "Confirmation is delayed. We are checking the original submission before retrying.",

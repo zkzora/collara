@@ -1,4 +1,4 @@
-import type { RuntimeMode } from "@collara/domain";
+import { isLedgerMode, type RuntimeMode } from "@collara/domain";
 import { formatUtcDate, formatUtcTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,7 @@ export const LEDGER_SYNC_COPY = {
 } as const;
 
 /**
- * "Ledger synced · offset 18422 · 14:32:05 UTC" from the projection checkpoint (LOCALNET).
+ * "Ledger synced · offset 18422 · 14:32:05 UTC" from the projection checkpoint (LOCALNET, DEVNET).
  * UI_MOCK has no ledger, so it says so instead of inventing an offset.
  */
 export function ledgerSyncText(mode: RuntimeMode, sync: LedgerSyncValue | null | undefined, { withDate = false } = {}): string {
@@ -34,7 +34,7 @@ export function LedgerSyncIndicator({
   withDate?: boolean;
   className?: string;
 }) {
-  const known = mode === "LOCALNET" && sync?.offset !== null && sync?.offset !== undefined && !!sync.at;
+  const known = isLedgerMode(mode) && sync?.offset !== null && sync?.offset !== undefined && !!sync.at;
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-[11.5px] text-fg-subtle", className)}>
       <span

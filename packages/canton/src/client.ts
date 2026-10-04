@@ -3,7 +3,7 @@ import createClient, { type Client } from "openapi-fetch";
 import { z } from "zod";
 import type { LedgerTokenProvider } from "./auth";
 import type { DeduplicationPeriod, DisclosedContract, LedgerCommand, TemplateId } from "./commands";
-import { classifyLedgerError, LedgerError } from "./errors";
+import { classifyCredentialFailure, classifyLedgerError, LedgerError } from "./errors";
 import {
   normalizeActiveContract,
   normalizeTransaction,
@@ -19,6 +19,8 @@ export type PartyDetails = Schemas["PartyDetails"];
 export type LedgerUser = Schemas["User"];
 export type LedgerRight = Schemas["Right"];
 export type LedgerVersion = Schemas["GetLedgerApiVersionResponse"];
+export type ConnectedSynchronizer = Schemas["ConnectedSynchronizer"];
+export type VettedPackages = Schemas["VettedPackages"];
 
 export type TransactionShape = "ACS_DELTA" | "LEDGER_EFFECTS";
 
@@ -163,9 +165,16 @@ export class LedgerClient {
       const timeout = AbortSignal.timeout(options?.timeoutMs ?? defaultTimeoutMs);
       const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
       let result: Awaited<ReturnType<typeof run>>;
+      const headers: Record<string, string> = {};
+      if (this.#tokens) {
+        try {
+          headers.Authorization = `Bearer ${await this.#tokens.getToken(signal)}`;
+        } catch (error) {
+          // No token, so nothing was sent: FAILED (never UNKNOWN_OUTCOME).
+          throw new LedgerError(operation, classifyCredentialFailure(signal.reason ?? error));
+        }
+      }
       try {
-        const headers: Record<string, string> = {};
-        if (this.#tokens) headers.Authorization = `Bearer ${await this.#tokens.getToken(signal)}`;
         result = await run({ headers, signal });
       } catch (error) {
         throw new LedgerError(operation, classifyLedgerError({ error: signal.reason ?? error }));
@@ -296,6 +305,55 @@ export class LedgerClient {
         }),
     );
     return body.newlyGrantedRights ?? [];
+  }
+
+  /** GET /v2/authenticated-user: the ledger user behind the current token. */
+  async authenticatedUser(options?: CallOptions): Promise<LedgerUser> {
+    const body = await this.#call<Schemas["GetUserResponse"]>("authenticatedUser", options, this.#options.timeoutMs, (init) =>
+      this.#http.GET("/v2/authenticated-user", init),
+    );
+    return body.user;
+  }
+
+  /** GET /v2/state/connected-synchronizers (optionally for one party). */
+  async connectedSynchronizers(query: { party?: string } = {}, options?: CallOptions): Promise<ConnectedSynchronizer[]> {
+    const body = await this.#call<Schemas["GetConnectedSynchronizersResponse"]>(
+      "connectedSynchronizers",
+      options,
+      this.#options.timeoutMs,
+      (init) => this.#http.GET("/v2/state/connected-synchronizers", { ...init, params: { query } }),
+    );
+    return body.connectedSynchronizers ?? [];
+  }
+
+  /** GET /v2/packages: ids of every package known to the participant. */
+  async listPackages(options?: CallOptions): Promise<string[]> {
+    const body = await this.#call<Schemas["ListPackagesResponse"]>("listPackages", options, this.#options.timeoutMs, (init) =>
+      this.#http.GET("/v2/packages", init),
+    );
+    return body.packageIds ?? [];
+  }
+
+  /** POST /v2/package-vetting/list for these package ids (all pages). Callable by any authenticated user. */
+  async vettedPackages(filter: { packageIds: string[]; participantIds?: string[] }, options?: CallOptions): Promise<VettedPackages[]> {
+    const result: VettedPackages[] = [];
+    let pageToken = "";
+    do {
+      const body = await this.#call<Schemas["ListVettedPackagesResponse"]>("vettedPackages", options, this.#options.timeoutMs, (init) =>
+        this.#http.POST("/v2/package-vetting/list", {
+          ...init,
+          body: {
+            packageMetadataFilter: { packageIds: filter.packageIds, packageNamePrefixes: [] },
+            topologyStateFilter: { participantIds: filter.participantIds ?? [], synchronizerIds: [] },
+            pageToken,
+            pageSize: 0,
+          },
+        }),
+      );
+      result.push(...(body.vettedPackages ?? []));
+      pageToken = body.nextPageToken ?? "";
+    } while (pageToken);
+    return result;
   }
 
   /** POST /v2/dars (binary body). Uploading the same DAR again is a no-op. */

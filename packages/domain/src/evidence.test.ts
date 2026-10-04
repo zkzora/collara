@@ -18,6 +18,7 @@ describe("EVIDENCE", () => {
       EVIDENCE.privacy.date,
       EVIDENCE.tierB.date,
       EVIDENCE.deployment.web.date,
+      EVIDENCE.devnet.date,
     ];
     for (const date of dates) expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -28,6 +29,9 @@ describe("EVIDENCE", () => {
     expect(EVIDENCE.tierB.integratedInApp).toBe(false);
     expect(EVIDENCE.deployment.web.mode).toBe("UI_MOCK");
     expect(EVIDENCE.deployment.cantonNetwork).toBe(false);
+    // DevNet: code only until a real run is recorded in docs/devnet-evidence.md.
+    expect(EVIDENCE.devnet.run).toBe(false);
+    expect(EVIDENCE.devnet.firstCommittedUpdateId).toBeNull();
   });
 
   it("feeds the capability table instead of repeating its numbers", () => {
@@ -36,6 +40,7 @@ describe("EVIDENCE", () => {
     expect(where("localnet-demo")).toContain(passCount(EVIDENCE.localnetIntegration));
     expect(where("roles")).toContain(`${EVIDENCE.privacy.participants} participants`);
     expect(where("governance")).toContain(passCount(EVIDENCE.tierB.scriptedChecks));
+    expect(where("devnet")).toContain(EVIDENCE.devnet.status);
     expect(passCount({ passed: 7, total: 9 })).toBe("7/9");
   });
 });

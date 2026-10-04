@@ -275,6 +275,20 @@ export function classifyLedgerError(input: { status?: number; body?: unknown; er
   };
 }
 
+/**
+ * The bearer token could not be obtained (identity provider down, refresh token revoked, token failed
+ * validation). The request was never sent, so a submission is FAILED, never UNKNOWN_OUTCOME. The message comes
+ * from the token provider, which never includes a token.
+ */
+export function classifyCredentialFailure(error: unknown): LedgerErrorInfo {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError") return { ...FAILED("TIMEOUT", true), message: "token request timed out", original: error };
+  if (name === "AbortError") return { ...FAILED("UNKNOWN", true), message: "token request aborted", original: error };
+  const retryable = typeof error === "object" && error !== null && (error as { retryable?: unknown }).retryable === true;
+  const message = error instanceof Error ? error.message : String(error);
+  return { ...FAILED("UNAUTHENTICATED", retryable), message: truncate(`ledger token unavailable: ${message}`), original: error };
+}
+
 /** Error thrown by LedgerClient for every failed call. */
 export class LedgerError extends Error {
   override readonly name = "LedgerError";

@@ -1,6 +1,6 @@
 "use client";
 
-import { ENVIRONMENT_CHIPS, GOVERNANCE_INTEGRATION_LABELS, SAVED_VIEW_LABELS, type GovernanceIntegrationStatus } from "@collara/domain";
+import { ENVIRONMENT_CHIPS, GOVERNANCE_INTEGRATION_LABELS, isLedgerMode, SAVED_VIEW_LABELS, type GovernanceIntegrationStatus } from "@collara/domain";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -29,10 +29,10 @@ function orgInitials(name: string): string {
 
 function GovernanceBadge() {
   const { mode, me } = useSession();
-  const state = useGovernanceState({ enabled: mode === "LOCALNET" && me.navigation.includes("governance") });
+  const state = useGovernanceState({ enabled: isLedgerMode(mode) && me.navigation.includes("governance") });
   const status: GovernanceIntegrationStatus = mode === "UI_MOCK" ? "SIMULATED" : (state.data?.integration.status ?? "UNAVAILABLE");
   const full = mode === "UI_MOCK" ? GOVERNANCE_INTEGRATION_LABELS.SIMULATED : (state.data?.integration.label ?? GOVERNANCE_INTEGRATION_LABELS.UNAVAILABLE);
-  if (mode === "LOCALNET" && state.isPending) return null;
+  if (isLedgerMode(mode) && state.isPending) return null;
   return (
     <Badge variant={status === "UNAVAILABLE" ? "warning" : "neutral"} className="h-5 px-1.5 text-[10.5px]" title={full}>
       <span aria-hidden="true">{INTEGRATION_SHORT[status]}</span>
