@@ -1,0 +1,20 @@
+{
+  "status": 400,
+  "body": {
+    "code": "PARTICIPANT_PRUNED_DATA_ACCESSED",
+    "cause": "Updates request from 12 to 40 precedes pruned offset 25",
+    "correlationId": null,
+    "traceId": "00000000000000000000000000000001",
+    "context": {
+      "participant": "devnet-synthetic",
+      "earliest_offset": "25",
+      "definite_answer": "false",
+      "category": "9"
+    },
+    "resources": [],
+    "errorCategory": 9,
+    "grpcCodeValue": 9,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

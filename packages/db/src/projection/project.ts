@@ -1,6 +1,7 @@
-// One projection pass per participant source: reset detection, then /v2/updates (LEDGER_EFFECTS) from the
-// durable checkpoint to the ledger end, each transaction applied atomically (apply.ts), then the command-status
-// sweep. Restart-safe: everything resumes from ledger_sources.checkpoint_offset.
+// One projection pass per participant source: reset and pruning detection, then /v2/updates (LEDGER_EFFECTS) from
+// the durable checkpoint to the ledger end, each transaction applied atomically (apply.ts), then the command-status
+// sweep. Restart-safe: everything resumes from ledger_sources.checkpoint_offset. A checkpoint below the
+// participant's pruning offset is never "resumed" (the updates in between are gone): the source becomes PRUNED.
 import { eq } from "drizzle-orm";
 import type { Db } from "../client";
 import { ledgerContracts, ledgerEvents, ledgerSources, ledgerUpdates, type LedgerSourceRow } from "../schema";
@@ -33,7 +34,24 @@ export interface ProjectOnceOptions {
   readonly beforeCommit?: ApplyOptions["beforeCommit"];
 }
 
-export type ProjectionStatus = "ACTIVE" | "RESET_DETECTED" | "PAUSED";
+export type ProjectionStatus = "ACTIVE" | "RESET_DETECTED" | "PRUNED" | "PAUSED";
+
+/**
+ * Canton error ids meaning "the offset you asked for was pruned". PARTICIPANT_PRUNED_DATA_ACCESSED is the id named
+ * in the committed Canton 3.5.19 OpenAPI (FAILED_PRECONDITION). Matched structurally on LedgerError.info.code.
+ */
+export const PRUNED_ERROR_CODES: readonly string[] = ["PARTICIPANT_PRUNED_DATA_ACCESSED"];
+
+/** The Canton error id of a pruned-offset failure (a LedgerError from @collara/canton), or null. */
+export function prunedErrorCode(error: unknown): string | null {
+  const code = (error as { info?: { code?: unknown } } | null)?.info?.code;
+  return typeof code === "string" && PRUNED_ERROR_CODES.includes(code) ? code : null;
+}
+
+export function prunedReason(checkpoint: number, prunedUpTo: number | null): string {
+  const horizon = prunedUpTo === null ? "the participant's pruning offset" : `pruning offset ${prunedUpTo}`;
+  return `updates after checkpoint ${checkpoint} were pruned (${horizon}); they cannot be re-projected. Keep this projection as history and start a new run (docs/devnet/recovery.md)`;
+}
 
 export interface ProjectOnceResult {
   readonly source: string;
@@ -61,10 +79,10 @@ async function loadSource(db: Db, source: string): Promise<LedgerSourceRow | nul
   return row ?? null;
 }
 
-async function markReset(db: Db, source: string, reason: string, now: Date): Promise<void> {
+async function markReset(db: Db, source: string, reason: string, now: Date, status: "RESET_DETECTED" | "PRUNED" = "RESET_DETECTED"): Promise<void> {
   await db
     .update(ledgerSources)
-    .set({ status: "RESET_DETECTED", resetDetectedAt: now, resetReason: reason.slice(0, 500), updatedAt: now })
+    .set({ status, resetDetectedAt: now, resetReason: reason.slice(0, 500), updatedAt: now })
     .where(eq(ledgerSources.source, source));
 }
 
@@ -149,6 +167,16 @@ export async function projectOnce(
       return inactive((await loadSource(db, config.source)) ?? row, ledgerEnd, participantId);
     }
 
+    // Pruning: the next read starts after the checkpoint; if the participant pruned past it, the updates in between
+    // are gone and reading on would silently skip them.
+    if (client.latestPrunedOffset) {
+      const prunedUpTo = await client.latestPrunedOffset({ signal });
+      if (prunedUpTo > row.checkpointOffset) {
+        await markReset(db, config.source, prunedReason(row.checkpointOffset, prunedUpTo), now, "PRUNED");
+        return inactive((await loadSource(db, config.source)) ?? row, ledgerEnd, participantId);
+      }
+    }
+
     const checkpointBefore = row.checkpointOffset;
     let checkpoint = checkpointBefore;
     let applied = 0;
@@ -163,10 +191,18 @@ export async function projectOnce(
 
     for (let pages = 0; !complete && (options.maxPages === undefined || pages < options.maxPages); pages++) {
       signal?.throwIfAborted();
-      const page = await client.updates(
-        { beginExclusive: checkpoint, endInclusive: ledgerEnd, parties, shape: "LEDGER_EFFECTS", limit: options.pageLimit ?? 200 },
-        { signal },
-      );
+      let page: Awaited<ReturnType<ProjectionLedgerClient["updates"]>>;
+      try {
+        page = await client.updates(
+          { beginExclusive: checkpoint, endInclusive: ledgerEnd, parties, shape: "LEDGER_EFFECTS", limit: options.pageLimit ?? 200 },
+          { signal },
+        );
+      } catch (error) {
+        const code = prunedErrorCode(error);
+        if (!code) throw error;
+        await markReset(db, config.source, `${code}: ${prunedReason(checkpoint, null)}`, clock(), "PRUNED");
+        return inactive((await loadSource(db, config.source)) ?? row, ledgerEnd, participantId);
+      }
       for (const update of page.updates) {
         if (update.kind !== "transaction") continue;
         const result = await applyTransaction(db, config.source, update.transaction, { ...applyOptions, now: clock() });
@@ -250,16 +286,32 @@ export interface ResetSummary {
 /**
  * Operator command after a ledger reset: deletes the source's projected contracts, events and updates and
  * restarts it from offset 0 (ACTIVE), optionally re-pointed at a new participant id. Command records are kept.
+ * `startOffset` (DevNet new run on a pruned participant) starts the projection at the pruning offset instead and
+ * records it as the source's history floor: nothing at or before it is projected.
  */
 export async function resetProjectionSource(
   db: Db,
   source: string,
-  options: { participantId?: string; jsonApiUrl?: string; now?: Date } = {},
+  options: { participantId?: string; jsonApiUrl?: string; now?: Date; startOffset?: number } = {},
 ): Promise<ResetSummary> {
+  const startOffset = options.startOffset ?? 0;
+  if (!Number.isSafeInteger(startOffset) || startOffset < 0) throw new Error(`invalid start offset ${startOffset}`);
   const now = options.now ?? new Date();
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(ledgerSources).where(eq(ledgerSources.source, source)).for("update");
-    if (!row) throw new Error(`unknown projection source ${source}`);
+    if (!row) {
+      // A source the worker never created can be started at a history floor (new DevNet run on a pruned participant).
+      if (!options.participantId || !options.jsonApiUrl) throw new Error(`unknown projection source ${source}`);
+      await tx.insert(ledgerSources).values({
+        source,
+        participantId: options.participantId,
+        jsonApiUrl: options.jsonApiUrl,
+        checkpointOffset: startOffset,
+        historyFloorOffset: startOffset > 0 ? startOffset : null,
+        updatedAt: now,
+      });
+      return { source, contracts: 0, events: 0, updates: 0 };
+    }
     const events = await tx.delete(ledgerEvents).where(eq(ledgerEvents.source, source)).returning({ id: ledgerEvents.id });
     const contracts = await tx
       .delete(ledgerContracts)
@@ -272,7 +324,8 @@ export async function resetProjectionSource(
     await tx
       .update(ledgerSources)
       .set({
-        checkpointOffset: 0,
+        checkpointOffset: startOffset,
+        historyFloorOffset: startOffset > 0 ? startOffset : null,
         lastUpdateId: null,
         lastAppliedAt: null,
         ledgerEndSeen: null,

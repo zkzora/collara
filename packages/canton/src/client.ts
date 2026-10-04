@@ -224,6 +224,17 @@ export class LedgerClient {
     return body.offset ?? 0;
   }
 
+  /**
+   * GET /v2/state/latest-pruned-offsets: participantPrunedUpToInclusive, the offset up to which the participant has
+   * pruned (0 = never pruned). Reads must start at or after it; a checkpoint below it cannot be resumed.
+   */
+  async latestPrunedOffset(options?: CallOptions): Promise<number> {
+    const body = await this.#call<Schemas["GetLatestPrunedOffsetsResponse"]>("latestPrunedOffset", options, this.#options.timeoutMs, (init) =>
+      this.#http.GET("/v2/state/latest-pruned-offsets", init),
+    );
+    return body.participantPrunedUpToInclusive ?? 0;
+  }
+
   // Parties, users, packages (admin) ----------------------------------------------------------
 
   async allocateParty(

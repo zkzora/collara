@@ -89,6 +89,11 @@ export interface ProjectionLedgerClient {
     },
     options?: { signal?: AbortSignal },
   ): Promise<ProjectionUpdatesPage>;
+  /**
+   * GET /v2/state/latest-pruned-offsets → participantPrunedUpToInclusive (0 = never pruned). Optional: a client
+   * without it is only checked through PARTICIPANT_PRUNED_DATA_ACCESSED errors.
+   */
+  latestPrunedOffset?(options?: { signal?: AbortSignal }): Promise<number>;
 }
 
 /** Completions of one ledger user (used to reconcile UNKNOWN_OUTCOME commands). */

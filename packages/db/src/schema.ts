@@ -497,8 +497,16 @@ export const ledgerSources = pgTable("ledger_sources", {
   lastAppliedAt: tsz("last_applied_at"),
   /** Ledger end observed at the last poll; < checkpoint means the ledger was reset. */
   ledgerEndSeen: offset("ledger_end_seen"),
-  /** ACTIVE | RESET_DETECTED | PAUSED. A reset source is never mixed with a new history. */
+  /**
+   * ACTIVE | RESET_DETECTED | PRUNED | PAUSED. A reset source is never mixed with a new history; a PRUNED source
+   * (updates after its checkpoint were pruned by the participant) is never re-projected from a pruned offset.
+   */
   status: text("status").notNull().default("ACTIVE"),
+  /**
+   * Set when a projection was (re)started at the participant's pruning offset instead of 0 (new DevNet run on a
+   * pruned participant): nothing at or before this offset is projected.
+   */
+  historyFloorOffset: offset("history_floor_offset"),
   resetDetectedAt: tsz("reset_detected_at"),
   resetReason: text("reset_reason"),
   /**
@@ -731,7 +739,14 @@ export const ledgerCredentials = pgTable(
     ledgerUserId: text("ledger_user_id").notNull(),
     issuer: text("issuer").notNull(),
     clientId: text("client_id").notNull(),
-    refreshToken: text("refresh_token"),
+    /**
+     * The rotating refresh token, AES-256-GCM encrypted (credential-cipher.ts, migration 0005): key id, nonce,
+     * ciphertext and tag, base64. All four are set or all are null. The key itself is never stored here.
+     */
+    refreshTokenKeyId: text("refresh_token_key_id"),
+    refreshTokenNonce: text("refresh_token_nonce"),
+    refreshTokenCiphertext: text("refresh_token_ciphertext"),
+    refreshTokenTag: text("refresh_token_tag"),
     /** ACTIVE | REAUTH_REQUIRED (the identity provider rejected the refresh token: run the login script). */
     status: text("status").notNull().default("ACTIVE"),
     accessTokenExpiresAt: tsz("access_token_expires_at"),
@@ -742,7 +757,13 @@ export const ledgerCredentials = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check("ledger_credentials_status", sql`${t.status} in ('ACTIVE', 'REAUTH_REQUIRED')`)],
+  (t) => [
+    check("ledger_credentials_status", sql`${t.status} in ('ACTIVE', 'REAUTH_REQUIRED')`),
+    check(
+      "ledger_credentials_envelope",
+      sql`(${t.refreshTokenKeyId} is null and ${t.refreshTokenNonce} is null and ${t.refreshTokenCiphertext} is null and ${t.refreshTokenTag} is null) or (${t.refreshTokenKeyId} is not null and ${t.refreshTokenNonce} is not null and ${t.refreshTokenCiphertext} is not null and ${t.refreshTokenTag} is not null)`,
+    ),
+  ],
 );
 
 export type OrganizationRow = typeof organizations.$inferSelect;

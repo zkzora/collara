@@ -1,10 +1,16 @@
 // Ledger connections of the worker: one projector client per participant source (read-only, CanReadAs the
 // Collara parties: a documented privileged operator credential, ADR-0001 §2.5) and on-demand completion clients
 // for the ledger users whose UNKNOWN_OUTCOME commands are reconciled. DEVNET: one source ("devnet") read through
-// the tenant user's OIDC refresh token, with readAs = exactly the bound Collara parties (never any-party).
+// the tenant user's OIDC refresh token (stored encrypted; key DEVNET_CREDENTIAL_KEY), with readAs = exactly the bound
+// Collara parties (never any-party), plus a periodic recovery check (devnet-recovery: reset, pruning, rights,
+// packages, credential) reported in /healthz.
 import {
   createHmacTokenProviders,
   devnetCredentialId,
+  diagnoseDevnet,
+  observeDevnetLedger,
+  parseCredentialKeyring,
+  type DevnetDiagnosis,
   devnetOidcSettings,
   devnetStatePath,
   LedgerClient,
@@ -13,7 +19,16 @@ import {
   type LocalnetState,
   type OidcLedgerSettings,
 } from "@collara/canton";
-import { PgRefreshTokenStore, type CompletionLedgerClient, type Db, type ProjectionLedgerClient, type ProjectionSourceConfig } from "@collara/db";
+import {
+  CredentialCipher,
+  databaseRecoveryState,
+  PgRefreshTokenStore,
+  projectionRecoveryState,
+  type CompletionLedgerClient,
+  type Db,
+  type ProjectionLedgerClient,
+  type ProjectionSourceConfig,
+} from "@collara/db";
 import { DEV_HMAC_SECRET, type WorkerConfig } from "./config";
 
 export interface ProjectionSource {
@@ -26,6 +41,8 @@ export interface WorkerLedger {
   readonly sources: readonly ProjectionSource[];
   /** Completions client for a ledger user (null when the user is not in the bootstrap state). */
   completionClient(ledgerUserId: string, source: string | null): CompletionLedgerClient | null;
+  /** DEVNET: read-only recovery diagnosis (docs/devnet/recovery.md). */
+  recoveryCheck?: () => Promise<DevnetDiagnosis>;
 }
 
 export class LedgerNotBootstrappedError extends Error {
@@ -62,19 +79,43 @@ export async function connectDevnetLedger(
   const extra = parties.filter((party) => !bound.has(party));
   if (extra.length) throw new Error(`PROJECTION_PARTIES names parties that are not bound Collara parties: ${extra.join(", ")}`);
   if (parties.length === 0) throw new Error("the DevNet projector reads no parties");
+  const store = new PgRefreshTokenStore(db, { cipher: new CredentialCipher(parseCredentialKeyring(config)) });
+  const credentialId = devnetCredentialId(tenant.id);
   const provider = new OidcRefreshTokenProvider({
     settings: { ...devnetOidcSettings({ ...config, DEVNET_LEDGER_USER_ID: tenant.id }), ...options.oidc },
-    store: new PgRefreshTokenStore(db),
-    credentialId: devnetCredentialId(tenant.id),
+    store,
+    credentialId,
   });
   const sources: ProjectionSource[] = Object.entries(state.participants).map(([source, participant]) => ({
     config: { source, jsonApiUrl: participant.jsonApiUrl, parties, ledgerUserId: tenant.id },
     client: new LedgerClient({ baseUrl: participant.jsonApiUrl, tokenProvider: provider, timeoutMs: 30_000, ...(options.fetch ? { fetch: options.fetch } : {}) }),
   }));
   const completion = new Map<string, LedgerClient>();
+  const [primary] = Object.entries(state.participants);
+  const recoveryClient = primary ? new LedgerClient({ baseUrl: primary[1].jsonApiUrl, tokenProvider: provider, timeoutMs: 30_000, ...(options.fetch ? { fetch: options.fetch } : {}) }) : null;
   return {
     state,
     sources,
+    async recoveryCheck() {
+      const database = await databaseRecoveryState(db);
+      const ok = database.reachable && database.migrated;
+      const credential = ok ? await store.check(credentialId) : null;
+      const ledger =
+        credential?.state === "OK" && recoveryClient
+          ? await observeDevnetLedger(
+              recoveryClient,
+              tenant.id,
+              state.packages.map((p) => ({ name: p.name, version: p.version, packageId: p.mainPackageId })),
+            )
+          : null;
+      return diagnoseDevnet({
+        database,
+        credential: credential ? { state: credential.state, detail: credential.detail } : null,
+        state: { participantId: state.participantId, namespace: null, parties: Object.fromEntries(Object.entries(state.parties).map(([hint, p]) => [hint, p.party])) },
+        ledger,
+        projection: ok && primary ? await projectionRecoveryState(db, primary[0]) : null,
+      });
+    },
     completionClient(ledgerUserId, source) {
       const participant = state.participants[source ?? tenant.participant];
       if (ledgerUserId !== tenant.id || !participant) return null;

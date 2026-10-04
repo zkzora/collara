@@ -1,9 +1,10 @@
 // DEVNET configuration shared by the API, the worker and scripts/devnet: the shared participant's JSON Ledger API,
 // the OIDC public client of the tenant, the tenant ledger user, and the guards that keep DEVNET apart from
-// LOCALNET (its own database, its own state file, no HMAC secret). Nothing here is a secret: the refresh token lives
-// only in the ledger_credentials table.
+// LOCALNET (its own database, its own state file, no HMAC secret). The refresh token lives only in the
+// ledger_credentials table, encrypted with DEVNET_CREDENTIAL_KEY (credential-key.ts), which never goes into the database.
 import { z } from "zod";
 import { LedgerUserIdSchema } from "./auth";
+import { credentialKeyIssues } from "./credential-key";
 import { defaultDevnetStatePath, isLocalnetStatePath } from "./localnet-state";
 import { devnetCredentialId, type OidcLedgerSettings } from "./oidc";
 
@@ -34,6 +35,11 @@ export const DevnetEnvSchema = z.object({
   DEVNET_LEDGER_USER_ID: LedgerUserIdSchema.optional(),
   /** Default <repo>/.local/devnet/state.json. */
   COLLARA_DEVNET_STATE: z.string().min(1).optional(),
+  /** SECRET (never logged, never NEXT_PUBLIC_*, never in the database): base64 of 32 bytes; validated by devnetGuardIssues. */
+  DEVNET_CREDENTIAL_KEY: z.string().optional(),
+  DEVNET_CREDENTIAL_KEY_ID: z.string().optional(),
+  /** SECRET: comma-separated `<id>:<base64>` of keys before a rotation (decrypt only). */
+  DEVNET_CREDENTIAL_KEY_PREVIOUS: z.string().optional(),
 });
 export type DevnetEnv = z.output<typeof DevnetEnvSchema>;
 
@@ -42,10 +48,14 @@ export interface DevnetGuardInput {
   readonly COLLARA_LOCALNET_STATE?: string | undefined;
   readonly COLLARA_DEVNET_STATE?: string | undefined;
   readonly CANTON_JWT_HMAC_SECRET?: string | undefined;
+  readonly DEVNET_CREDENTIAL_KEY?: string | undefined;
+  readonly DEVNET_CREDENTIAL_KEY_ID?: string | undefined;
+  readonly DEVNET_CREDENTIAL_KEY_PREVIOUS?: string | undefined;
 }
 
 /**
- * Reasons DEVNET must refuse to start (empty = fine): a LocalNet database or state file, or an HMAC secret.
+ * Reasons DEVNET must refuse to start (empty = fine): a LocalNet database or state file, an HMAC secret, or a
+ * missing or malformed credential key (messages never contain key material).
  * DEVNET's database name must contain "devnet" (e.g. collara_devnet) so it can never be the LocalNet demo database.
  */
 export function devnetGuardIssues(env: DevnetGuardInput): { path: string; message: string }[] {
@@ -75,6 +85,7 @@ export function devnetGuardIssues(env: DevnetGuardInput): { path: string; messag
   if (env.CANTON_JWT_HMAC_SECRET) {
     issues.push({ path: "CANTON_JWT_HMAC_SECRET", message: "DEVNET refuses HMAC ledger tokens: unset CANTON_JWT_HMAC_SECRET (LOCALNET only)" });
   }
+  issues.push(...credentialKeyIssues(env));
   return issues;
 }
 

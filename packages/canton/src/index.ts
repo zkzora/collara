@@ -111,5 +111,40 @@ export {
   type DevnetEnv,
   type DevnetGuardInput,
 } from "./devnet-config";
+export {
+  CREDENTIAL_KEY_ENV,
+  CREDENTIAL_KEY_ID_ENV,
+  CREDENTIAL_KEY_PREVIOUS_ENV,
+  CredentialKeyConfigError,
+  credentialKeyIssues,
+  GEN_KEY_COMMAND,
+  parseCredentialKeyring,
+  publicEnvKeyLeaks,
+  type CredentialKeyEnv,
+  type CredentialKeyIssue,
+  type CredentialKeyMaterial,
+  type CredentialKeyring,
+} from "./credential-key";
+export {
+  classifyRecoveryError,
+  DEVNET_RECOVERY_CASES,
+  diagnoseDevnet,
+  formatDiagnosis,
+  observeDevnetLedger,
+  OFFSET_AHEAD_ERROR_CODES,
+  PACKAGE_ERROR_CODES,
+  PRUNED_OFFSET_ERROR_CODES,
+  RECOVER_COMMAND,
+  RECOVER_NEW_RUN_COMMAND,
+  type CredentialCheckState,
+  type DevnetDiagnosis,
+  type DevnetFinding,
+  type DevnetObservation,
+  type DevnetRecoveryCase,
+  type LedgerObservation,
+  type RecoveryErrorClassification,
+  type RecoveryLedgerClient,
+  type RequiredPackageObservation,
+} from "./devnet-recovery";
 export * as damlValue from "./values";
 export type { DamlJson } from "./values";

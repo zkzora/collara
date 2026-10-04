@@ -9,3 +9,12 @@ export function fixture(name: string): unknown {
 export function errorFixture(name: string): { status: number; body: unknown } {
   return fixture(`errors/${name}`) as { status: number; body: unknown };
 }
+
+/**
+ * SYNTHETIC error response: { status, body }, NOT recorded from a participant. Built from the JsCantonError schema
+ * and an error id named in the committed OpenAPI or the Canton error-code reference, for error kinds a sandbox
+ * cannot produce on demand (pruning). Replace with a recorded body when one is observed.
+ */
+export function syntheticErrorFixture(name: string): { status: number; body: unknown } {
+  return fixture(`errors-synthetic/${name}`) as { status: number; body: unknown };
+}

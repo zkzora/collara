@@ -8,10 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { devnetCredentialId, OidcRefreshTokenProvider, remoteJwks } from "@collara/canton";
 import { startMockOidcIssuer, type MockOidcIssuer } from "@collara/canton/testing";
-import { createPgDatabase, createPgliteDatabase, PgRefreshTokenStore, type DbHandle } from "@collara/db";
+import { createPgDatabase, createPgliteDatabase, CredentialCipher, ledgerSources, PgRefreshTokenStore, type DbHandle } from "@collara/db";
+import pino from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "./config";
 import { connectDevnetLedger } from "./ledger";
+import { startRuntime } from "./runtime";
 
 const USER = "c2ede6f6-0000-4000-8000-00000000beef";
 const AUDIENCE = "https://hackcanton-01.devnet.naas.noders.services";
@@ -19,6 +21,10 @@ const API = "https://ledger.devnet.invalid";
 const HINTS = ["CollaraRegistrar", "CollaraGovernance", "DemoManufacturer", "DemoCNCDealer", "DemoVerifier", "DemoLenderA", "DemoLenderB", "DemoAuditor", "GovSeat1", "GovSeat2", "GovSeat3"];
 const party = (hint: string) => `c2ede6f6-${hint}::1220aa`;
 const OTHER = "c2ede6f6-unrelated::1220aa";
+// Unit-test credential key (fixed bytes), never used anywhere else.
+const KEY = Buffer.alloc(32, 0x42).toString("base64");
+const cipher = () => new CredentialCipher({ current: { id: "k1", key: Buffer.from(KEY, "base64") }, previous: [] });
+const keyedStore = (db: DbHandle) => new PgRefreshTokenStore(db.db, { cipher: cipher() });
 
 function devnetState() {
   const bound = HINTS.map(party);
@@ -39,13 +45,17 @@ function devnetState() {
   };
 }
 
-/** Fake JSON API: records the bearer token per call and answers ledger-end. */
-function fakeLedger() {
+/** Fake JSON API: records the bearer token per call; answers the read-only GETs the projection and recovery use. */
+function fakeLedger(options: { prunedUpTo?: number; actAs?: string[] } = {}) {
   const tokens: string[] = [];
   const fetchImpl = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : new Request(input, init);
     tokens.push(request.headers.get("authorization") ?? "");
-    if (new URL(request.url).pathname === "/v2/state/ledger-end") return Response.json({ offset: 123 });
+    const path = new URL(request.url).pathname;
+    if (path === "/v2/state/ledger-end") return Response.json({ offset: 123 });
+    if (path === "/v2/parties/participant-id") return Response.json({ participantId: "PAR::noders::1220" });
+    if (path === "/v2/state/latest-pruned-offsets") return Response.json({ participantPrunedUpToInclusive: options.prunedUpTo ?? 0 });
+    if (path === `/v2/users/${USER}/rights`) return Response.json({ rights: (options.actAs ?? HINTS.map(party)).map((p) => ({ kind: { CanActAs: { value: { party: p } } } })) });
     return new Response("not found", { status: 404 });
   };
   return { tokens, fetch: fetchImpl as typeof fetch };
@@ -73,11 +83,13 @@ const config = (extra: Record<string, string> = {}) =>
     DATABASE_URL: "postgres://collara:unused@127.0.0.1:5432/collara_devnet",
     DEVNET_LEDGER_USER_ID: USER,
     COLLARA_DEVNET_STATE: statePath,
+    DEVNET_CREDENTIAL_KEY: KEY,
+    DEVNET_CREDENTIAL_KEY_ID: "k1",
     ...extra,
   });
 
 async function storeLogin(db: DbHandle) {
-  await new PgRefreshTokenStore(db.db).storeLogin({
+  await keyedStore(db).storeLogin({
     id: devnetCredentialId(USER),
     ledgerUserId: USER,
     issuer: issuer.issuer,
@@ -93,6 +105,12 @@ describe("worker DEVNET config", () => {
     expect(() => config({ DATABASE_URL: "postgres://collara:x@127.0.0.1:5432/collara" })).toThrow(/refuses database/);
     expect(() => config({ COLLARA_LOCALNET_STATE: "state.json" })).toThrow(/COLLARA_LOCALNET_STATE/);
     expect(() => config({ CANTON_JWT_HMAC_SECRET: "collara-local-dev-secret-change-me" })).toThrow(/refuses HMAC/);
+  });
+
+  it("refuses to start without the credential key, or with the key in a NEXT_PUBLIC_* variable", () => {
+    expect(() => config({ DEVNET_CREDENTIAL_KEY: "" })).toThrow(/DEVNET needs DEVNET_CREDENTIAL_KEY/);
+    expect(() => config({ DEVNET_CREDENTIAL_KEY_ID: "" })).toThrow(/DEVNET needs DEVNET_CREDENTIAL_KEY_ID/);
+    expect(() => config({ NEXT_PUBLIC_LEAK: KEY })).toThrow(/NEXT_PUBLIC_LEAK: must not carry DEVNET_CREDENTIAL_KEY/);
   });
 });
 
@@ -136,13 +154,52 @@ describe("connectDevnetLedger (PGlite + mock issuer)", () => {
     const worker = await connectDevnetLedger(config(), handle.db, { fetch: ledger.fetch, oidc: oidc() });
     const api = new OidcRefreshTokenProvider({
       settings: { ...oidc(), audience: AUDIENCE, ledgerUserId: USER },
-      store: new PgRefreshTokenStore(handle.db),
+      store: keyedStore(handle),
       jwks: remoteJwks(issuer.jwksUri),
     });
     await Promise.all([worker.sources[0]?.client.ledgerEnd(), api.getToken(), api.getToken()]);
     expect(issuer.refreshCount() - before).toBe(2);
     expect(issuer.reuseCount()).toBe(0);
     issuer.delayMs = 0;
+  });
+
+  it("recovery check: OK, then PARTIES_MISSING and PRUNED, each reported in /healthz with the recover command", async () => {
+    const healthy = await connectDevnetLedger(config(), handle.db, { fetch: fakeLedger().fetch, oidc: oidc() });
+    expect((await healthy.recoveryCheck?.())?.primary).toBe("OK");
+
+    const lostRights = await connectDevnetLedger(config(), handle.db, { fetch: fakeLedger({ actAs: [party("CollaraRegistrar")] }).fetch, oidc: oidc() });
+    const parties = await lostRights.recoveryCheck?.();
+    expect(parties?.primary).toBe("PARTIES_MISSING");
+    expect(parties?.findings.find((f) => f.case === "PARTIES_MISSING")?.detail).toContain(party("DemoLenderA"));
+
+    await handle.db.insert(ledgerSources).values({ source: "devnet", participantId: "PAR::noders::1220", jsonApiUrl: API, checkpointOffset: 50 });
+    const pruned = await connectDevnetLedger(config({ DEVNET_RECOVERY_CHECK_INTERVAL_MS: "10000" }), handle.db, { fetch: fakeLedger({ prunedUpTo: 60 }).fetch, oidc: oidc() });
+    const controller = new AbortController();
+    const runtime = startRuntime({ config: config(), db: handle.db, ledger: { sources: [], completionClient: () => null, recoveryCheck: pruned.recoveryCheck }, log: pino({ level: "silent" }), signal: controller.signal });
+    try {
+      let health = await runtime.health();
+      for (let i = 0; i < 100 && !(health as { recovery?: { checkedAt?: string | null } }).recovery?.checkedAt; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        health = await runtime.health();
+      }
+      expect(health).toMatchObject({ degraded: true, recovery: { case: "PRUNED", newRunRequired: true, command: "node scripts/devnet/recover.mjs" } });
+      expect(JSON.stringify(health)).not.toContain(KEY);
+    } finally {
+      controller.abort();
+      await runtime.done;
+      await handle.db.delete(ledgerSources);
+    }
+  });
+
+  it("recovery check: a wrong key is CREDENTIAL_KEY, never a crash and never the key bytes", async () => {
+    const wrong = Buffer.alloc(32, 0x07).toString("base64");
+    const worker = await connectDevnetLedger(config({ DEVNET_CREDENTIAL_KEY: wrong }), handle.db, { fetch: fakeLedger().fetch, oidc: oidc() });
+    const diagnosis = await worker.recoveryCheck?.();
+    expect(diagnosis?.primary).toBe("CREDENTIAL_KEY");
+    expect(JSON.stringify(diagnosis)).not.toContain(wrong);
+    const error = await worker.sources[0]?.client.ledgerEnd().catch((e: unknown) => e);
+    expect(String((error as Error).message)).toMatch(/does not decrypt with key id k1/);
+    expect(String((error as Error).message)).not.toContain(wrong);
   });
 });
 
@@ -159,12 +216,12 @@ describe.skipIf(!PG_URL)("refresh lock across two PostgreSQL pools (opt-in)", ()
       const before = issuer.refreshCount();
       const reusesBefore = issuer.reuseCount();
       const provider = (handle: DbHandle) =>
-        new OidcRefreshTokenProvider({ settings: { ...oidc(), audience: AUDIENCE, ledgerUserId: USER }, store: new PgRefreshTokenStore(handle.db), jwks: remoteJwks(issuer.jwksUri) });
+        new OidcRefreshTokenProvider({ settings: { ...oidc(), audience: AUDIENCE, ledgerUserId: USER }, store: keyedStore(handle), jwks: remoteJwks(issuer.jwksUri) });
       const providers = [provider(a), provider(b), provider(a), provider(b)];
       await Promise.all(providers.map((p) => p.getToken()));
       expect(issuer.refreshCount() - before).toBe(4);
       expect(issuer.reuseCount() - reusesBefore).toBe(0);
-      expect((await new PgRefreshTokenStore(b.db).status(devnetCredentialId(USER)))?.status).toBe("ACTIVE");
+      expect((await keyedStore(b).check(devnetCredentialId(USER))).state).toBe("OK");
     } finally {
       issuer.delayMs = 0;
       await a.close();

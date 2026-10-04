@@ -2,10 +2,19 @@
 // CanActAs/CanReadAs on every Collara party it was granted). The API still derives authority server-side
 // (session → membership → mandate → party binding) and submits with exactly that organisation's party in
 // actAs/readAs; the tenant credential is a privileged project-operator credential, not inter-organisation
-// credential isolation (docs/devnet.md §3). Tokens come from the rotating OIDC refresh token stored in
-// ledger_credentials (PostgreSQL), never from HMAC.
-import { devnetCredentialId, devnetOidcSettings, devnetStatePath, OidcRefreshTokenProvider, type DevnetEnv, type LedgerTokenProvider } from "@collara/canton";
-import { PgRefreshTokenStore, type Db } from "@collara/db";
+// credential isolation (docs/devnet.md §3). Tokens come from the rotating OIDC refresh token stored encrypted in
+// ledger_credentials (PostgreSQL; key DEVNET_CREDENTIAL_KEY from the environment), never from HMAC.
+import {
+  devnetCredentialId,
+  devnetOidcSettings,
+  devnetStatePath,
+  OidcRefreshTokenProvider,
+  parseCredentialKeyring,
+  type CredentialKeyEnv,
+  type DevnetEnv,
+  type LedgerTokenProvider,
+} from "@collara/canton";
+import { CredentialCipher, PgRefreshTokenStore, type Db } from "@collara/db";
 import { LedgerAccess } from "./access";
 import { loadLedgerState, type LedgerState } from "./state";
 
@@ -41,13 +50,23 @@ export function assertDevnetState(state: LedgerState, env: DevnetLedgerEnv): voi
   }
 }
 
+/** The cipher of the stored refresh token (throws CredentialKeyConfigError, without key material, when unusable). */
+export function devnetCredentialCipher(env: CredentialKeyEnv): CredentialCipher {
+  return new CredentialCipher(parseCredentialKeyring(env));
+}
+
+/** The credential store with this process's key. */
+export function devnetCredentialStore(env: CredentialKeyEnv, db: Db): PgRefreshTokenStore {
+  return new PgRefreshTokenStore(db, { cipher: devnetCredentialCipher(env) });
+}
+
 /** One OIDC refresh-token provider for the tenant user, backed by ledger_credentials. */
 export function devnetTokenProvider(env: DevnetLedgerEnv, db: Db, options: { fetch?: typeof fetch } = {}): OidcRefreshTokenProvider {
   if (!env.DEVNET_LEDGER_USER_ID) throw new DevnetStateError("DEVNET_LEDGER_USER_ID is not set");
   const settings = devnetOidcSettings({ ...env, DEVNET_LEDGER_USER_ID: env.DEVNET_LEDGER_USER_ID });
   return new OidcRefreshTokenProvider({
     settings,
-    store: new PgRefreshTokenStore(db),
+    store: devnetCredentialStore(env, db),
     credentialId: devnetCredentialId(env.DEVNET_LEDGER_USER_ID),
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });

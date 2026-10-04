@@ -1,0 +1,19 @@
+{
+  "status": 400,
+  "body": {
+    "code": "OFFSET_AFTER_LEDGER_END",
+    "cause": "Begin offset (40) is after ledger end (3)",
+    "correlationId": null,
+    "traceId": "00000000000000000000000000000002",
+    "context": {
+      "participant": "devnet-synthetic",
+      "definite_answer": "false",
+      "category": "12"
+    },
+    "resources": [],
+    "errorCategory": 12,
+    "grpcCodeValue": 11,
+    "retryInfo": null,
+    "definiteAnswer": null
+  }
+}

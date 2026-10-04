@@ -53,11 +53,23 @@ export {
 export { toLogSafeError } from "./log-safety";
 export {
   PgRefreshTokenStore,
+  type CredentialCheck,
+  type PgRefreshTokenStoreOptions,
   type CredentialStatus,
   type CredentialUpdate,
   type StoredCredential,
   type StoredCredentialStatus,
 } from "./credentials";
+export {
+  CredentialCipher,
+  CredentialCipherError,
+  type CredentialCipherErrorCode,
+  type CredentialKey,
+  type CredentialKeys,
+  type SealedSecret,
+  type SecretBinding,
+} from "./credential-cipher";
+export { databaseRecoveryState, projectionRecoveryState, type DatabaseRecoveryState, type ProjectionRecoveryState } from "./recovery";
 // Worker projection (ledger updates → ledger_* tables) and the stakeholder-filtered read model.
 export * from "./projection";
 export * from "./read-model";

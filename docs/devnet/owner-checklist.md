@@ -4,7 +4,9 @@ One ordered list for the project owner. Every step that uses the team's hackatho
 
 What you need: the team's hackathon login (username + password), this repository with `pnpm install` done, WSL PostgreSQL (`pnpm db:up`), Node 24.
 
-Never paste the password, a token or the contents of `.env.devnet` (other than the ledger user id) into chat, an issue, a commit or a command line.
+Never paste the password, a token, the credential key or the contents of `.env.devnet` (other than the ledger user id) into chat, an issue, a commit or a command line.
+
+Something broke later (DevNet reset or pruned, login rejected, key or database lost, a package missing)? Run `node scripts/devnet/recover.mjs` and follow [`recovery.md`](recovery.md).
 
 ---
 
@@ -70,13 +72,20 @@ Never paste the password, a token or the contents of `.env.devnet` (other than t
    cp infra/env/devnet.env.example .env.devnet
    ```
    It already points at `postgres://collara:collara_dev@127.0.0.1:5432/collara_devnet`. Leave `DEVNET_LEDGER_USER_ID=` empty for now. The database name must contain `devnet`; the LocalNet databases are refused.
-3. Create the database, apply the migrations (0000–0004, including `ledger_credentials`) and seed the synthetic identities:
+3. Generate the key that encrypts the stored refresh token (printed once, written nowhere):
+
+   PowerShell and Git Bash:
+   ```
+   node scripts/devnet/gen-key.mjs
+   ```
+   Paste the two printed lines (`DEVNET_CREDENTIAL_KEY_ID=…`, `DEVNET_CREDENTIAL_KEY=…`) into `.env.devnet` over the empty ones (or into the host's secret manager). Keep a copy somewhere safe outside the repository: without it the stored token cannot be read and you must log in again. Every DevNet step refuses to run without it. Never put it in a `NEXT_PUBLIC_*` variable or send it to anyone.
+4. Create the database, apply the migrations (0000–0005, including `ledger_credentials` with the encrypted token columns) and seed the synthetic identities:
 
    PowerShell and Git Bash:
    ```
    node scripts/devnet/db-setup.mjs
    ```
-   Expected: `database postgres://collara:***@127.0.0.1:5432/collara_devnet created; migrations applied (incl. 0004_ledger_credentials)` (or `exists` on a re-run).
+   Expected: `database postgres://collara:***@127.0.0.1:5432/collara_devnet created; migrations applied (incl. 0005_credential_encryption_recovery)` (or `exists` on a re-run).
 
 ## (e) Log in once (stores only the refresh token)
 
@@ -91,13 +100,15 @@ Git Bash (mintty has no TTY for Node; use winpty):
 winpty node scripts/devnet/login.mjs
 ```
 
-It asks for the username and the password (the password is not shown), runs one password grant, validates the token, checks that the participant accepts it, and stores **only the refresh token** in `collara_devnet`. It prints the ledger user id, the access-token expiry and the audience, never a secret. On the first run it ends with a line like:
+It asks for the username and the password (the password is not shown), runs one password grant, validates the token, checks that the participant accepts it, and stores **only the refresh token**, encrypted with your `DEVNET_CREDENTIAL_KEY`, in `collara_devnet`. It prints the ledger user id, the access-token expiry and the audience, never a secret. On the first run it ends with a line like:
 
 ```
 DEVNET_LEDGER_USER_ID=<your ledger user id>
 ```
 
 Put that line into `.env.devnet` (replace the empty one). Run `login.mjs` again whenever a later step says `Run node scripts/devnet/login.mjs again`.
+
+If you logged in before migration 0005 existed, that plaintext token was erased by the migration: run `login.mjs` again, and also sign out of the team session in the Wallet once (database backups may still hold the old token).
 
 ## (f) Preflight → import bindings → bootstrap
 
@@ -159,8 +170,9 @@ Send:
 - the output of `import-bindings.mjs` (party ids and the namespace are not secret),
 - the summary lines of `bootstrap.mjs` and the output of `verify-first-tx.mjs`,
 - the party quota you saw, and any Console error text (DAR upload, party creation, rights) word for word,
-- whether the Console granted your user CanActAs/CanReadAs on the new parties by itself, or NODERS had to.
+- whether the Console granted your user CanActAs/CanReadAs on the new parties by itself, or NODERS had to,
+- the output of `node scripts/devnet/recover.mjs` (expected `case: OK`; it shows key ids, never keys).
 
-Never send: the password, any token, the contents of `.env.devnet` other than `DEVNET_LEDGER_USER_ID`, a database dump, or a screenshot that shows a token.
+Never send: the password, any token, `DEVNET_CREDENTIAL_KEY` or `DEVNET_CREDENTIAL_KEY_PREVIOUS`, the contents of `.env.devnet` other than `DEVNET_LEDGER_USER_ID`, a database dump, or a screenshot that shows a token or the key.
 
 The lead records these results in [`docs/devnet-evidence.md`](../devnet-evidence.md).

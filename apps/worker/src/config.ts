@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { DevnetEnvSchema, devnetGuardIssues } from "@collara/canton";
+import { DevnetEnvSchema, devnetGuardIssues, publicEnvKeyLeaks } from "@collara/canton";
 import { z } from "zod";
 
 const bool = z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1");
@@ -51,6 +51,8 @@ const ConfigSchema = z
 
     // --- DEVNET only (docs/devnet.md): the shared participant through the tenant user's OIDC refresh token ----------
     ...DevnetEnvSchema.shape,
+    /** DEVNET: how often /healthz re-runs the read-only recovery diagnosis (rights, packages, pruning, reset). */
+    DEVNET_RECOVERY_CHECK_INTERVAL_MS: z.coerce.number().int().min(10_000).max(3_600_000).default(300_000),
   })
   .superRefine((config, ctx) => {
     if (config.COLLARA_MODE === "DEVNET") {
@@ -77,5 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   if (!result.success) {
     throw new Error(`Invalid worker configuration:\n${z.prettifyError(result.error)}`);
   }
+  const leaks = publicEnvKeyLeaks(cleaned);
+  if (leaks.length) throw new Error(`Invalid worker configuration:\n${leaks.map((name) => `${name}: must not carry DEVNET_CREDENTIAL_KEY (server-only secret)`).join("\n")}`);
   return result.data;
 }

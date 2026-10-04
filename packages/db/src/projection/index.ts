@@ -13,6 +13,9 @@ export {
 } from "./commands";
 export {
   projectOnce,
+  PRUNED_ERROR_CODES,
+  prunedErrorCode,
+  prunedReason,
   resetProjectionSource,
   runProjectionLoop,
   type ProjectionLoopOptions,

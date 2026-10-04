@@ -8,6 +8,14 @@ const privateNoStore = [{ key: "Cache-Control", value: "private, no-store" }];
 // exactly the regular `next build` / `next start` setup.
 const standalone = process.env.NEXT_OUTPUT === "standalone";
 
+// DEVNET_CREDENTIAL_KEY (the server-side key of the stored ledger refresh token) must never be inlined into a browser
+// bundle: refuse to build or start when any NEXT_PUBLIC_* variable names it or carries its value.
+const credentialKey = process.env.DEVNET_CREDENTIAL_KEY?.trim();
+const leakedKeyVars = Object.entries(process.env)
+  .filter(([name, value]) => name.startsWith("NEXT_PUBLIC_") && (/CREDENTIAL_KEY/i.test(name) || (!!credentialKey && credentialKey.length >= 40 && !!value?.includes(credentialKey))))
+  .map(([name]) => name);
+if (leakedKeyVars.length) throw new Error(`refusing to build: ${leakedKeyVars.join(", ")} must not carry DEVNET_CREDENTIAL_KEY (server-only secret)`);
+
 const nextConfig: NextConfig = {
   // Separate build dirs (e.g. NEXT_DIST_DIR=.next-landing) let parallel builds coexist.
   distDir: process.env.NEXT_DIST_DIR || ".next",

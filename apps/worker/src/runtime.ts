@@ -2,6 +2,7 @@
 // reconciliation, and the export job runner. Everything durable lives in PostgreSQL (checkpoints, command
 // states, job leases), so a restart — graceful or a crash — resumes where the last committed transaction left
 // off. In-memory state is only what /healthz reports between passes.
+import { classifyRecoveryError, type DevnetDiagnosis, type DevnetRecoveryCase } from "@collara/canton";
 import {
   commands,
   exportJobs,
@@ -22,7 +23,7 @@ export interface RuntimeOptions {
   readonly config: WorkerConfig;
   readonly db: Db;
   /** The projector clients per source and the completions clients (the bootstrap state itself is not needed). */
-  readonly ledger: Pick<WorkerLedger, "sources" | "completionClient">;
+  readonly ledger: Pick<WorkerLedger, "sources" | "completionClient" | "recoveryCheck">;
   readonly log: Logger;
   readonly signal: AbortSignal;
   readonly now?: () => Date;
@@ -47,6 +48,15 @@ interface SourceState {
   lastPassAt: string | null;
   lastError: string | null;
   lastErrorAt: string | null;
+  /** Recovery case the last error signals (devnet-recovery), e.g. CREDENTIAL_REVOKED or PARTIES_MISSING. */
+  lastErrorCase: DevnetRecoveryCase | null;
+}
+
+/** The recovery case a projection status stands for. */
+function statusCase(status: string | undefined): DevnetRecoveryCase | null {
+  if (status === "PRUNED") return "PRUNED";
+  if (status === "RESET_DETECTED") return "LEDGER_RESET";
+  return null;
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -86,8 +96,9 @@ export function startRuntime(options: RuntimeOptions): WorkerRuntime {
   const { config, db, ledger, log, signal } = options;
   const now = options.now ?? (() => new Date());
   const sources = new Map<string, SourceState>(
-    ledger.sources.map((s) => [s.config.source, { lastPass: null, lastPassAt: null, lastError: null, lastErrorAt: null }]),
+    ledger.sources.map((s) => [s.config.source, { lastPass: null, lastPassAt: null, lastError: null, lastErrorAt: null, lastErrorCase: null }]),
   );
+  const recovery: { diagnosis: DevnetDiagnosis | null; checkedAt: string | null; error: string | null } = { diagnosis: null, checkedAt: null, error: null };
   const loops = {
     reconcile: { runs: 0, lastRunAt: null, lastError: null, lastErrorAt: null } as LoopState,
     exports: { runs: 0, lastRunAt: null, lastError: null, lastErrorAt: null } as LoopState,
@@ -109,9 +120,12 @@ export function startRuntime(options: RuntimeOptions): WorkerRuntime {
           state.lastPass = result;
           state.lastPassAt = now().toISOString();
           state.lastError = null;
+          state.lastErrorCase = null;
         }
         if (result.status !== lastStatus) {
           if (result.status === "ACTIVE") slog.info({ checkpoint: result.checkpoint, participantId: result.participantId }, "projection source active");
+          else if (config.COLLARA_MODE === "DEVNET")
+            slog.error({ status: result.status, case: statusCase(result.status), reason: result.resetReason }, "projection source is not active; run node scripts/devnet/recover.mjs (docs/devnet/recovery.md)");
           else slog.error({ status: result.status, reason: result.resetReason }, "projection source is not active; run `pnpm --filter @collara/worker projection:reset` after checking the ledger");
           lastStatus = result.status;
         }
@@ -131,11 +145,13 @@ export function startRuntime(options: RuntimeOptions): WorkerRuntime {
         );
       },
       onError(error) {
+        const classified = classifyRecoveryError(error);
         if (state) {
           state.lastError = message(error).slice(0, 500);
           state.lastErrorAt = now().toISOString();
+          state.lastErrorCase = classified?.case ?? null;
         }
-        slog.error({ err: error }, "projection pass failed; retrying");
+        slog.error({ err: error, ...(classified ? { case: classified.case } : {}) }, classified ? `projection pass failed (${classified.case}); retrying` : "projection pass failed; retrying");
       },
     });
   });
@@ -170,7 +186,41 @@ export function startRuntime(options: RuntimeOptions): WorkerRuntime {
     now,
   );
 
-  const done = Promise.allSettled([...projection, reconcile, exportsLoop]).then(() => undefined);
+  // DEVNET: periodic read-only recovery diagnosis; the primary case is logged when it changes and shown in /healthz.
+  const recoveryCheck = ledger.recoveryCheck;
+  let lastCase: string | null = null;
+  const recoveryLoop = recoveryCheck
+    ? every(
+        "recovery",
+        config.DEVNET_RECOVERY_CHECK_INTERVAL_MS,
+        { runs: 0, lastRunAt: null, lastError: null, lastErrorAt: null },
+        log,
+        signal,
+        async () => {
+          let diagnosis: DevnetDiagnosis;
+          try {
+            diagnosis = await recoveryCheck();
+            recovery.diagnosis = diagnosis;
+            recovery.error = null;
+          } catch (error) {
+            recovery.error = message(error).slice(0, 300);
+            throw error;
+          } finally {
+            recovery.checkedAt = now().toISOString();
+          }
+          const primary = diagnosis.primary;
+          if (primary !== lastCase) {
+            const failing = diagnosis.findings.find((f) => f.case === primary);
+            if (primary === "OK") log.info({ case: primary }, "DevNet recovery check: OK");
+            else log.error({ case: primary, detail: failing?.detail, next: failing?.next }, "DevNet recovery needed: run node scripts/devnet/recover.mjs (docs/devnet/recovery.md)");
+            lastCase = primary;
+          }
+        },
+        now,
+      )
+    : Promise.resolve();
+
+  const done = Promise.allSettled([...projection, reconcile, exportsLoop, recoveryLoop]).then(() => undefined);
 
   async function health(): Promise<HealthDetails> {
     const at = now();
@@ -205,14 +255,35 @@ export function startRuntime(options: RuntimeOptions): WorkerRuntime {
         lastPassAt: state?.lastPassAt ?? null,
         resetDetectedAt: row?.resetDetectedAt?.toISOString() ?? null,
         resetReason: row?.resetReason ?? null,
+        historyFloor: row?.historyFloorOffset ?? null,
+        // Recovery case (docs/devnet/recovery.md): PRUNED / LEDGER_RESET from the status, else what the last error signals.
+        recoveryCase: statusCase(row?.status) ?? state?.lastErrorCase ?? null,
         lastError: state?.lastError ?? row?.lastError ?? null,
         lastErrorAt: state?.lastErrorAt ?? row?.lastErrorAt?.toISOString() ?? null,
       };
     });
-    const degraded = sourceHealth.some((s) => s.status !== "ACTIVE" || s.lastError !== null) || !!loops.reconcile.lastError || !!loops.exports.lastError;
+    const recoveryCase = recovery.diagnosis?.primary ?? null;
+    const degraded =
+      sourceHealth.some((s) => s.status !== "ACTIVE" || s.lastError !== null) ||
+      !!loops.reconcile.lastError ||
+      !!loops.exports.lastError ||
+      (recoveryCase !== null && recoveryCase !== "OK") ||
+      recovery.error !== null;
     return {
       degraded,
       sources: sourceHealth,
+      ...(recoveryCheck
+        ? {
+            recovery: {
+              case: recoveryCase,
+              newRunRequired: recovery.diagnosis?.newRunRequired ?? null,
+              checkedAt: recovery.checkedAt,
+              error: recovery.error,
+              findings: (recovery.diagnosis?.findings ?? []).filter((f) => f.status !== "ok").map((f) => ({ case: f.case, status: f.status, title: f.title, detail: f.detail, next: f.next })),
+              command: "node scripts/devnet/recover.mjs",
+            },
+          }
+        : {}),
       commands: Object.fromEntries(commandCounts.map((c) => [c.status, c.count])),
       exportJobs: Object.fromEntries(jobCounts.map((j) => [j.state, j.count])),
       loops: { reconcile: { ...loops.reconcile }, exports: { ...loops.exports } },

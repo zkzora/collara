@@ -1,12 +1,16 @@
 import { Writable } from "node:stream";
 import pino from "pino";
 import { DrizzleQueryError } from "drizzle-orm/errors";
+import { CredentialCipher } from "@collara/db";
 import { ApiProblemSchema, ERROR_COPY } from "@collara/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type CollaraApp } from "./app";
 import { loadConfig } from "./config";
 import { loggerOptions, redactUrl } from "./logger";
 import { testApp, type TestApp } from "./test-support";
+
+// Unit-test credential key (fixed bytes), never used anywhere else.
+const TEST_KEY = Buffer.alloc(32, 0x5a).toString("base64");
 
 describe("api app without a database (UI_MOCK)", () => {
   let app: CollaraApp;
@@ -123,7 +127,13 @@ describe("config", () => {
   });
 
   it("DEVNET: own database and state, tenant user required, no HMAC, no LocalNet state", () => {
-    const devnet = { COLLARA_MODE: "DEVNET", DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara_devnet", DEVNET_LEDGER_USER_ID: "c2ede6f6-team" };
+    const devnet = {
+      COLLARA_MODE: "DEVNET",
+      DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara_devnet",
+      DEVNET_LEDGER_USER_ID: "c2ede6f6-team",
+      DEVNET_CREDENTIAL_KEY: TEST_KEY,
+      DEVNET_CREDENTIAL_KEY_ID: "k1",
+    };
     const config = loadConfig(devnet);
     expect(config.COLLARA_MODE).toBe("DEVNET");
     expect(config.DEVNET_OIDC_CLIENT_ID).toBe("web-app-ui-hackcanton-01-devnet");
@@ -132,6 +142,20 @@ describe("config", () => {
     expect(() => loadConfig({ ...devnet, COLLARA_LOCALNET_STATE: ".local/localnet/state.json" })).toThrow(/COLLARA_LOCALNET_STATE/);
     expect(() => loadConfig({ ...devnet, CANTON_JWT_HMAC_SECRET: "collara-local-dev-secret-change-me" })).toThrow(/refuses HMAC/);
     expect(() => loadConfig({ ...devnet, DEVNET_LEDGER_USER_ID: "" })).toThrow(/DEVNET_LEDGER_USER_ID is required/);
+    // The refresh-token key: required, exactly 32 bytes, never echoed, never in NEXT_PUBLIC_*.
+    expect(() => loadConfig({ ...devnet, DEVNET_CREDENTIAL_KEY: "" })).toThrow(/DEVNET needs DEVNET_CREDENTIAL_KEY.*gen-key\.mjs/);
+    const short = Buffer.alloc(16, 7).toString("base64");
+    const shortError = (() => {
+      try {
+        loadConfig({ ...devnet, DEVNET_CREDENTIAL_KEY: short });
+      } catch (error) {
+        return String(error);
+      }
+      return "";
+    })();
+    expect(shortError).toMatch(/exactly 32 bytes/);
+    expect(shortError).not.toContain(short);
+    expect(() => loadConfig({ ...devnet, NEXT_PUBLIC_DEVNET_CREDENTIAL_KEY: TEST_KEY })).toThrow(/NEXT_PUBLIC_DEVNET_CREDENTIAL_KEY: must not carry/);
     // LOCALNET is unaffected by the DEVNET guards.
     expect(loadConfig({ COLLARA_MODE: "LOCALNET", DATABASE_URL: "postgres://collara:p@127.0.0.1:5432/collara" }).COLLARA_MODE).toBe("LOCALNET");
   });
@@ -153,8 +177,13 @@ describe("logger", () => {
     });
     log.info({ tokens: { id_token: "eyJhbGciOi.secret.sig", access_token: "secret-access" }, proposal: { principal: "100000.00" } });
     log.info({ credential: { refresh_token: "rt-secret-refresh", refreshToken: "rt-secret-camel" }, DATABASE_URL: "postgres://collara:db-password@h/collara_devnet" });
+    // The credential key: as a variable, inside a config object, and the cipher object itself.
+    const cipher = new CredentialCipher({ current: { id: "k1", key: Buffer.from(TEST_KEY, "base64") }, previous: [] });
+    log.info({ DEVNET_CREDENTIAL_KEY: TEST_KEY, config: { DEVNET_CREDENTIAL_KEY: TEST_KEY, DEVNET_CREDENTIAL_KEY_PREVIOUS: `k0:${TEST_KEY}` }, cipher });
     const output = lines.join("");
     expect(output).not.toMatch(/secret-token|collara_sid=|secret-code|secret-state|eyJhbGciOi|secret-access|100000\.00|rt-secret|db-password/);
+    expect(output).not.toContain(TEST_KEY);
+    expect(output).not.toContain(Buffer.from(TEST_KEY, "base64").toString("hex"));
     expect(output).toContain("[redacted]");
   });
 

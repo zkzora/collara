@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { DEVNET_DEFAULTS, DevnetEnvSchema, devnetGuardIssues, devnetOidcSettings } from "./devnet-config";
 import { isLocalnetStatePath } from "./localnet-state";
 
-const OK = { DATABASE_URL: "postgres://collara:x@127.0.0.1:5432/collara_devnet" };
+const OK = {
+  DATABASE_URL: "postgres://collara:x@127.0.0.1:5432/collara_devnet",
+  // Unit-test key (32 zero bytes), never used anywhere else.
+  DEVNET_CREDENTIAL_KEY: Buffer.alloc(32).toString("base64"),
+  DEVNET_CREDENTIAL_KEY_ID: "test",
+};
 
 describe("DEVNET guards", () => {
   it("accepts a dedicated devnet database and no LocalNet settings", () => {
@@ -14,6 +19,7 @@ describe("DEVNET guards", () => {
     ["the test database", { DATABASE_URL: "postgres://collara:x@127.0.0.1:5432/collara_test" }, "DATABASE_URL"],
     ["a database without devnet in its name", { DATABASE_URL: "postgres://collara:x@127.0.0.1:5432/collara_core" }, "DATABASE_URL"],
     ["no database", {}, "DATABASE_URL"],
+    ["no credential key", { DATABASE_URL: OK.DATABASE_URL }, "DEVNET_CREDENTIAL_KEY"],
     ["a LocalNet state file", { ...OK, COLLARA_LOCALNET_STATE: ".local/localnet/state.json" }, "COLLARA_LOCALNET_STATE"],
     ["a DevNet state path that is a LocalNet state", { ...OK, COLLARA_DEVNET_STATE: "C:\\Collara\\.local\\localnet\\state-core.json" }, "COLLARA_DEVNET_STATE"],
     ["an HMAC secret", { ...OK, CANTON_JWT_HMAC_SECRET: "collara-local-dev-secret-change-me" }, "CANTON_JWT_HMAC_SECRET"],

@@ -1,4 +1,4 @@
-import { DevnetEnvSchema, devnetGuardIssues } from "@collara/canton";
+import { DevnetEnvSchema, devnetGuardIssues, publicEnvKeyLeaks } from "@collara/canton";
 import { z } from "zod";
 
 export const CollaraModeSchema = z.enum(["UI_MOCK", "LOCALNET", "DEVNET"]);
@@ -127,6 +127,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!result.success) {
     throw new Error(`Invalid API configuration:\n${z.prettifyError(result.error)}`);
   }
+  // The credential key must never reach a browser bundle (Next inlines NEXT_PUBLIC_* at build time).
+  const leaks = publicEnvKeyLeaks(cleaned);
+  if (leaks.length) throw new Error(`Invalid API configuration:\n${leaks.map((name) => `${name}: must not carry DEVNET_CREDENTIAL_KEY (server-only secret)`).join("\n")}`);
   return result.data;
 }
 

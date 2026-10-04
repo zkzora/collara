@@ -8,13 +8,22 @@
 //                     the DB bindings (never allocates parties)
 //   bootstrap         the seed (clean-start or main) through the API's workflow runner on the DevNet state
 //   verify-first-tx   the first committed command (update id, offset) and the registrar's AssetRegistry/CollaraConfig
-// Secrets are never printed, logged, put in argv or read from the environment (the password is read from the TTY).
+//   recover           read-only diagnosis after a DevNet reset, pruning, a lost credential, key or database: prints the
+//                     case and the exact next commands. --new-run --yes: fresh run namespace, reset of the "devnet"
+//                     projection source only, bindings re-imported, clean-start bootstrap (idempotent; never
+//                     allocates parties, never touches other tenants' data)
+// Every command needs DEVNET_CREDENTIAL_KEY (+ _ID): the refresh token is stored AES-256-GCM encrypted with it.
+// Secrets are never printed, logged or put in argv; the password is read from the TTY, the key only from the env file.
 import { rename, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import {
+  credentialKeyIssues,
   decodeJwtSubject,
   devnetCredentialId,
+  diagnoseDevnet,
+  formatDiagnosis,
+  publicEnvKeyLeaks,
   DevnetEnvSchema,
   devnetGuardIssues,
   devnetOidcSettings,
@@ -27,15 +36,17 @@ import {
   validateLedgerAccessToken,
   type DevnetEnv,
 } from "@collara/canton";
-import { commands as commandsTable, createPgDatabase, PgRefreshTokenStore, seedDemoIdentities, type DbHandle } from "@collara/db";
+import { commands as commandsTable, createPgDatabase, resetProjectionSource, seedDemoIdentities, type DbHandle } from "@collara/db";
 import { asc, inArray } from "drizzle-orm";
 import { AcsReader } from "../ledger/acs";
-import { loadLedgerState } from "../ledger/state";
+import { devnetCredentialStore } from "../ledger/devnet";
+import { loadLedgerState, type LedgerState } from "../ledger/state";
 import { ensureDatabase, prepareDatabase } from "../seed/database";
 import { ensureSystemUsers } from "../workflow/actors";
 import { redactUrl, seedLocalnet, SeedRefusedError, type SeedProfile } from "../seed/localnet";
-import { buildDevnetState, COLLARA_PARTIES, devnetNamespace, matchParties, matchProblems, rightsToParties, type CollaraPartyHint } from "./bindings";
+import { buildDevnetState, COLLARA_PARTIES, DEVNET_SOURCE, devnetNamespace, matchParties, matchProblems, rightsToParties, type CollaraPartyHint } from "./bindings";
 import { authenticatedChecks, formatChecks, publicChecks, readUploadManifest } from "./preflight";
+import { observeDevnet, planNewRun } from "./recovery";
 
 class CliError extends Error {}
 
@@ -46,6 +57,11 @@ function loadEnv(options: { requireDatabase: boolean; requireUser: boolean }): E
   const parsed = DevnetEnvSchema.safeParse(cleaned);
   if (!parsed.success) throw new CliError(`invalid DEVNET settings in .env.devnet:\n${parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n")}`);
   const env: Env = { ...parsed.data, DATABASE_URL: cleaned.DATABASE_URL };
+  // Every command reads or writes the encrypted refresh token, or must not run without its key.
+  const keyIssues = credentialKeyIssues(env);
+  if (keyIssues.length) throw new CliError(keyIssues.map((i) => `${i.path}: ${i.message}`).join("\n"));
+  const leaks = publicEnvKeyLeaks(cleaned);
+  if (leaks.length) throw new CliError(`${leaks.join(", ")}: must not carry DEVNET_CREDENTIAL_KEY (server-only secret)`);
   if (options.requireDatabase) {
     const issues = devnetGuardIssues({ ...env, COLLARA_LOCALNET_STATE: cleaned.COLLARA_LOCALNET_STATE, CANTON_JWT_HMAC_SECRET: cleaned.CANTON_JWT_HMAC_SECRET });
     if (issues.length) throw new CliError(issues.map((i) => `${i.path}: ${i.message}`).join("\n"));
@@ -61,7 +77,7 @@ function openDb(env: Env): DbHandle {
 
 function provider(env: Env, db: DbHandle): OidcRefreshTokenProvider {
   const user = env.DEVNET_LEDGER_USER_ID ?? "";
-  return new OidcRefreshTokenProvider({ settings: devnetOidcSettings({ ...env, DEVNET_LEDGER_USER_ID: user }), store: new PgRefreshTokenStore(db.db), credentialId: devnetCredentialId(user) });
+  return new OidcRefreshTokenProvider({ settings: devnetOidcSettings({ ...env, DEVNET_LEDGER_USER_ID: user }), store: devnetCredentialStore(env, db.db), credentialId: devnetCredentialId(user) });
 }
 
 // --- prompts (TTY only; the password is never echoed) ---------------------------------------------------------
@@ -118,7 +134,7 @@ async function dbSetup(): Promise<void> {
     await db.migrate();
     const seeded = await seedDemoIdentities(db.db);
     await ensureSystemUsers(db.db);
-    console.log(`database ${redactUrl(url)}${created ? " created" : " exists"}; migrations applied (incl. 0004_ledger_credentials)`);
+    console.log(`database ${redactUrl(url)}${created ? " created" : " exists"}; migrations applied (incl. 0005_credential_encryption_recovery)`);
     console.log(`synthetic demo identities: ${JSON.stringify(seeded)}`);
   } finally {
     await db.close();
@@ -151,7 +167,7 @@ async function login(): Promise<void> {
 
   const db = openDb(env);
   try {
-    await new PgRefreshTokenStore(db.db).storeLogin({
+    await devnetCredentialStore(env, db.db).storeLogin({
       id: devnetCredentialId(validated.ledgerUserId),
       ledgerUserId: validated.ledgerUserId,
       issuer: settings.issuer,
@@ -170,7 +186,7 @@ async function login(): Promise<void> {
   console.log(`participant user:     ${user.id}${user.primaryParty ? ` (primary party ${user.primaryParty})` : ""}`);
   console.log(`access token expires: ${validated.expiresAt.toISOString()} (not stored)`);
   console.log(`audience:             ${validated.audience.join(", ")}`);
-  console.log(`stored:               refresh token in ${redactUrl(env.DATABASE_URL ?? "")} table ledger_credentials, id ${devnetCredentialId(validated.ledgerUserId)}`);
+  console.log(`stored:               refresh token, AES-256-GCM encrypted with key ${env.DEVNET_CREDENTIAL_KEY_ID ?? "?"}, in ${redactUrl(env.DATABASE_URL ?? "")} table ledger_credentials, id ${devnetCredentialId(validated.ledgerUserId)}`);
   if (!env.DEVNET_LEDGER_USER_ID) console.log(`\nNext: add this line to .env.devnet, then run preflight:\nDEVNET_LEDGER_USER_ID=${validated.ledgerUserId}`);
 }
 
@@ -186,11 +202,15 @@ async function preflight(json: boolean): Promise<number> {
   } else {
     const db = openDb(env);
     try {
-      const status = await new PgRefreshTokenStore(db.db).status(devnetCredentialId(env.DEVNET_LEDGER_USER_ID)).catch(() => null);
-      if (!status?.hasRefreshToken || status.status !== "ACTIVE") {
-        checks.push({ name: "credential", status: "skip", detail: status ? `stored credential is ${status.status}: run login.mjs again` : "no credential stored: run login.mjs" });
+      const store = devnetCredentialStore(env, db.db);
+      const id = devnetCredentialId(env.DEVNET_LEDGER_USER_ID);
+      const [status, check] = await Promise.all([store.status(id).catch(() => null), store.check(id).catch((error: unknown) => ({ state: "ERROR", detail: String(error).slice(0, 200) }))]);
+      if (check.state === "MISSING" || check.state === "REAUTH_REQUIRED") {
+        checks.push({ name: "credential", status: "skip", detail: check.state === "MISSING" ? "no credential stored: run login.mjs" : `stored credential is REAUTH_REQUIRED (${check.detail}): run login.mjs again` });
+      } else if (check.state !== "OK") {
+        checks.push({ name: "credential", status: "fail", detail: `${check.state}: ${check.detail}` });
       } else {
-        checks.push({ name: "credential", status: "ok", detail: `stored, rotated ${status.rotationCount} time(s), last at ${status.rotatedAt?.toISOString() ?? "never"}` });
+        checks.push({ name: "credential", status: "ok", detail: `stored (${check.detail}), rotated ${status?.rotationCount ?? 0} time(s), last at ${status?.rotatedAt?.toISOString() ?? "never"}` });
         const result = await authenticatedChecks({
           jsonApiUrl: env.CANTON_DEVNET_JSON_API_URL,
           ledgerUserId: env.DEVNET_LEDGER_USER_ID,
@@ -214,7 +234,7 @@ async function preflight(json: boolean): Promise<number> {
   return checks.some((c) => c.status === "fail") ? 1 : 0;
 }
 
-async function importBindings(runRef: string | undefined): Promise<void> {
+async function importBindings(runRef: string | undefined): Promise<LedgerState> {
   const env = loadEnv({ requireDatabase: true, requireUser: true });
   const userId = env.DEVNET_LEDGER_USER_ID ?? "";
   const statePath = devnetStatePath(env);
@@ -267,11 +287,12 @@ async function importBindings(runRef: string | undefined): Promise<void> {
   for (const { hint, role } of COLLARA_PARTIES) console.log(`  ${hint.padEnd(18)} ${state.parties[hint]?.party}  (${role})`);
   console.log(
     `database ${redactUrl(env.DATABASE_URL ?? "")}${prepared.created ? " (created)" : ""}: ${prepared.bindings.bindings} party bindings, ${prepared.bindings.ledgerUsers} ledger user, revoked ${prepared.bindings.revoked}` +
-      `${prepared.bindings.sources.some((s) => s.reset) ? "; RESET DETECTED: the worker will not mix histories (docs/devnet.md §6)" : ""}`,
+      `${prepared.bindings.sources.some((s) => s.reset) ? "; RESET DETECTED: the worker will not mix histories (docs/devnet/recovery.md)" : ""}`,
   );
+  return state;
 }
 
-async function bootstrap(profile: SeedProfile, skipDocuments: boolean, json: boolean): Promise<void> {
+async function bootstrap(profile: SeedProfile, skipDocuments: boolean, json: boolean, forceNewNamespace = false): Promise<void> {
   const env = loadEnv({ requireDatabase: true, requireUser: true });
   const statePath = devnetStatePath(env);
   const state = await loadLedgerState(statePath);
@@ -281,6 +302,7 @@ async function bootstrap(profile: SeedProfile, skipDocuments: boolean, json: boo
     statePath,
     databaseUrl: env.DATABASE_URL ?? "",
     skipDocuments,
+    forceNewNamespace,
     log: json ? () => undefined : (line) => console.log(line),
   });
   if (json) {
@@ -331,6 +353,76 @@ async function verifyFirstTx(): Promise<number> {
   }
 }
 
+/**
+ * Read-only diagnosis (exit 0 = nothing to recover, 2 = a recovery case applies); with --new-run --yes also the
+ * recovery itself: fresh run namespace, reset of the "devnet" projection source only (at the pruning offset when
+ * the participant was pruned), bindings re-imported, clean-start bootstrap. Each step is skipped when already done.
+ */
+async function recover(options: { json: boolean; newRun: boolean; yes: boolean; runRef: string | undefined }): Promise<number> {
+  const env = loadEnv({ requireDatabase: true, requireUser: true });
+  if (options.runRef) devnetNamespace(options.runRef);
+  const userId = env.DEVNET_LEDGER_USER_ID ?? "";
+  const statePath = devnetStatePath(env);
+  const handle = openDb(env);
+  try {
+    let databaseError: string | undefined;
+    await handle.ping().catch((error: unknown) => {
+      databaseError = (error instanceof Error ? error.message : String(error)).slice(0, 160);
+    });
+    const reachable = databaseError === undefined;
+    const client = new LedgerClient({ baseUrl: env.CANTON_DEVNET_JSON_API_URL, tokenProvider: provider(env, handle), timeoutMs: 30_000 });
+    const { observation, state } = await observeDevnet({
+      db: reachable ? handle.db : null,
+      databaseError,
+      store: reachable ? devnetCredentialStore(env, handle.db) : null,
+      credentialId: devnetCredentialId(userId),
+      ledgerUserId: userId,
+      client,
+      statePath,
+      manifest: await readUploadManifest(),
+    });
+    const diagnosis = diagnoseDevnet(observation);
+    if (options.json) console.log(JSON.stringify({ diagnosis, namespace: state?.namespace ?? null }, null, 2));
+    else {
+      console.log(`DevNet recovery diagnosis (read-only): ${env.CANTON_DEVNET_JSON_API_URL}${state?.namespace ? `, run namespace ${state.namespace}` : ""}`);
+      console.log(formatDiagnosis(diagnosis));
+    }
+    if (!options.newRun) return diagnosis.primary === "OK" ? 0 : 2;
+
+    if (!options.yes) {
+      throw new CliError("--new-run writes the DevNet state file, the DEVNET database's bindings and its \"devnet\" projection source, and submits the clean-start bootstrap. Stop the worker and the API, then add --yes.");
+    }
+    const plan = planNewRun({ diagnosis, observation, requestedRunRef: options.runRef, currentNamespace: state?.namespace ?? null, now: new Date() });
+    if (plan.refusal) throw new CliError(plan.refusal);
+    const ledger = observation.ledger;
+    if (!ledger?.reachable) throw new CliError("the ledger was not observed");
+
+    console.log("\n--new-run:");
+    if (plan.importRunRef) {
+      console.log(`1. import bindings for a new run namespace ${devnetNamespace(plan.importRunRef)}`);
+      await importBindings(plan.importRunRef);
+    } else {
+      console.log(`1. bindings: the state already names participant ${ledger.participantId} (namespace ${state?.namespace ?? "?"}); kept`);
+    }
+    if (plan.resetProjection) {
+      const { startOffset, reason } = plan.resetProjection;
+      const summary = await resetProjectionSource(handle.db, DEVNET_SOURCE, { participantId: ledger.participantId, jsonApiUrl: env.CANTON_DEVNET_JSON_API_URL, startOffset });
+      console.log(
+        `2. projection source ${DEVNET_SOURCE} reset (${reason}): ${summary.contracts} contracts, ${summary.events} events, ${summary.updates} updates removed; restarts at offset ${startOffset}` +
+          (startOffset > 0 ? ` (history floor: offsets up to ${startOffset} were pruned and are not projected)` : ""),
+      );
+    } else {
+      console.log(`2. projection source ${DEVNET_SOURCE}: consistent with the participant; kept`);
+    }
+    console.log("3. clean-start bootstrap (replays committed steps)");
+    await bootstrap("clean-start", true, false, true);
+    console.log("\nnext: start the worker and the API again (they load the new state), then:\n  node scripts/devnet/verify-first-tx.mjs\n  node scripts/devnet/recover.mjs");
+    return 0;
+  } finally {
+    await handle.close();
+  }
+}
+
 // --- main ------------------------------------------------------------------------------------------------------
 
 const [command, ...rest] = process.argv.slice(2).filter((arg) => arg !== "--");
@@ -341,6 +433,8 @@ const { values } = parseArgs({
     profile: { type: "string", default: "clean-start" },
     "skip-documents": { type: "boolean", default: false },
     "run-ref": { type: "string" },
+    "new-run": { type: "boolean", default: false },
+    yes: { type: "boolean", default: false },
   },
   allowPositionals: false,
 });
@@ -368,11 +462,19 @@ try {
     case "verify-first-tx":
       process.exitCode = await verifyFirstTx();
       break;
+    case "recover":
+      process.exitCode = await recover({ json: values.json, newRun: values["new-run"], yes: values.yes, runRef: values["run-ref"] });
+      break;
     default:
-      throw new CliError("usage: cli.ts db-setup | login | preflight [--json] | import-bindings [--run-ref <ref>] | bootstrap [--profile clean-start|main] [--skip-documents] | verify-first-tx");
+      throw new CliError(
+        "usage: cli.ts db-setup | login | preflight [--json] | import-bindings [--run-ref <ref>] | bootstrap [--profile clean-start|main] [--skip-documents] | verify-first-tx | recover [--json] [--new-run --yes [--run-ref <ref>]]",
+      );
   }
 } catch (error) {
-  const known = error instanceof CliError || error instanceof SeedRefusedError || (error instanceof Error && error.name === "LedgerCredentialError");
+  const known =
+    error instanceof CliError ||
+    error instanceof SeedRefusedError ||
+    (error instanceof Error && ["LedgerCredentialError", "CredentialCipherError", "CredentialKeyConfigError"].includes(error.name));
   console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
   if (!known && error instanceof Error && process.env.DEVNET_CLI_DEBUG === "1") console.error(error.stack);
   process.exitCode = 1;

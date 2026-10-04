@@ -25,6 +25,10 @@ export const CREDENTIAL_LOG_KEYS = [
   "client_secret",
   "CANTON_JWT_HMAC_SECRET",
   "DATABASE_URL",
+  // the key that encrypts the stored refresh token (credential-key.ts)
+  "DEVNET_CREDENTIAL_KEY",
+  "DEVNET_CREDENTIAL_KEY_PREVIOUS",
+  "credentialKey",
 ] as const;
 
 /** Run this when the stored refresh token is missing or was rejected. */

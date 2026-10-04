@@ -1,6 +1,7 @@
 // Sanitized infrastructure status for GET /api/system/health: no URLs, credentials or party ids.
-import { devnetCredentialId, loadLocalnetState, type LocalnetState } from "@collara/canton";
+import { CredentialKeyConfigError, devnetCredentialId, loadLocalnetState, type CredentialKeyEnv, type LocalnetState } from "@collara/canton";
 import { PgRefreshTokenStore, type Db, type DbHandle, type LedgerSourceRow } from "@collara/db";
+import { devnetCredentialCipher } from "../ledger/devnet";
 import type { SystemHealth } from "@collara/domain";
 import type { StorageService } from "./storage";
 
@@ -22,13 +23,34 @@ export function topologyLabel(state: Pick<LocalnetState, "topology" | "cantonVer
   return `Canton ${canton} dpm sandbox, ${TOPOLOGY_LABELS[state.topology]} (not Splice LocalNet)`;
 }
 
-/** DEVNET: whether a usable refresh token is stored (no token, no user id, no URL in the result). */
-export async function devnetCredentialStatus(env: { DEVNET_LEDGER_USER_ID?: string | undefined }, db: Db): Promise<HealthCheck> {
+/**
+ * DEVNET: whether the stored refresh token is usable with this process's key. Each recovery case has its own
+ * wording (docs/devnet/recovery.md); no token, key, key id, user id or URL in the result.
+ */
+export async function devnetCredentialStatus(env: CredentialKeyEnv & { DEVNET_LEDGER_USER_ID?: string | undefined }, db: Db): Promise<HealthCheck> {
   if (!env.DEVNET_LEDGER_USER_ID) return { status: "unavailable", detail: "No DevNet ledger user configured." };
-  const status = await new PgRefreshTokenStore(db).status(devnetCredentialId(env.DEVNET_LEDGER_USER_ID)).catch(() => null);
-  if (!status || !status.hasRefreshToken) return { status: "unavailable", detail: "No DevNet credential stored: the owner must run scripts/devnet/login.mjs." };
-  if (status.status !== "ACTIVE") return { status: "unavailable", detail: "The DevNet credential was rejected: the owner must run scripts/devnet/login.mjs again." };
-  return { status: "ok" };
+  let store: PgRefreshTokenStore;
+  try {
+    store = new PgRefreshTokenStore(db, { cipher: devnetCredentialCipher(env) });
+  } catch (error) {
+    if (error instanceof CredentialKeyConfigError) return { status: "unavailable", detail: "CREDENTIAL_KEY: DEVNET_CREDENTIAL_KEY is missing or invalid (node scripts/devnet/gen-key.mjs)." };
+    throw error;
+  }
+  const check = await store.check(devnetCredentialId(env.DEVNET_LEDGER_USER_ID)).catch(() => null);
+  switch (check?.state) {
+    case "OK":
+      return { status: "ok" };
+    case undefined:
+    case "MISSING":
+      return { status: "unavailable", detail: "CREDENTIAL_MISSING: no DevNet credential stored: the owner must run scripts/devnet/login.mjs." };
+    case "REAUTH_REQUIRED":
+      return { status: "unavailable", detail: "CREDENTIAL_REVOKED: the DevNet credential was rejected or erased: the owner must run scripts/devnet/login.mjs again." };
+    default:
+      return {
+        status: "unavailable",
+        detail: "CREDENTIAL_KEY: the stored DevNet credential does not decrypt with the configured DEVNET_CREDENTIAL_KEY: restore the key or run scripts/devnet/login.mjs again (scripts/devnet/recover.mjs explains).",
+      };
+  }
 }
 
 export interface LedgerProbeOptions {
@@ -86,9 +108,16 @@ export async function probeLedger(options: LedgerProbeOptions = {}): Promise<Hea
 
 export function workerCheck(sources: readonly LedgerSourceRow[], now: Date, staleAfterSeconds: number): HealthCheck {
   if (sources.length === 0) return { status: "unavailable", detail: "No projection checkpoint yet (worker not started)." };
+  const pruned = sources.filter((s) => s.status === "PRUNED");
+  if (pruned.length > 0) {
+    return {
+      status: "degraded",
+      detail: `PRUNED: the participant pruned updates the projection had not read (${pruned.map((s) => s.source).join(", ")}); the projection is kept as history and a new run is required (scripts/devnet/recover.mjs).`,
+    };
+  }
   const reset = sources.filter((s) => s.status !== "ACTIVE");
   if (reset.length > 0) {
-    return { status: "degraded", detail: `Projection paused after a ledger reset: ${reset.map((s) => s.source).join(", ")}.` };
+    return { status: "degraded", detail: `LEDGER_RESET: projection paused after a ledger reset: ${reset.map((s) => s.source).join(", ")}.` };
   }
   const applied = sources.map((s) => s.lastAppliedAt).filter((d): d is Date => d !== null);
   if (applied.length < sources.length) return { status: "degraded", detail: "The worker has not applied any ledger update yet." };

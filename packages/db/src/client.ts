@@ -14,8 +14,8 @@ export type DbOrTx = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 export interface DbHandle {
   readonly kind: "pg" | "pglite";
   readonly db: Db;
-  /** Applies the committed SQL migrations (idempotent). */
-  migrate(): Promise<void>;
+  /** Applies the committed SQL migrations (idempotent). Tests may pass a copy of the folder cut at a migration. */
+  migrate(options?: { migrationsFolder?: string }): Promise<void>;
   /** Cheap liveness probe (`select 1`). */
   ping(): Promise<void>;
   close(): Promise<void>;
@@ -46,7 +46,7 @@ export function createPgDatabase({ url, max = 10, applicationName = "collara" }:
   return {
     kind: "pg",
     db,
-    migrate: () => migratePg(db, { migrationsFolder: MIGRATIONS_FOLDER }),
+    migrate: (options) => migratePg(db, { migrationsFolder: options?.migrationsFolder ?? MIGRATIONS_FOLDER }),
     ping: async () => {
       await pool.query("select 1");
     },
@@ -70,7 +70,7 @@ export async function createPgliteDatabase(options: { migrate?: boolean } = {}):
   const handle: DbHandle = {
     kind: "pglite",
     db,
-    migrate: () => migrate(db, { migrationsFolder: MIGRATIONS_FOLDER }),
+    migrate: (migrateOptions) => migrate(db, { migrationsFolder: migrateOptions?.migrationsFolder ?? MIGRATIONS_FOLDER }),
     ping: async () => {
       await client.query("select 1");
     },

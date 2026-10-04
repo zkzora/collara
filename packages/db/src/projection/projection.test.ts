@@ -208,6 +208,54 @@ describe("projection: reset detection", () => {
   });
 });
 
+describe("projection: pruning", () => {
+  it("resumes while the checkpoint is within retention, and stops (PRUNED) once updates after it were pruned", async () => {
+    const ledger = new FakeLedger();
+    history(ledger);
+    await projectOnce(handle.db, ledger, source());
+    // Pruned up to the checkpoint: nothing after it is missing, so the projection simply resumes.
+    ledger.prunedUpTo = 2;
+    ledger.tx(() => {});
+    expect(await projectOnce(handle.db, ledger, source())).toMatchObject({ status: "ACTIVE", checkpoint: 3 });
+
+    // The participant prunes past the checkpoint (offsets 4..5 are gone before the worker read them).
+    ledger.tx(() => {});
+    ledger.tx(() => {});
+    ledger.prunedUpTo = 5;
+    const pruned = await projectOnce(handle.db, ledger, source());
+    expect(pruned).toMatchObject({ status: "PRUNED", transactionsApplied: 0, checkpoint: 3 });
+    expect(pruned.resetReason).toMatch(/updates after checkpoint 3 were pruned \(pruning offset 5\)/);
+    expect(pruned.resetReason).toContain("docs/devnet/recovery.md");
+    // The existing projection is kept as history and never silently re-projected.
+    expect(await counts()).toMatchObject({ contracts: 2, checkpoint: 3, status: "PRUNED" });
+    expect((await projectOnce(handle.db, ledger, source())).status).toBe("PRUNED");
+  });
+
+  it("treats PARTICIPANT_PRUNED_DATA_ACCESSED from /v2/updates as PRUNED (pruning between the check and the read)", async () => {
+    const ledger = new FakeLedger();
+    history(ledger);
+    ledger.prunedUpTo = 1;
+    ledger.hidePruning = true;
+    const result = await projectOnce(handle.db, ledger, source());
+    expect(result.status).toBe("PRUNED");
+    expect(result.resetReason).toContain("PARTICIPANT_PRUNED_DATA_ACCESSED");
+    expect(await counts()).toMatchObject({ contracts: 0, checkpoint: 0 });
+  });
+
+  it("a fresh projection on a pruned participant is refused from 0, and starts only at an explicit history floor", async () => {
+    const ledger = new FakeLedger();
+    history(ledger);
+    ledger.prunedUpTo = 1;
+    expect((await projectOnce(handle.db, ledger, source())).status).toBe("PRUNED");
+    // New run (scripts/devnet/recover.mjs --new-run): reset with the pruning offset as the history floor.
+    await resetProjectionSource(handle.db, "sandbox", { startOffset: 1 });
+    const [row] = await handle.db.select().from(ledgerSources).where(eq(ledgerSources.source, "sandbox"));
+    expect(row).toMatchObject({ status: "ACTIVE", checkpointOffset: 1, historyFloorOffset: 1 });
+    expect(await projectOnce(handle.db, ledger, source())).toMatchObject({ status: "ACTIVE", checkpoint: 2, transactionsApplied: 1 });
+    await expect(resetProjectionSource(handle.db, "sandbox", { startOffset: -1 })).rejects.toThrow(/invalid start offset/);
+  });
+});
+
 describe("projection: command status advancement", () => {
   async function command(updateId: string | null, status: string, committedAt: Date | null, extra: Partial<typeof commands.$inferInsert> = {}) {
     const [row] = await handle.db

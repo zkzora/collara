@@ -122,6 +122,10 @@ export class FakeLedger implements ProjectionLedgerClient, CompletionLedgerClien
   updateCalls = 0;
   /** When set, updates() ignores beginExclusive and re-delivers everything (duplicate delivery). */
   redeliverAll = false;
+  /** Participant pruning offset (inclusive); updates() below it fails like Canton (PARTICIPANT_PRUNED_DATA_ACCESSED). */
+  prunedUpTo = 0;
+  /** Makes latestPrunedOffset() report 0 (pruning that happens between the check and the read). */
+  hidePruning = false;
 
   constructor(start = Date.parse("2026-10-01T08:00:00Z")) {
     this.clock = start;
@@ -171,6 +175,10 @@ export class FakeLedger implements ProjectionLedgerClient, CompletionLedgerClien
     return this.end;
   }
 
+  async latestPrunedOffset(): Promise<number> {
+    return this.hidePruning ? 0 : this.prunedUpTo;
+  }
+
   async updates(request: {
     beginExclusive: number;
     endInclusive?: number;
@@ -178,6 +186,13 @@ export class FakeLedger implements ProjectionLedgerClient, CompletionLedgerClien
     limit?: number;
   }): Promise<ProjectionUpdatesPage> {
     this.updateCalls += 1;
+    if (request.beginExclusive < this.prunedUpTo) {
+      // Same shape as @collara/canton's LedgerError (info.code), which the projection matches structurally.
+      throw Object.assign(new Error("updates: PARTICIPANT_PRUNED_DATA_ACCESSED: Command interpretation failed"), {
+        name: "LedgerError",
+        info: { kind: "FAILED_PRECONDITION", code: "PARTICIPANT_PRUNED_DATA_ACCESSED", errorCategory: 9 },
+      });
+    }
     const endInclusive = request.endInclusive ?? this.end;
     const begin = this.redeliverAll ? 0 : request.beginExclusive;
     if (endInclusive <= begin) return { updates: [], endInclusive, nextBeginExclusive: request.beginExclusive, complete: true };
