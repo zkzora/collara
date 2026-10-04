@@ -3,6 +3,14 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 /**
+ * Path relative to this module, resolved at run time. A literal `new URL("…", import.meta.url)` makes bundlers (the
+ * embedded API inside Next) try to ship the target file, so the relative path is passed in as a value.
+ */
+function besideModule(relative: string): string {
+  return fileURLToPath(new URL(relative, import.meta.url));
+}
+
+/**
  * Schema of .local/localnet/state.json, written by scripts/localnet/bootstrap.mjs.
  * Party ids change on every sandbox start; consumers must compare `participantId` with the
  * running participant (LedgerClient.participantId()) and treat a mismatch as a ledger reset.
@@ -45,19 +53,33 @@ export type LocalnetState = z.infer<typeof LocalnetStateSchema>;
 
 /** <repo>/.local/localnet/state.json (override with COLLARA_LOCALNET_STATE). */
 export function defaultLocalnetStatePath(): string {
-  return process.env.COLLARA_LOCALNET_STATE ?? fileURLToPath(new URL("../../../.local/localnet/state.json", import.meta.url));
+  return process.env.COLLARA_LOCALNET_STATE ?? besideModule("../../../.local/localnet/state.json");
 }
 
-/** Reads and validates the bootstrap state; returns null when the file does not exist. */
-export async function loadLocalnetState(path = defaultLocalnetStatePath()): Promise<LocalnetState | null> {
-  let text: string;
+/** Prefix of a state "path" that names an environment variable holding the JSON (hosts without a persistent disk). */
+export const STATE_ENV_PREFIX = "env:";
+
+/**
+ * The text of a state file, or null when it does not exist. `env:NAME` reads the JSON from the environment variable
+ * NAME instead (e.g. env:DEVNET_STATE_JSON on Vercel); an unset or empty variable counts as a missing file.
+ */
+export async function readStateText(path: string): Promise<string | null> {
+  if (path.startsWith(STATE_ENV_PREFIX)) {
+    const value = process.env[path.slice(STATE_ENV_PREFIX.length)];
+    return value?.trim() ? value : null;
+  }
   try {
-    text = await readFile(path, "utf8");
+    return await readFile(path, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
-  return LocalnetStateSchema.parse(JSON.parse(text));
+}
+
+/** Reads and validates the bootstrap state; returns null when the file does not exist. */
+export async function loadLocalnetState(path = defaultLocalnetStatePath()): Promise<LocalnetState | null> {
+  const text = await readStateText(path);
+  return text === null ? null : LocalnetStateSchema.parse(JSON.parse(text));
 }
 
 export interface LocalnetPartyRef {
@@ -78,7 +100,7 @@ export function localnetParty(state: LocalnetState, hint: string): LocalnetParty
 
 /** <repo>/.local/devnet/state.json (override with COLLARA_DEVNET_STATE). DEVNET never reads the LocalNet state. */
 export function defaultDevnetStatePath(): string {
-  return process.env.COLLARA_DEVNET_STATE ?? fileURLToPath(new URL("../../../.local/devnet/state.json", import.meta.url));
+  return process.env.COLLARA_DEVNET_STATE ?? besideModule("../../../.local/devnet/state.json");
 }
 
 /** True for a path that names a LocalNet state file (.local/localnet/state*.json); DEVNET refuses those. */

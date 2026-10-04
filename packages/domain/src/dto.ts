@@ -470,6 +470,18 @@ export const UploadIntentSchema = z.object({
   uploadPath: z.string(),
   maxBytes: z.number().int().positive(),
   expiresAt: IsoDateTimeSchema,
+  /**
+   * Present only when the API runs with STORAGE_UPLOAD_MODE=presigned: the browser PUTs the bytes straight to this
+   * short-lived storage URL (quarantine) with exactly these headers, then calls finalize. Absent: PUT to uploadPath.
+   */
+  directUpload: z
+    .object({
+      url: z.url({ protocol: /^https?$/ }),
+      method: z.literal("PUT"),
+      headers: z.record(z.string(), z.string()),
+      expiresAt: IsoDateTimeSchema,
+    })
+    .optional(),
 });
 export type UploadIntent = z.infer<typeof UploadIntentSchema>;
 

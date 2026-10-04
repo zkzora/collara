@@ -120,6 +120,11 @@ export interface CollaraClient {
     createUploadIntent(body: UploadIntentRequest, options?: MutationOptions): Promise<CommandResult<UploadIntent>>;
     /** Streams bytes into quarantine through the API (PDF/JPEG/PNG, 20 MB). */
     uploadContent(evidenceId: string, file: Blob, options?: MutationOptions): Promise<CommandResult<EvidenceDocument>>;
+    /**
+     * Presigned mode (intent.directUpload present): PUTs the bytes straight to private storage (quarantine), without
+     * cookies. Nothing is recorded until finalize, which hashes and validates the stored bytes server-side.
+     */
+    uploadDirect(target: NonNullable<UploadIntent["directUpload"]>, file: Blob, options?: RequestOptions): Promise<void>;
     /** Server hashes, checks type/size and assigns the version. */
     finalize(evidenceId: string, options?: MutationOptions): Promise<CommandResult<EvidenceDocument>>;
     get(evidenceId: string, options?: RequestOptions): Promise<EvidenceDocument>;

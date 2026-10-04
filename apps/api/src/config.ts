@@ -82,6 +82,14 @@ const ConfigSchema = z
     // DEVNET (shared DevNet participant, OIDC refresh-token auth; docs/devnet.md): CANTON_DEVNET_JSON_API_URL,
     // DEVNET_OIDC_*, DEVNET_LEDGER_AUDIENCE, DEVNET_LEDGER_USER_ID, COLLARA_DEVNET_STATE (see DevnetEnvSchema).
     ...DevnetEnvSchema.shape,
+    // "process": a persistent worker (apps/worker) projects the ledger. "on-request": no worker process; the embedded
+    // API (Vercel, docs/devnet/deploy-free.md) runs a bounded projection pass around requests. Health reports which.
+    WORKER_MODE: z.enum(["process", "on-request"]).default("process"),
+    // Evidence bytes: "proxied" = PUT through the API (20 MB cap); "presigned" = the browser PUTs straight to a
+    // short-lived presigned URL under quarantine/ (needed where the API's request body limit is 4.5 MB, e.g. Vercel).
+    STORAGE_UPLOAD_MODE: z.enum(["proxied", "presigned"]).default("proxied"),
+    // node-postgres pool size (main.ts default 10; serverless/embedded: 1–3 against a transaction pooler).
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).optional(),
     // Health: a projection checkpoint older than this is reported as degraded.
     WORKER_STALE_AFTER_SECONDS: z.coerce.number().int().min(5).default(120),
 
@@ -111,6 +119,9 @@ const ConfigSchema = z
       if (!config.DEVNET_LEDGER_USER_ID) {
         ctx.addIssue({ code: "custom", path: ["DEVNET_LEDGER_USER_ID"], message: "DEVNET_LEDGER_USER_ID is required (printed by node scripts/devnet/login.mjs)" });
       }
+    }
+    if (config.STORAGE_UPLOAD_MODE === "presigned" && !config.COLLARA_S3_ENDPOINT) {
+      ctx.addIssue({ code: "custom", path: ["STORAGE_UPLOAD_MODE"], message: "STORAGE_UPLOAD_MODE=presigned needs COLLARA_S3_ENDPOINT (S3-compatible storage)" });
     }
     if (config.COLLARA_S3_ENDPOINT && !(config.COLLARA_S3_ACCESS_KEY && config.COLLARA_S3_SECRET_KEY)) {
       // SeaweedFS without credentials serves the bucket anonymously; never run storage that way.

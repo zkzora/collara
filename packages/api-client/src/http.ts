@@ -155,6 +155,16 @@ export function createHttpClient(config: HttpClientOptions = {}): CollaraClient 
     evidence: {
       createUploadIntent: (body, options) => call("evidence.createUploadIntent", commandResultSchema(UploadIntentSchema), { body, options }),
       uploadContent: (id, file, options) => call("evidence.uploadContent", commandResultSchema(EvidenceDocumentSchema), { id, raw: file, options }),
+      uploadDirect: async (target, file, options) => {
+        let response: Response;
+        try {
+          response = await doFetch(target.url, { method: target.method, headers: target.headers, body: file, credentials: "omit", cache: "no-store", signal: options?.signal });
+        } catch {
+          if (options?.signal?.aborted) throw new ApiError(0, "network_error", "The upload was cancelled.");
+          throw new ApiError(0, "network_error", "The upload could not reach storage.");
+        }
+        if (!response.ok) throw new ApiError(response.status, "upstream_unavailable", "Storage refused the upload. Try again.");
+      },
       finalize: (id, options) => call("evidence.finalize", commandResultSchema(EvidenceDocumentSchema), { id, body: {}, options }),
       get: (id, options) => call("evidence.get", EvidenceDocumentSchema, { id, options }),
       download: (id, options) => call("evidence.download", EvidenceDownloadSchema, { id, options }),

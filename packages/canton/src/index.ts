@@ -73,6 +73,8 @@ export {
   defaultLocalnetStatePath,
   isLocalnetStatePath,
   loadLocalnetState,
+  readStateText,
+  STATE_ENV_PREFIX,
   localnetParty,
   LocalnetStateSchema,
   type LocalnetPartyRef,

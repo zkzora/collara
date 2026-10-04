@@ -2,6 +2,8 @@
 //   POST /upload-intents   → version row UPLOAD_PENDING (owner or invited dealer of the asset)
 //   PUT  /:id/content      → streamed bytes (20 MB cap, PDF/JPEG/PNG by magic bytes) → quarantine/ → QUARANTINED
 //   POST /:id/finalize     → server re-reads + SHA-256 + checks → evidence/ → AVAILABLE (scan: NOT_SCANNED)
+//   STORAGE_UPLOAD_MODE=presigned: the intent also carries a short-lived presigned PUT URL for quarantine/; the browser
+//   sends the bytes straight to storage (no API body limit) and finalize hashes and validates them as above.
 //   GET  /:id, /:id/download → owner or contributing organization; package-share recipients through the read model
 //                              (metadata) and a fresh ledger check of an active share at every download
 // Each mutation is an APPLICATION command (Idempotency-Key required); none claims a ledger confirmation.
@@ -23,6 +25,7 @@ import {
   type UploadIntent,
 } from "@collara/domain";
 import { and, asc, eq, inArray } from "drizzle-orm";
+import type { FastifyBaseLogger } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { isProblemError, problems, type ProblemError } from "../errors";
@@ -37,6 +40,8 @@ import { presentSharedEvidence, sharedDownloadVersion } from "../workflow/sharin
 
 export const INTENT_TTL_MS = 15 * 60_000;
 export const DOWNLOAD_URL_TTL_SECONDS = 60;
+/** Upper bound of a presigned upload URL's lifetime (also capped by the intent's expiry). */
+export const DIRECT_UPLOAD_URL_TTL_SECONDS = 10 * 60;
 const UPLOAD_CONTENT_TYPES = ["application/pdf", "image/jpeg", "image/png", "application/octet-stream"];
 
 export interface EvidenceRoutesOptions {
@@ -45,12 +50,24 @@ export interface EvidenceRoutesOptions {
   readonly commands: CommandService;
   readonly projections: ProjectionReader;
   readonly clock: () => Date;
+  /** "presigned": upload intents carry a direct-to-storage PUT URL (default "proxied"). */
+  readonly uploadMode?: "proxied" | "presigned";
+}
+
+/** Quarantine key of a direct (presigned) upload: one per version row, so finalize finds it without extra state. */
+export function directUploadKey(row: Pick<EvidenceDocumentRow, "docRef" | "version" | "id">): string {
+  return `quarantine/${row.docRef}/v${row.version}/direct-${row.id}`;
+}
+
+function isMissingObject(error: unknown): boolean {
+  const e = error as { name?: unknown; message?: unknown; $metadata?: { httpStatusCode?: unknown } } | null;
+  return e?.name === "NoSuchKey" || e?.name === "NotFound" || e?.$metadata?.httpStatusCode === 404 || (typeof e?.message === "string" && e.message.endsWith("not found"));
 }
 
 const IdempotencyHeaders = z.object({ "idempotency-key": IdempotencyKeySchema });
 const DocParams = z.object({ id: DocumentRefSchema });
 
-export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = async (app, { db, storage, commands, projections, clock }) => {
+export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = async (app, { db, storage, commands, projections, clock, uploadMode = "proxied" }) => {
   // Raw bodies for PUT /:id/content are passed through as streams (scoped to this plugin only).
   app.addContentTypeParser(UPLOAD_CONTENT_TYPES, (_request, payload, done) => done(null, payload));
 
@@ -83,6 +100,25 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     const latest = (await versionsOf(docRef)).at(-1);
     if (!latest || latest.contributorOrgId !== actor.orgId) throw problems.unavailable();
     return latest;
+  }
+
+  /**
+   * Adds the presigned PUT URL (presigned mode, version still UPLOAD_PENDING). Never stored in the command result: a
+   * replayed intent gets a fresh URL, valid at most until the intent expires.
+   */
+  async function withDirectUpload(intent: UploadIntent): Promise<UploadIntent> {
+    if (uploadMode !== "presigned" || !storage) return intent;
+    const [row] = await db
+      .select()
+      .from(evidenceDocuments)
+      .where(and(eq(evidenceDocuments.docRef, intent.evidenceId), eq(evidenceDocuments.version, intent.version)))
+      .limit(1);
+    if (!row || row.status !== "UPLOAD_PENDING") return intent;
+    const now = clock().getTime();
+    const seconds = Math.min(DIRECT_UPLOAD_URL_TTL_SECONDS, Math.floor((row.intentExpiresAt.getTime() - now) / 1000));
+    if (seconds < 1) return intent;
+    const url = await storage.presignPut(directUploadKey(row), { expiresInSeconds: seconds, contentType: row.contentType });
+    return { ...intent, directUpload: { url, method: "PUT", headers: { "content-type": row.contentType }, expiresAt: new Date(now + seconds * 1000).toISOString() } };
   }
 
   /** Re-throws the original validation outcome when a rejected command is replayed. */
@@ -142,7 +178,10 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
         payload: body,
         target: "APPLICATION",
       });
-      const respond = (row: CommandRow, intent: UploadIntent) => reply.code(created ? 201 : 200).send({ command: commands.toStatus(row), result: intent });
+      const respond = async (row: CommandRow, stored: UploadIntent) => {
+        const intent = row.status === "COMMITTED" ? await withDirectUpload(stored) : stored;
+        return reply.code(created ? 201 : 200).send({ command: commands.toStatus(row), result: intent });
+      };
       if (record.status !== "PREPARED") return respond(record, UploadIntentSchema.parse(record.result));
 
       const now = clock();
@@ -278,6 +317,64 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
     },
   );
 
+  /**
+   * Presigned mode: the bytes were PUT straight to storage, so the API sees them for the first time here. Same checks
+   * as the proxied path (20 MB cap, non-empty, magic bytes = declared type), SHA-256 of what storage holds, then
+   * evidence/ and AVAILABLE in one command. A missing object is NOT_UPLOADED (retryable after the PUT).
+   */
+  async function finalizeDirect(store: StorageService, row: EvidenceDocumentRow, record: CommandRow, actor: ResolvedActor, request: { id: string; log: FastifyBaseLogger }): Promise<CommandRow> {
+    const quarantineKey = directUploadKey(row);
+    let body: AsyncIterable<Uint8Array>;
+    try {
+      body = await store.getObject(quarantineKey);
+    } catch (error) {
+      if (isMissingObject(error)) throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
+      throw error;
+    }
+    const read = await readCapped(body, EVIDENCE_MAX_BYTES);
+    const discard = () => store.deleteObject(quarantineKey).catch(() => undefined);
+    if (!read.ok) {
+      await reject(row, record, "TOO_LARGE", EVIDENCE_ERRORS.TOO_LARGE);
+      await discard();
+      throw problems.validation([{ path: "body", message: EVIDENCE_ERRORS.TOO_LARGE }], EVIDENCE_ERRORS.TOO_LARGE, 413);
+    }
+    const failure = read.size === 0 ? EVIDENCE_ERRORS.EMPTY : detectContentType(read.bytes) !== row.contentType ? EVIDENCE_ERRORS.TYPE_MISMATCH : null;
+    if (failure) {
+      await reject(row, record, "VALIDATION", failure);
+      await discard();
+      throw problems.validation([{ path: "body", message: failure }], failure);
+    }
+    const evidenceKey = `evidence/${row.docRef}/v${row.version}/${read.sha256}`;
+    await store.putObject(evidenceKey, read.bytes, row.contentType);
+    const now = clock();
+    const outcome = await commands.runApplicationCommand(record, async (tx) => {
+      const [promoted] = await tx
+        .update(evidenceDocuments)
+        .set({
+          status: "AVAILABLE",
+          scanStatus: "NOT_SCANNED",
+          uploadSha256: read.sha256,
+          sha256: read.sha256,
+          sizeBytes: read.size,
+          storageKey: evidenceKey,
+          uploadedAt: now,
+          finalizedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(evidenceDocuments.id, row.id), eq(evidenceDocuments.status, "UPLOAD_PENDING")))
+        .returning();
+      if (!promoted) throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
+      return { kind: "commit", result: { evidenceId: row.docRef, version: row.version } };
+    });
+    if (outcome.wrote) {
+      await discard();
+      await recordAudit(db, { actor, action: "evidence.finalize", resourceType: "evidence", resourceRef: row.docRef, outcome: "SUCCEEDED", requestId: request.id, detail: { version: row.version, sha256: read.sha256, sizeBytes: read.size, upload: "presigned" } }, request.log);
+    } else if (outcome.record.status === "REJECTED") {
+      throw replayedRejection(outcome.record);
+    }
+    return outcome.record;
+  }
+
   // --- POST /:id/finalize --------------------------------------------------------------------------
 
   app.post(
@@ -306,6 +403,9 @@ export const evidenceRoutes: FastifyPluginAsyncZod<EvidenceRoutesOptions> = asyn
       });
       if (record.status === "REJECTED") throw replayedRejection(record);
       if (record.status !== "PREPARED") return { command: commands.toStatus(record), result: await present(await versionsOf(row.docRef), actor) };
+      if (uploadMode === "presigned" && row.status === "UPLOAD_PENDING") {
+        return { command: commands.toStatus(await finalizeDirect(store, row, record, actor, request)), result: await present(await versionsOf(row.docRef), actor) };
+      }
       if (row.status !== "QUARANTINED" || !row.storageKey) throw problems.stateConflict(EVIDENCE_ERRORS.NOT_UPLOADED);
 
       // Hash what storage actually holds, independently of what was computed while receiving.

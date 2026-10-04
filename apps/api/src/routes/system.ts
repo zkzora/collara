@@ -14,6 +14,8 @@ export interface SystemRoutesOptions {
   /** Ledger reachability + exact topology (LOCALNET only). */
   probeLedger: () => Promise<HealthCheck>;
   workerStaleAfterSeconds: number;
+  /** "on-request": no persistent worker; the embedded API projects around requests (reported in the worker check). */
+  workerMode?: "process" | "on-request";
   clock: () => Date;
 }
 
@@ -38,7 +40,11 @@ export const systemRoutes: FastifyPluginAsyncZod<SystemRoutesOptions> = async (a
         checks.ledger = await opts.probeLedger();
         if (opts.db && checks.database?.status === "ok") {
           const sources = await ledgerCheckpoints(opts.db.db);
-          checks.worker = workerCheck(sources, opts.clock(), opts.workerStaleAfterSeconds);
+          const check = workerCheck(sources, opts.clock(), opts.workerStaleAfterSeconds);
+          checks.worker =
+            opts.workerMode === "on-request"
+              ? { ...check, detail: `On-request sync (no persistent worker; the projection advances only while the app is used). ${check.detail ?? ""}`.trim() }
+              : check;
         } else {
           checks.worker = { status: "unavailable", detail: "Projection state needs the database." };
         }

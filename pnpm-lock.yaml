@@ -342,12 +342,18 @@ importers:
       '@base-ui/react':
         specifier: 'catalog:'
         version: 1.8.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@collara/api':
+        specifier: workspace:*
+        version: link:../api
       '@collara/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
       '@collara/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@collara/worker':
+        specifier: workspace:*
+        version: link:../worker
       '@hookform/resolvers':
         specifier: 'catalog:'
         version: 5.9.1(ajv-formats@2.1.1)(ajv@8.20.0)(react-hook-form@7.89.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.5)

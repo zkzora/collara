@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@collara/api": "workspace:*",
     "@collara/api-client": "workspace:*",
     "@collara/domain": "workspace:*",
+    "@collara/worker": "workspace:*",
     "@hookform/resolvers": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",

@@ -33,8 +33,13 @@ export const DevnetEnvSchema = z.object({
   DEVNET_LEDGER_AUDIENCE: z.string().min(1).default(DEVNET_DEFAULTS.audience),
   /** The tenant's ledger user id (the JWT `sub`), printed by scripts/devnet/login.mjs. */
   DEVNET_LEDGER_USER_ID: LedgerUserIdSchema.optional(),
-  /** Default <repo>/.local/devnet/state.json. */
+  /** Default <repo>/.local/devnet/state.json; `env:NAME` reads the JSON from env var NAME. */
   COLLARA_DEVNET_STATE: z.string().min(1).optional(),
+  /**
+   * The DevNet state JSON itself (party ids, participant, packages; no secrets), for hosts without a persistent disk
+   * (Vercel). Used when COLLARA_DEVNET_STATE is unset.
+   */
+  DEVNET_STATE_JSON: z.string().min(1).optional(),
   /** SECRET (never logged, never NEXT_PUBLIC_*, never in the database): base64 of 32 bytes; validated by devnetGuardIssues. */
   DEVNET_CREDENTIAL_KEY: z.string().optional(),
   DEVNET_CREDENTIAL_KEY_ID: z.string().optional(),
@@ -102,8 +107,8 @@ export function devnetOidcSettings(env: DevnetEnv & { DEVNET_LEDGER_USER_ID: str
   };
 }
 
-export function devnetStatePath(env: Pick<DevnetEnv, "COLLARA_DEVNET_STATE">): string {
-  return env.COLLARA_DEVNET_STATE ?? defaultDevnetStatePath();
+export function devnetStatePath(env: Pick<DevnetEnv, "COLLARA_DEVNET_STATE"> & { readonly DEVNET_STATE_JSON?: string | undefined }): string {
+  return env.COLLARA_DEVNET_STATE ?? (env.DEVNET_STATE_JSON ? "env:DEVNET_STATE_JSON" : defaultDevnetStatePath());
 }
 
 export { devnetCredentialId };

@@ -4,6 +4,9 @@
   "private": true,
   "description": "Collara API (Fastify 5): auth/session, permission and mandate checks, domain services, Canton commands, evidence storage, OpenAPI",
   "type": "module",
+  "exports": {
+    "./embedded": "./src/embedded.ts"
+  },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
     "start": "tsx --env-file-if-exists=../../.env src/main.ts",

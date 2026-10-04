@@ -1,8 +1,7 @@
 // LocalNet bootstrap state (scripts/localnet/bootstrap.mjs), with the isolation prefix and the Collara
 // namespace. state.json (no prefix) or state-<prefix>.json; parties are keyed by logical hint.
-import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { defaultLocalnetStatePath, LocalnetStateSchema } from "@collara/canton";
+import { defaultLocalnetStatePath, LocalnetStateSchema, readStateText } from "@collara/canton";
 import { ASSET_NAMESPACE } from "@collara/domain";
 import { z } from "zod";
 
@@ -20,16 +19,10 @@ export function ledgerStatePath(prefix?: string | null): string {
   return prefix ? join(dirname(base), `state-${prefix}.json`) : base;
 }
 
-/** Reads and validates a bootstrap state file; null when it does not exist. */
+/** Reads and validates a bootstrap state file (or `env:NAME`, see readStateText); null when it does not exist. */
 export async function loadLedgerState(path: string = defaultLocalnetStatePath()): Promise<LedgerState | null> {
-  let text: string;
-  try {
-    text = await readFile(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-  return LedgerStateSchema.parse(JSON.parse(text));
+  const text = await readStateText(path);
+  return text === null ? null : LedgerStateSchema.parse(JSON.parse(text));
 }
 
 /** The Collara namespace of a bootstrap state ("collara-localnet" or "collara-localnet-<prefix>"). */

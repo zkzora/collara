@@ -24,6 +24,11 @@ export interface StorageService {
   getObject(key: string): Promise<AsyncIterable<Uint8Array>>;
   deleteObject(key: string): Promise<void>;
   presignGet(key: string, options: PresignOptions): Promise<string>;
+  /**
+   * Short-lived URL a browser PUTs the bytes to (STORAGE_UPLOAD_MODE=presigned). Content-Type is part of the
+   * signature, so the PUT must send exactly `contentType`. Size and type are still checked server-side at finalize.
+   */
+  presignPut(key: string, options: { readonly expiresInSeconds: number; readonly contentType: string }): Promise<string>;
   check(): Promise<{ ok: boolean; detail: string }>;
 }
 
@@ -73,6 +78,12 @@ export function createS3Storage(config: Config): StorageService | null {
         { expiresIn: options.expiresInSeconds },
       );
     },
+    presignPut(key, options) {
+      return getSignedUrl(presignClient, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: options.contentType }), {
+        expiresIn: options.expiresInSeconds,
+        signableHeaders: new Set(["content-type"]),
+      });
+    },
     async check() {
       try {
         await client.send(new HeadBucketCommand({ Bucket: bucket }), { abortSignal: AbortSignal.timeout(3_000) });
@@ -107,6 +118,10 @@ export function createMemoryStorage(bucket = "collara-evidence-memory"): Storage
       if (!objects.has(key)) throw new Error(`object ${key} not found`);
       const expires = Date.now() + options.expiresInSeconds * 1000;
       return `memory://${bucket}/${encodeURIComponent(key)}?expires=${expires}`;
+    },
+    async presignPut(key, options) {
+      const expires = Date.now() + options.expiresInSeconds * 1000;
+      return `https://storage.invalid/${bucket}/${encodeURIComponent(key)}?put=1&expires=${expires}`;
     },
     async check() {
       return { ok: true, detail: "In-memory storage (tests only)." };

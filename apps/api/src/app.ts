@@ -66,6 +66,11 @@ export interface BuildAppOptions {
   /** Ledger reachability probe for health (defaults to the LocalNet bootstrap state + /readyz). */
   probeLedger?: () => Promise<HealthCheck>;
   clock?: () => Date;
+  /**
+   * Serve the Swagger UI at /api/docs (default true). The embedded adapter turns it off: swagger-ui serves static files
+   * from its package directory, which a bundled serverless function does not ship.
+   */
+  apiDocs?: boolean;
 }
 
 /** Services available to route plugins (also decorated on the instance as `services`). */
@@ -185,12 +190,14 @@ export async function buildApp(options: BuildAppOptions) {
     },
     transform: jsonSchemaTransform,
   });
-  await app.register(swaggerUi, {
-    routePrefix: "/api/docs",
-    staticCSP: true,
-    // The docs are served over plain http locally; upgrade-insecure-requests would break their assets.
-    transformStaticCSP: (header) => header.replace(/\s*upgrade-insecure-requests;?/, ""),
-  });
+  if (options.apiDocs ?? true) {
+    await app.register(swaggerUi, {
+      routePrefix: "/api/docs",
+      staticCSP: true,
+      // The docs are served over plain http locally; upgrade-insecure-requests would break their assets.
+      transformStaticCSP: (header) => header.replace(/\s*upgrade-insecure-requests;?/, ""),
+    });
+  }
 
   const db = options.db ?? null;
   const storage = options.storage === undefined ? createS3Storage(config) : options.storage;
@@ -206,6 +213,7 @@ export async function buildApp(options: BuildAppOptions) {
         ? () => probeLedger({ statePath: devnetStatePath(config), credentialStatus: db ? () => devnetCredentialStatus(config, db.db) : undefined })
         : () => probeLedger({ statePath: config.COLLARA_LOCALNET_STATE })),
     workerStaleAfterSeconds: config.WORKER_STALE_AFTER_SECONDS,
+    workerMode: config.WORKER_MODE,
     clock,
   });
 
@@ -237,7 +245,7 @@ export async function buildApp(options: BuildAppOptions) {
     rateLimit: { max: config.PILOT_RATE_LIMIT_MAX, timeWindowMs: config.PILOT_RATE_LIMIT_WINDOW_MS },
   });
   await app.register(commandRoutes, { prefix: "/api/commands", commands });
-  await app.register(evidenceRoutes, { prefix: "/api/evidence", db: db.db, storage, commands, projections, clock });
+  await app.register(evidenceRoutes, { prefix: "/api/evidence", db: db.db, storage, commands, projections, clock, uploadMode: config.STORAGE_UPLOAD_MODE });
   // Workflow modules (cases, assets, verification, reviews, proposals, pledges, release, access, audit,
   // reports, governance incl. GET /verifiers): one registration; each module declares its full paths under /api.
   await app.register(workflowRoutes, { prefix: "/api", services, workflow, mode: config.COLLARA_MODE });

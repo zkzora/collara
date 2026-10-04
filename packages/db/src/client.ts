@@ -5,6 +5,14 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import pg from "pg";
 import * as schema from "./schema";
 
+/**
+ * Path relative to this module, resolved at run time. A literal `new URL("…", import.meta.url)` makes bundlers (the
+ * embedded API inside Next) try to ship the target file, so the relative path is passed in as a value.
+ */
+function besideModule(relative: string): string {
+  return fileURLToPath(new URL(relative, import.meta.url));
+}
+
 export type Schema = typeof schema;
 /** Driver-independent Drizzle database (node-postgres in the API/worker, PGlite in tests). */
 export type Db = PgDatabase<PgQueryResultHKT, Schema>;
@@ -22,7 +30,7 @@ export interface DbHandle {
 }
 
 /** packages/db/migrations (committed output of `drizzle-kit generate`). */
-export const MIGRATIONS_FOLDER = fileURLToPath(new URL("../migrations", import.meta.url));
+export const MIGRATIONS_FOLDER = besideModule("../migrations");
 
 export interface PgOptions {
   /** postgres://user:pass@host:5432/db */

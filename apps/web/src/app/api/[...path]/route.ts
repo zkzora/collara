@@ -1,11 +1,16 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 /**
  * Same-origin `/api/*` proxy to the Fastify API (ADR-0001 §2.9, research-webstack §7.3).
  * The upstream origin is read per request, so one build works in every environment.
  * Bodies are streamed in both directions (no 10 MB rewrite cap).
+ * API_MODE=embedded (Vercel without a separate API host, docs/devnet/deploy-free.md): the API runs in this
+ * process instead and requests are dispatched in-process (src/server/embedded-api.ts).
  */
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+// Vercel Hobby allows up to 300 s; a request plus its on-request sync pass stays far below that.
+export const maxDuration = 60;
 
 const DEFAULT_API_ORIGIN = "http://127.0.0.1:4000";
 const UPSTREAM_TIMEOUT_MS = 60_000;
@@ -46,6 +51,7 @@ function jsonError(status: number, error: string) {
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   // UI mockup deployments have no API: the workspace uses the in-browser mock client and never calls /api.
   if (process.env.COLLARA_MODE === "UI_MOCK") return jsonError(404, "not_available_in_ui_mockup");
+  if (process.env.API_MODE === "embedded") return embedded(request);
   const { path } = await context.params;
   const origin = process.env.API_INTERNAL_ORIGIN || DEFAULT_API_ORIGIN;
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`, origin);
@@ -96,6 +102,25 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     statusText: upstream.statusText,
     headers: responseHeaders,
   });
+}
+
+async function embedded(request: NextRequest): Promise<Response> {
+  const { embeddedApi, syncAfterMutation, syncBeforeRead } = await import("@/server/embedded-api");
+  let instance: Awaited<ReturnType<typeof embeddedApi>>;
+  try {
+    instance = await embeddedApi();
+  } catch (error) {
+    // Configuration or database problem at cold start: logged for the operator (config errors name the variable, not
+    // its value), never sent in the response.
+    console.error("embedded API failed to start:", error instanceof Error ? error.message : String(error));
+    return jsonError(503, "api_unavailable");
+  }
+  const { api, sync } = instance;
+  const pathname = request.nextUrl.pathname;
+  if (sync && syncBeforeRead(request.method, pathname)) await sync.sync();
+  const response = await api.handle(request);
+  if (sync && syncAfterMutation(request.method, pathname)) after(() => sync.sync({ force: true }).then(() => undefined));
+  return response;
 }
 
 export {

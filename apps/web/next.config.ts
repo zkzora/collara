@@ -22,7 +22,9 @@ const nextConfig: NextConfig = {
   ...(standalone ? { output: "standalone", outputFileTracingRoot: resolve(process.cwd(), "../..") } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
-  transpilePackages: ["@collara/domain", "@collara/api-client"],
+  // @collara/api and @collara/worker (and their server-only workspace deps) are loaded only by the embedded API
+  // (API_MODE=embedded, src/server/embedded-api.ts); internal packages ship TypeScript source.
+  transpilePackages: ["@collara/domain", "@collara/api-client", "@collara/api", "@collara/worker", "@collara/db", "@collara/canton"],
   async headers() {
     return [
       { source: "/app/:path*", headers: privateNoStore },

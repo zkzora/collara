@@ -961,6 +961,11 @@ export function createMockClient(options: MockClientOptions = {}): MockCollaraCl
         );
       },
 
+      uploadDirect: async () => {
+        // The UI mockup never issues presigned uploads (its intents have no directUpload).
+        throw new ApiError(501, "upstream_unavailable", "Direct uploads are not available in the UI mockup.");
+      },
+
       finalize: async (evidenceId, opts) => {
         const pending = uploads.get(evidenceId);
         if (!pending || pending.orgId !== actor().orgId) throw unavailable();

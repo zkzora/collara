@@ -112,7 +112,9 @@ export function EvidenceUploadDialog({
           { idempotencyKey: `${key}:intent`, signal },
         );
         const id = intent.result.evidenceId;
-        await client.evidence.uploadContent(id, payload.file, { idempotencyKey: `${key}:content`, signal });
+        const direct = intent.result.directUpload;
+        if (direct) await client.evidence.uploadDirect(direct, payload.file, { signal });
+        else await client.evidence.uploadContent(id, payload.file, { idempotencyKey: `${key}:content`, signal });
         return client.evidence.finalize(id, { idempotencyKey: `${key}:finalize`, signal });
       }}
     >

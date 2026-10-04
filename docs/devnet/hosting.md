@@ -26,6 +26,7 @@ Prices are from third-party pricing summaries checked in late September 2026, no
 | **A. Render + Cloudflare R2** | Starter web service ≈ $7 | Starter background worker ≈ $7 | Basic-256MB ≈ $7 (Basic-1GB ≈ $20) | R2: 10 GB free tier, egress free ≈ $0 | **≈ $21–34** |
 | **B. Fly.io + Neon + R2** | shared-cpu-1x 512 MB ≈ $3.3–3.7 | same ≈ $3.3–3.7 | Neon Launch, pay-as-you-go (≈ $15 for a small always-on app; Free plan possible for a demo with cold starts) | R2 ≈ $0 | **≈ $7–23** |
 | **C. Railway** (all-in-one) | usage-based | usage-based | Railway Postgres, usage-based | Railway volume or R2 | **≈ $5–20** (Hobby $5 includes $5 usage) |
+| **D. $0: Supabase Free + Vercel Hobby** | embedded in the Vercel `/api` function | **none** (on-request sync + daily cron) | Supabase Free (500 MB, pauses after 7 idle days) | Supabase Storage (1 GB, private bucket) | **$0** |
 
 Our recommendation for the hackathon demo: **Option A** — fewest moving parts (managed API + worker + Postgres on one platform, R2 for private objects), predictable fixed price; or Option B if cost matters most. Either needs the owner's account and payment method — nothing will be ordered without that.
 
@@ -39,3 +40,18 @@ Sources: Render — https://frontdeskreview.com/software/managed-postgres/render
 4. Only after it passes with no mock fallback: switch production (or the demo link) to that environment. Rollback = restore the UI mockup environment variables and redeploy.
 
 Runbook for Option A (Render + R2): [deploy-render.md](deploy-render.md), with the Blueprint in [`render.yaml`](../../render.yaml).
+
+## Option D ($0) vs Option A (Render, ≈ $21): trade-offs
+
+Runbook: [deploy-free.md](deploy-free.md). Both options are wired in code; neither has been deployed.
+
+| | A. Render + R2 | D. Supabase Free + Vercel Hobby |
+|---|---|---|
+| Worker | Persistent: the projection follows the ledger continuously, exports start within seconds | **Not persistent**: projection, reconciliation and exports advance only while someone uses the app (bounded pass before reads and after mutations) plus one cron run per day. Exports may finish on the next request. This does not meet the review's request for a persistent worker |
+| Latency | One extra hop Vercel → Render | No hop, but workspace reads can wait up to the sync budget (default 8 s) after an idle period; function cold starts build the Fastify app |
+| Uploads | Through the API, 20 MB | Presigned PUT straight to storage (Vercel body limit 4.5 MB). Supabase cannot restrict bucket CORS to the Vercel domain |
+| Database | Render PostgreSQL, direct connections | Supabase through the transaction pooler (no session features; checked in code). The project pauses after 7 idle days |
+| Ops | Two services + DB on one platform | One Vercel project + one Supabase project; migrations and DevNet scripts from the owner's machine |
+| Cost | ≈ $21/month | $0 within Free/Hobby limits |
+
+Recommendation unchanged for a judged demo where the projection must keep up unattended: **Option A**. Option D is for when the budget is $0, and the demo copy must not claim a continuously running worker.
