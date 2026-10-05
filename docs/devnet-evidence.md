@@ -49,6 +49,12 @@ Registration, dealer contribution, evidence manifest v1→v2, verification reque
 | 10 borrower grant audit access | POST /access-grants | `122011231fa5f04e…` |
 | 11 lender grant audit access | POST /access-grants | `1220d53a380dc7da…` |
 
+## Screenshot (UI on DevNet)
+
+![CL-001 Closed / Released on DevNet](devnet/evidence/cl-001-devnet-closed.png)
+
+The workspace shows the banner "Synthetic demo data — Canton DevNet.", "Ledger synced · offset 2098852 · Ledger-committed", case **Closed**, pledge **Released**, proposal **Accepted**.
+
 ## Final state (read back through the API)
 
 - Pledge PL-001: **RELEASED**; lock RELEASED; asset control consumed v3→v4 at activation, recreated at v5 on release.
