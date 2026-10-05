@@ -1,68 +1,65 @@
-# DevNet evidence
+# DevNet run evidence
 
-What was actually run against the HackCanton shared DevNet participant (NODERS). Fill a section **only from a real run**, with the date, who ran it, the exact command and its non-secret output. Never paste a password, a token or `.env.devnet` contents (other than the ledger user id). `EVIDENCE.devnet` in `packages/domain/src/evidence.ts` stays `run: false` until section 3 has a committed transaction.
+Real, synthetic-data run of the full Collara workflow on the **HackCanton shared DevNet participant** (NODERS). No funds move; a Collara lock does not replace a legal lien registration.
 
-Status: **code ready; not yet run on DevNet** (no credential used, nothing uploaded, allocated or submitted).
+- **Date:** 2026-10-05T04:24Z
+- **Repo commit:** `d47f962`
+- **Network:** Canton DevNet (not a local sandbox). JSON Ledger API `https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services`, Canton 3.5.19.
+- **Participant:** `hackcanton-devnet-3::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e`
+- **Synchronizer:** `global` (`global-domain::1220be58c29e…`)
+- **Tenant ledger user:** `9c376537-054a-4e15-b828-c9eb58c2c64d` — one tenant user holds CanActAs on all 11 project parties (a privileged project-operator credential, **not** credential isolation between organisations).
+- **Run namespace:** `collara-devnet-r202610050410`
+- **Parties:** `9c376537-<Role>::1220…` for CollaraRegistrar, CollaraGovernance, GovSeat1–3, DemoManufacturer, DemoCNCDealer, DemoVerifier, DemoLenderA, DemoLenderB, DemoAuditor.
+- **Packages uploaded + vetted:** governance-core-v1 0.1.0 (`361d1f28…`), collara-contracts 0.2.0 (`1c0e5e62…`), collara-governance 0.1.0, governance-action-v1 0.1.0, splice-util 0.1.4.
 
-**Governance on DevNet is Tier A only, and it has not run.** The owner's bootstrap (section 2, step f3) includes B2–B6: Tier A `GovernanceRules` and the governed verifier registry with `VER-001`, created by ordinary parties of the one tenant ledger user on the shared NODERS participant (no decentralized party; the tenant credential can act as the governance party without the seat quorum, `docs/devnet.md` §3). **Tier B (Decentralization Manager nodes, decentralized party) was not attempted on DevNet**: the shared participant is not set up to host teams' Decentralized Parties. Tier B ran only on a local WSL topology with one operator ([governance-tier-b.md](governance-tier-b.md)). The records are `EVIDENCE.governance.tierA.devnet` and `EVIDENCE.governance.tierB.devnet` in `packages/domain/src/evidence.ts`; set `tierA.devnet.run` only from a committed B6 execute recorded below (section 3b).
+## Bootstrap — Tier A governance (clean-start B1–B8, all COMMITTED)
 
-## 1. Public checks without credentials (run 2026-10-04, by the builder)
+Includes the 2-of-3 governed verifier registry: B3 propose, B4 confirm (seat 1), B5 confirm (seat 2), B6 execute, then config + verifier status mirror.
 
-`node scripts/devnet/preflight.mjs` from the repository root, no `.env.devnet`, 2026-10-04T14:16:38Z:
-
-```
-DevNet preflight: https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services
-  ok    node                                 Node 24.16.0 (needs >=24.15 <25)
-  ok    GET /readyz                          HTTP 200 [+] ledger ok (SERVING) readyz check passed
-  ok    GET /livez                           HTTP 200
-  ok    GET /v2/version                      Canton 3.5.19 (expected 3.5.19)
-  ok    OpenAPI vs committed spec            sha256 3f62d28ec078a2c0… = committed canton-3.5.19.yaml 3f62d28ec078a2c0…
-  ok    OIDC discovery                       issuer, token endpoint, JWKS, password + refresh_token grants, daml_ledger_api + offline_access scopes
-  ok    OIDC JWKS                            1 signing key(s): RS256
-  skip  credentialed checks                  no DATABASE_URL or DEVNET_LEDGER_USER_ID in .env.devnet (run login.mjs first)
-exit=0
-```
-
-Also observed (unauthenticated GETs): the OIDC discovery document lists `issuer` `https://keycloak.naas.noders.services/realms/noders-appsfactory`, the token endpoint `…/protocol/openid-connect/token`, the JWKS `…/protocol/openid-connect/certs`, grant types including `password` and `refresh_token`, and scopes including `daml_ledger_api`, `offline_access` and `audience-mapper-hackcanton-01-devnet`. The participant's `/docs/openapi` SHA-256 is `3f62d28ec078a2c0c51cd06b4d96d4bafc83d228e74cadcf2b2ac67b85b13cf0`, equal to `packages/canton/openapi/canton-3.5.19.yaml`.
-
-## 2. Owner steps (to be filled by the owner's run)
-
-| Step | Date | Result (non-secret) |
+| Step | Actor | Offset |
 |---|---|---|
-| (a) Wallet onboarding, primary party | | |
-| (b) Parties created, quota seen, rights granted automatically? | | |
-| (c) DAR uploads (both), vetting | | |
-| (d) `db-setup.mjs` | | |
-| (e) `login.mjs`: ledger user id, access-token expiry | | |
-| (f1) `preflight.mjs` with credentials | | |
-| (f2) `import-bindings.mjs`: namespace, 11 parties | | |
-| (f3) `bootstrap.mjs`: steps committed | | |
+| B1 create AssetRegistry | registrar | 2097686 |
+| B2 create GovernanceRules | governance | 2097693 |
+| B3 propose add verifier | gov seat 1 | 2097707 |
+| B4 confirm | gov seat 1 | 2097720 |
+| B5 confirm | gov seat 2 | 2097723 |
+| B6 execute | gov seat 2 | 2097729 |
+| B7 create CollaraConfig | registrar | 2097738 |
+| B8 publish verifier status | registrar | 2097747 |
 
-## 3. First committed transaction
+First update id: `12205dd84f8eeb9f960bfdd9ee834335b3bce8a12ca36dbe8b9a4a84245eadadbba9` at offset 2097686.
 
-| Field | Value |
-|---|---|
-| Date / run by | |
-| Namespace | |
-| First command (operation) | |
-| updateId | |
-| offset | |
-| AssetRegistry contract id | |
-| CollaraConfig contract id | |
-| Seen in the Console | |
+## Main fixture (CL-001, M1–M18, all COMMITTED, offsets 2097816–2097938)
 
-## 3b. Tier A governance bootstrap on DevNet (B2–B6)
+Registration, dealer contribution, evidence manifest v1→v2, verification request + change request + attestation ATT-001, dealer consent, package share to Lender A, control share, attestation disclosure, lender assessment.
 
-| Field | Value |
-|---|---|
-| Date / run by | |
-| B2 `GovernanceRules` contract id | |
-| B6 execute updateId / offset | |
-| `VerifierAccreditation` VER-001 contract id | |
+## Full workflow through the application API (same endpoints the UI calls; all COMMITTED on DevNet, none simulated)
 
-Tier A only: an ordinary governance party, no decentralized party, one shared participant.
+| Step | Endpoint | Update id |
+|---|---|---|
+| 1 analyst save assessment | POST /cases/CL-001/assessments | `12207120ffd22014…` |
+| 2 analyst submit for approval | POST /reviews/CA-001/submit-for-approval | `1220bf06f943c24b…` |
+| 3 approver decide ELIGIBLE | POST /reviews/CA-001/decision | `1220809364126414…` |
+| 4 approver issue proposal FP-001 | POST /cases/CL-001/proposals | `12209840729c28e1…` |
+| 5 borrower accept v1 | POST /proposals/FP-001/acceptance | `12202a6176b78299…` |
+| 6 borrower authorize activation | POST /proposals/FP-001/activation-authorization | `1220ece05aeb45f8…` |
+| 7 approver activate pledge PL-001 | POST /cases/CL-001/pledge-activation | `1220f23737949bd0…` |
+| 8 borrower request release | POST /pledges/PL-001/release-requests | `1220d9502ebc74ff…` |
+| 9 approver authorize release | POST /release-requests/RR-001/decision | `1220e9fa1123736d…` |
+| 10 borrower grant audit access | POST /access-grants | `122011231fa5f04e…` |
+| 11 lender grant audit access | POST /access-grants | `1220d53a380dc7da…` |
 
-## 4. Optional
+## Final state (read back through the API)
 
-- `DEVNET_IT=1 pnpm --filter @collara/api test:devnet` (read-only): not run.
-- API, worker and web in `COLLARA_MODE=DEVNET`: not run.
+- Pledge PL-001: **RELEASED**; lock RELEASED; asset control consumed v3→v4 at activation, recreated at v5 on release.
+- Case CL-001: **Closed / Released**.
+
+## Privacy check on DevNet
+
+- Demo Lender B (unrelated lender): `GET /api/cases/CL-001` → **404**, case list → **0 cases**. The unrelated lender sees nothing of CL-001 on the shared participant.
+
+## Not covered in this run
+
+- Document uploads and the auditor export: object storage (S3) was not configured for this local run (health "degraded" on storage only). The seed used `--skip-documents`. Evidence-document and export flows are proven on LOCALNET (`docs/verification.md`), not here.
+- Witness-level privacy across independent participants: not applicable here — one shared participant, one tenant credential.
+- The participant had pruned history up to offset 175012; the projection was started at that floor (the run's commits are well above it). See `docs/devnet/recovery.md`.
