@@ -84,6 +84,7 @@ export {
   ACCEPTED_TOKEN_ALGORITHMS,
   CREDENTIAL_LOG_KEYS,
   decodeJwtSubject,
+  decodeJwtClaims,
   DEVNET_LOGIN_COMMAND,
   devnetCredentialId,
   LedgerCredentialError,

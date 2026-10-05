@@ -288,6 +288,22 @@ export function decodeJwtSubject(token: string): string | null {
   }
 }
 
+/** Non-secret claims for diagnostics (never the signature; never a refresh token). */
+export function decodeJwtClaims(token: string): { sub?: string; aud?: string | string[]; scope?: string; iss?: string; expiresInSeconds?: number } | null {
+  try {
+    const c = decodeJwt(token);
+    return {
+      sub: c.sub,
+      aud: c.aud,
+      scope: typeof c.scope === "string" ? c.scope : undefined,
+      iss: c.iss,
+      expiresInSeconds: typeof c.exp === "number" ? c.exp - Math.floor(Date.now() / 1000) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** The issuer's JWKS as a jose key getter (cached and rate-limited by jose). */
 export function remoteJwks(jwksUri: string): JWTVerifyGetKey {
   return createRemoteJWKSet(new URL(jwksUri));

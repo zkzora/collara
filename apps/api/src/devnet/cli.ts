@@ -20,6 +20,7 @@ import { parseArgs } from "node:util";
 import {
   credentialKeyIssues,
   decodeJwtSubject,
+  decodeJwtClaims,
   devnetCredentialId,
   diagnoseDevnet,
   formatDiagnosis,
@@ -162,6 +163,19 @@ async function login(): Promise<void> {
   // The participant must accept the token (read-only GET).
   const client = new LedgerClient({ baseUrl: env.CANTON_DEVNET_JSON_API_URL, tokenProvider: { getToken: async () => response.access_token } });
   const user = await client.authenticatedUser().catch((error: unknown) => {
+    // The token passed local audience/scope/subject checks, so this is the participant rejecting the ledger user
+    // (typically: Wallet onboarding not completed, so the user is not provisioned on the shared participant).
+    const claims = decodeJwtClaims(response.access_token);
+    console.error("");
+    console.error("The identity provider accepted your login and issued a token, but the NODERS participant rejected it.");
+    console.error("This usually means the ledger user behind the token is not provisioned on the shared participant yet.");
+    console.error("Token claims (not secret):");
+    console.error(`  ledger user (sub): ${claims?.sub ?? "?"}`);
+    console.error(`  audience (aud):    ${Array.isArray(claims?.aud) ? claims?.aud.join(", ") : (claims?.aud ?? "?")}`);
+    console.error(`  scope:             ${claims?.scope ?? "?"}`);
+    console.error("Next: open the Wallet, complete onboarding, and confirm the ledger user id it shows matches the sub above.");
+    console.error("  Wallet: https://wallet.validator.hackcanton-01.devnet.naas.noders.services");
+    console.error("If onboarding is already done and this persists, send the lines above to NODERS (docs/devnet/noders-rights-request.md). Nothing was stored.");
     throw new CliError(`the participant did not accept the token: ${error instanceof Error ? error.message : String(error)}`);
   });
 
