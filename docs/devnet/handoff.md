@@ -17,7 +17,9 @@ This is a **redacted permission error from the participant**, not a login failur
 ### Fix, then resume
 
 1. **Complete Wallet onboarding** at <https://wallet.validator.hackcanton-01.devnet.naas.noders.services> with `zkzora01@gmail.com`. Finish any onboarding prompt until the Wallet shows a **primary party** id (`<prefix>-…::1220…`). Note the prefix.
+   Also confirm the account is provisioned in the HackCanton Season 3 tenant: the Wallet should show the party and a Canton Coin balance. If the Wallet itself is empty or refuses, the account is not provisioned on the HackCanton node — that is for the NODERS organisers.
 2. Run `node scripts/devnet/login.mjs` again. Success prints `DEVNET_LEDGER_USER_ID=…`; put that into `.env.devnet`.
+   If the participant still rejects the token, the error now prints the token's `sub`, `aud` and `scope` (non-secret). If `sub` differs from the ledger user id in the Wallet, the login account is not the onboarded one. Send those three lines.
 3. If it still fails after onboarding, run `node scripts/devnet/preflight.mjs` (its output is non-secret) and send it over, and raise it in the NODERS BitSafe/participant channel (draft: `docs/devnet/noders-rights-request.md`).
 
 ## What is already done (no action needed)

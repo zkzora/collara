@@ -162,7 +162,12 @@ async function login(): Promise<void> {
   // The participant must accept the token (read-only GET).
   const client = new LedgerClient({ baseUrl: env.CANTON_DEVNET_JSON_API_URL, tokenProvider: { getToken: async () => response.access_token } });
   const user = await client.authenticatedUser().catch((error: unknown) => {
-    throw new CliError(`the participant did not accept the token: ${error instanceof Error ? error.message : String(error)}`);
+    // Non-secret claims, so the owner can compare sub with the ledger user id the Wallet shows.
+    throw new CliError(
+      `the participant did not accept the token: ${error instanceof Error ? error.message : String(error)}\n` +
+        `  sub:   ${validated.ledgerUserId}\n  aud:   ${validated.audience.join(", ")}\n  scope: ${validated.scopes.join(" ")}\n` +
+        "Finish Wallet onboarding until a primary party is shown, then retry (docs/devnet/handoff.md).",
+    );
   });
 
   const db = openDb(env);
