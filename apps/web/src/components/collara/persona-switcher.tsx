@@ -3,7 +3,6 @@
 import { errorMessage } from "@collara/api-client";
 import {
   DEMO_PERSONAS,
-  isLedgerMode,
   orderRoles,
   orgName,
   PERSONA_IDS,
@@ -76,14 +75,14 @@ export function PersonaSwitcher({ className, onSwitched }: { className?: string;
   const remote = useQuery({
     queryKey: ["demo", "personas"],
     queryFn: ({ signal }) => client.demo.personas({ signal }),
-    enabled: isLedgerMode(mode),
+    enabled: mode === "LOCALNET",
     staleTime: Infinity,
     retry: false,
   });
 
   const options = mode === "UI_MOCK" ? mockPersonaOptions({ short: true }) : (remote.data ?? []).map((p) => demoPersonaOption(p, { short: true }));
   const selectedLabel = options.find((option) => option.id === me.personaId)?.label;
-  if (isLedgerMode(mode) && (remote.isError || options.length === 0)) return null;
+  if (mode === "DEVNET" || (mode === "LOCALNET" && (remote.isError || options.length === 0))) return null;
 
   async function change(value: string) {
     const parsed = PersonaIdSchema.safeParse(value);

@@ -1286,6 +1286,13 @@ export function presentMe(persona: Persona, mode: RuntimeMode, options: { demo?:
     mandates: [...persona.mandates],
     governanceSeat: persona.mandates.find((m) => m.code === "GOVERNANCE_SEAT")?.seat ?? null,
     mode,
+    ledgerIdentity: {
+      network: mode,
+      participant: null,
+      partyId: null,
+      authMethod: "demo",
+      canSubmit: false,
+    },
     personaId: options.demo === false ? null : persona.id,
     navigation: navigationFor(persona),
   };

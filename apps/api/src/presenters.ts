@@ -30,6 +30,15 @@ export function presentMe(actor: ResolvedActor, mode: RuntimeMode): Me {
     mandates: actor.mandates,
     governanceSeat: actor.mandates.find((m) => m.code === "GOVERNANCE_SEAT")?.seat ?? null,
     mode,
+    ledgerIdentity: {
+      network: mode,
+      participant: mode === "DEVNET" ? "shared-devnet-participant" : mode === "LOCALNET" ? "localnet-participant" : null,
+      partyId: actor.parties.business,
+      authMethod: actor.authMethod,
+      // This is not a role grant. It only says that the server has a bound business party
+      // through which an already-authorized workflow action may be submitted.
+      canSubmit: mode !== "UI_MOCK" && actor.parties.business !== null,
+    },
     personaId: actor.personaId,
     navigation: navigationFor(actor),
   });

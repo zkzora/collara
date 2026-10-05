@@ -237,7 +237,14 @@ export async function buildApp(options: BuildAppOptions) {
 
   await app.register(authRoutes, { prefix: "/api/auth", config, db: db.db, oidc, clock });
   await app.register(meRoutes, { prefix: "/api/me", mode: config.COLLARA_MODE });
-  await app.register(demoRoutes, { prefix: "/api/demo", db: db.db, mode: config.COLLARA_MODE, demoSessionsEnabled: config.DEMO_SESSIONS_ENABLED });
+  // DevNet viewers always come from the real OIDC account. Demo persona sessions are restricted
+  // to UI_MOCK/LOCALNET so connecting an account cannot mint an approver or operator role.
+  await app.register(demoRoutes, {
+    prefix: "/api/demo",
+    db: db.db,
+    mode: config.COLLARA_MODE,
+    demoSessionsEnabled: config.COLLARA_MODE !== "DEVNET" && config.DEMO_SESSIONS_ENABLED,
+  });
   await app.register(pilotRoutes, {
     prefix: "/api/pilot-requests",
     db: db.db,

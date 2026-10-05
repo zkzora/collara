@@ -18,6 +18,7 @@ import { storePersona, useCollara } from "@/lib/collara-client";
 import { initials } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { LedgerSyncIndicator } from "./ledger-sync";
+import { shortenParty } from "./canton-connection";
 import { breadcrumbsFor } from "./navigation";
 
 function Breadcrumbs() {
@@ -100,7 +101,7 @@ function AccountMenu() {
 
 /** 52px workspace header: drawer button (< 900px), breadcrumbs, environment chip, ledger sync, account. */
 export function WorkspaceHeader({ menuOpen, onMenuToggle }: { menuOpen: boolean; onMenuToggle: () => void }) {
-  const { mode, ledgerSync } = useSession();
+  const { mode, ledgerSync, me } = useSession();
   return (
     <header className="flex h-[52px] flex-none items-center gap-3 border-b border-line-subtle bg-surface-header px-4 app:px-5">
       <Button
@@ -116,6 +117,11 @@ export function WorkspaceHeader({ menuOpen, onMenuToggle }: { menuOpen: boolean;
       </Button>
       <Breadcrumbs />
       <div className="flex-1" />
+      {mode !== "UI_MOCK" ? (
+        <span className="hidden max-w-[190px] truncate font-mono text-[11px] text-fg-subtle md:inline-flex" aria-label={`Canton party: ${me.ledgerIdentity.partyId ?? "not connected"}`}>
+          {shortenParty(me.ledgerIdentity.partyId)}
+        </span>
+      ) : null}
       <LedgerSyncIndicator mode={mode} sync={ledgerSync} className="hidden app:inline-flex" />
       <span
         className="hidden h-7 items-center rounded-[6px] border border-line-control px-2 font-mono text-[11px] tracking-[.04em] text-fg-muted xs:inline-flex"

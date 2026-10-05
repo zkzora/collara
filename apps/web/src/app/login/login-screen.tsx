@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@collara/api-client";
-import { DEFAULT_PERSONA_ID, isLedgerMode, type PersonaId, type RuntimeMode } from "@collara/domain";
+import { DEFAULT_PERSONA_ID, type PersonaId, type RuntimeMode } from "@collara/domain";
 import { useQuery } from "@tanstack/react-query";
 import { LogInIcon } from "lucide-react";
 import Image from "next/image";
@@ -83,7 +83,7 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
   const demo = useQuery({
     queryKey: ["demo", "personas"],
     queryFn: ({ signal }) => client.demo.personas({ signal }),
-    enabled: isLedgerMode(mode),
+    enabled: mode === "LOCALNET",
     staleTime: Infinity,
     retry: false,
   });
@@ -105,15 +105,24 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
     );
   }
 
-  const remote = (demo.data ?? []).map((p) => demoPersonaOption(p));
+  const remote = mode === "LOCALNET" ? (demo.data ?? []).map((p) => demoPersonaOption(p)) : [];
   return (
     <>
       <p className="text-[13.5px] leading-relaxed text-fg-muted">Access is by invitation during the pilot.</p>
       {/* A full navigation: the API starts the OIDC flow and sets an HttpOnly session cookie. */}
       <a href="/api/auth/login" className={cn(buttonVariants({ size: "lg" }), "h-9 self-start px-4")}>
         <LogInIcon aria-hidden="true" />
-        Continue with single sign-on
+        Connect Canton account
       </a>
+      {mode === "DEVNET" ? (
+        <p className="text-[12px] leading-relaxed text-fg-subtle">
+          First-time DevNet users must complete participant onboarding in the{" "}
+          <a href="https://wallet.validator.hackcanton-01.devnet.naas.noders.services" target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-fg">
+            Canton Wallet
+          </a>
+          . The wallet provisions the Canton party; Collara still derives roles and mandates from the signed-in organization.
+        </p>
+      ) : null}
       {demo.isPending ? <LoadingState variant="inline" label="Checking demo sessions…" /> : null}
       {remote.length > 0 ? (
         <div className="mt-2 flex flex-col gap-3 border-t border-line-subtle pt-5">

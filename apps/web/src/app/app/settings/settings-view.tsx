@@ -10,6 +10,7 @@ import { Panel } from "@/components/collara/panel";
 import { TableRegion, TD, TR } from "@/components/workspace/audit/table-region";
 import { useCollara } from "@/lib/collara-client";
 import { useSession } from "@/lib/session";
+import { CantonConnectionPanel } from "@/components/collara/canton-connection";
 
 const ORG_TYPE_LABELS: Readonly<Record<OrgType, string>> = {
   OPERATOR: "Collara operator",
@@ -75,6 +76,7 @@ export function SettingsView() {
           />
         </Panel>
       </div>
+      <CantonConnectionPanel />
       <section aria-labelledby="settings-members" className="flex flex-col gap-2">
         <h2 id="settings-members" className="text-[14px] font-medium text-fg">
           Members and mandates

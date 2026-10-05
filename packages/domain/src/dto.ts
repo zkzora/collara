@@ -229,6 +229,18 @@ export const MeSchema = z.object({
   mandates: z.array(MandateSchema),
   governanceSeat: GovernanceSeatSchema.nullable(),
   mode: RuntimeModeSchema,
+  /**
+   * The ledger identity used by the server for this session. Canton has no browser wallet
+   * address/signature primitive in this integration, so `partyId` is deliberately presented as
+   * a Canton party address and `canSubmit` only reflects the server-side party binding.
+   */
+  ledgerIdentity: z.object({
+    network: RuntimeModeSchema,
+    participant: z.string().nullable(),
+    partyId: z.string().nullable(),
+    authMethod: z.enum(["oidc", "demo"]),
+    canSubmit: z.boolean(),
+  }),
   /** Demo sessions only; null for real accounts. */
   personaId: PersonaIdSchema.nullable(),
   navigation: z.array(NavKeySchema),
