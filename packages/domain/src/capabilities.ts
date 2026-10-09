@@ -86,11 +86,11 @@ export const CAPABILITIES: readonly Capability[] = [
     id: "governance",
     label: "BitSafe governance for the verifier registry",
     // Tier A implemented (one local participant). Tier B (DM nodes, decentralized party) is exercised by scripts/tierb on a
-    // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here. Neither
-    // tier has run on DevNet, and Tier B cannot run on the shared DevNet participant (EVIDENCE.governance).
+    // separate WSL topology only (docs/governance-tier-b.md); the app does not use it, so it stays PLANNED here. Tier A ran once
+    // on DevNet; Tier B did not and cannot run on the shared DevNet participant (EVIDENCE.governance).
     statuses: ["IMPLEMENTED", "PLANNED"],
     where: {
-      text: `Tier A on one local participant; Tier B scripted on a local topology with one operator (${passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks), not in the app; neither tier on DevNet · `,
+      text: `Tier A on one local participant; Tier B scripted on a local topology with one operator (${passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks), not in the app; Tier A ran once on DevNet, Tier B did not · `,
       link: { label: "BitSafe governance", href: "#governance" },
     },
   },
@@ -102,10 +102,10 @@ export const CAPABILITIES: readonly Capability[] = [
     where: { text: "DM governance contracts used in Tier A; DM nodes run only in the scripted Tier B check, not connected to the app" },
   },
   {
-    // INFERRED label and text (pending approval). Code for the shared DevNet participant exists; it has not run there.
+    // INFERRED label and text (pending approval). One full synthetic run on the shared DevNet participant is recorded; the public site is not connected to it.
     id: "devnet",
     label: "Canton DevNet (shared participant)",
-    statuses: ["PLANNED"],
+    statuses: ["IMPLEMENTED"],
     where: { text: `DevNet mode: ${EVIDENCE.devnet.status}` },
   },
   {

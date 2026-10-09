@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Vercel CLI project link (local)
 .vercel
+
+# Supabase CLI project link and cached platform versions (local)
+supabase/.temp/

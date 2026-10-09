@@ -89,14 +89,15 @@ export const EVIDENCE = {
         record: "docs/governance.md",
       },
       devnet: {
-        // The DevNet bootstrap (B2–B6) would create the same Tier A GovernanceRules and the governed verifier
-        // registry on the shared NODERS participant, as ordinary parties of one tenant ledger user. Not run yet.
-        status: "not yet run on DevNet",
-        run: false,
+        // Run on the shared NODERS participant on 2026-10-05: the bootstrap created the same Tier A GovernanceRules and
+        // the governed verifier registry (B2–B6: propose, two confirmations, execute), as ordinary parties of one
+        // tenant ledger user. Not decentralized: one credential controls every party.
+        status: "ran once on DevNet (2026-10-05) as ordinary parties of one tenant user; not decentralized",
+        run: true,
         participants: 1,
         decentralizedParty: false,
-        firstGovernedExecuteUpdateId: null,
-        date: "2026-10-04",
+        firstGovernedExecuteUpdateId: "12209cb8f4bd725becd551b47b9688954e44d4c080a27cb9b4ef5f7fc09815e2ec13",
+        date: "2026-10-05",
         record: "docs/devnet-evidence.md",
       },
     },
@@ -139,18 +140,27 @@ export const EVIDENCE = {
     record: "docs/PROGRESS.md (Stage 7)",
   },
   devnet: {
-    // DEVNET mode against the HackCanton shared DevNet participant (NODERS, Canton 3.5.19). The code, scripts and
-    // owner checklist exist; nothing has been uploaded, allocated or submitted there yet. Fill in only from a real
-    // run recorded in docs/devnet-evidence.md.
-    status: "code ready; not yet run on DevNet",
-    run: false,
+    // DEVNET mode against the HackCanton shared DevNet participant (NODERS). One full synthetic run on 2026-10-05
+    // (Canton 3.5.19): bootstrap, fixture CL-001 and the financing workflow through pledge activation and release,
+    // 43 recorded commands. One tenant ledger user holds every party, so this is not isolation between operators.
+    // The public site is not connected to it (UI mockup only). See docs/devnet-evidence.md.
+    status: "one full synthetic run on the shared participant (2026-10-05); the public site is not connected to it",
+    run: true,
+    // The participant's version when the run was recorded.
     cantonVersion: "3.5.19",
-    // The participant's /docs/openapi matched the committed spec byte for byte (unauthenticated GET).
+    // On 2026-10-04 the participant's /docs/openapi matched the committed 3.5.19 spec byte for byte.
     openApiIdentical: true,
-    firstCommittedUpdateId: null,
-    // Governance on DevNet would be Tier A only (see governance.tierA.devnet / governance.tierB.devnet).
+    firstCommittedUpdateId: "12205dd84f8eeb9f960bfdd9ee834335b3bce8a12ca36dbe8b9a4a84245eadadbba9",
+    // Re-read on 2026-10-09 from the participant's own update stream, after NODERS upgraded the node to Canton 3.6.1
+    // (docs/devnet/evidence/receipts-r202610050410.json). Existing data survived the upgrade.
+    receiptsVerified: { passed: 43, total: 43, date: "2026-10-09", cantonVersion: "3.6.1" },
+    // Compatibility with 3.6.1 (observed 2026-10-09): the API differences for the endpoints Collara uses are added
+    // fields only; bootstrap and asset registration committed on 3.6.1. The remaining workflow was NOT re-run there
+    // (the fixture ids collide with the 5 October run on the same parties), and the CLI pin to 3.5.19 is unchanged.
+    canton361: { observed: "2026-10-09", newTransactions: "bootstrap (B1–B8) and asset registration (M1–M4) committed", fullWorkflowRerun: false },
+    // Governance on DevNet is Tier A only (see governance.tierA.devnet / governance.tierB.devnet).
     governanceTier: "A",
-    date: "2026-10-04",
+    date: "2026-10-05",
     record: "docs/devnet-evidence.md",
   },
 } as const;

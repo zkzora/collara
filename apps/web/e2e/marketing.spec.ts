@@ -281,7 +281,8 @@ test.describe("docs", () => {
     const governance = page.locator("section#governance");
     await expect(governance).toContainText("Tier B integration planned");
     // Governance evidence is split by tier and network: nothing may read as decentralized governance on DevNet.
-    await expect(governance).toContainText("Neither tier has run on Canton DevNet");
+    await expect(governance).toContainText("Tier A ran once on Canton DevNet");
+    await expect(governance).not.toContainText("Neither tier has run on Canton DevNet");
     await expect(governance).not.toContainText("Tier B planned");
     await expect(governance).toContainText("REQUIRE_ACTIVE_VERIFIER");
     await expect(governance).not.toContainText("attestations already issued remain valid");

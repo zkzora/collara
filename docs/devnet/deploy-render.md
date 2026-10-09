@@ -1,5 +1,7 @@
 # Deploying the DevNet demo backend on Render + Cloudflare R2 (runbook)
 
+> **Note 2026-10-09.** Demo personas are **disabled in DEVNET** (`33761de`) and web sign-in against the NODERS identity provider is not configured, so a DevNet web deployment has no sign-in that works for reviewers. Nothing is hosted. The submission uses the public UI mockup plus the recorded DevNet run ([`docs/devnet-evidence.md`](../devnet-evidence.md)). The `DEMO_SESSIONS_*` settings below have no effect in DEVNET.
+
 Status, 2026-10-05: **written, never run.** Nothing has been provisioned. The images were never built (no Docker on the authoring machine); `render.yaml` was parsed as YAML and its keys checked against Render's Blueprint spec page, but it was never applied. Synthetic data only. Not a production deployment and no security assurance. Every step that creates an account, spends money or publishes a URL needs the project owner's go-ahead.
 
 ## Recommendation and cost

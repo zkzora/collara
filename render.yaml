@@ -48,12 +48,12 @@ services:
         value: loopback,uniquelocal
       - key: SESSION_SECRET
         sync: false
-      # Synthetic demo personas for the DevNet walkthrough (the API refuses them with NODE_ENV=production unless
-      # the second flag is set). Set both to "false" if the owner decides against demo sessions.
+      # No effect in DEVNET since 33761de (demo personas are disabled there); kept false so a copy of this file cannot
+      # enable them anywhere by accident.
       - key: DEMO_SESSIONS_ENABLED
-        value: "true"
+        value: "false"
       - key: DEMO_SESSIONS_ALLOW_IN_PRODUCTION
-        value: "true"
+        value: "false"
       # --- DEVNET ledger access (infra/env/devnet.env.example) ---
       - key: DEVNET_CREDENTIAL_KEY_ID
         sync: false

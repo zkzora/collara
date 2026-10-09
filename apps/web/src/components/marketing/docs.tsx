@@ -143,8 +143,8 @@ const RUN_PERIOD = RUN_DATES[0] === RUN_DATES.at(-1) ? RUN_DATES[0] : `${RUN_DAT
 
 const DEPLOYMENT = [
   `Deployed: the web app in UI mockup mode, on ${E.deployment.web.host} (${E.deployment.web.date}). It holds synthetic data in the browser only.`,
-  "Not deployed: the API, the worker, PostgreSQL, document storage and the Canton ledger. Nothing is deployed to a Canton Network.",
-  `Canton DevNet: ${E.devnet.status}. Governance there would be Tier A only (${E.governance.tierA.devnet.status}); Tier B on DevNet: ${E.governance.tierB.devnet.status}.`,
+  "Not hosted: the API, the worker, PostgreSQL and document storage. The Daml packages were uploaded to the shared DevNet participant for the recorded run; no Collara service is hosted on any network.",
+  `Canton DevNet: ${E.devnet.status}. Governance there is Tier A only (${E.governance.tierA.devnet.status}); Tier B on DevNet: ${E.governance.tierB.devnet.status}.`,
 ] as const;
 
 const NOT_VERIFIED = [
@@ -674,8 +674,9 @@ export function GovernanceSection({ now }: { now: Date }) {
         one local participant run by one operator, so it does not yet meet that aim. Tier B, a decentralized governance
         party on Decentralization Manager nodes, has been exercised only by scripts on a separate local three-node
         topology run by one operator ({passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks)} checks passed); the
-        workspace does not use it. Neither tier has run on Canton DevNet: there, governance would be Tier A only, and
-        Tier B was not attempted because the shared DevNet participant cannot host decentralized parties. In UI mockup
+        workspace does not use it. Tier A ran once on Canton DevNet, as ordinary parties of one tenant ledger user, so it is
+        not decentralized there either; Tier B was not attempted because the shared DevNet participant cannot host
+        decentralized parties. In UI mockup
         mode, the workspace simulates governance in the browser.
       </DocsLead>
       <Callout tone="info">{BOUNDARY_COPY.GOVERNANCE_SCOPE}</Callout>

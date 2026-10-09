@@ -34,14 +34,18 @@ describe("EVIDENCE", () => {
     expect(EVIDENCE.governance.tierB.localnet.rerunWithContracts020).toBe(false);
     expect(EVIDENCE.deployment.web.mode).toBe("UI_MOCK");
     expect(EVIDENCE.deployment.cantonNetwork).toBe(false);
-    // DevNet: code only until a real run is recorded in docs/devnet-evidence.md.
-    expect(EVIDENCE.devnet.run).toBe(false);
-    expect(EVIDENCE.devnet.firstCommittedUpdateId).toBeNull();
+    // DevNet: one recorded run (docs/devnet-evidence.md); the public site is still not connected to it.
+    expect(EVIDENCE.devnet.run).toBe(true);
+    expect(EVIDENCE.devnet.firstCommittedUpdateId).toMatch(/^1220[0-9a-f]{64}$/);
+    expect(EVIDENCE.devnet.receiptsVerified).toMatchObject({ passed: 43, total: 43 });
+    // The 3.6.1 check must not read as a full re-run.
+    expect(EVIDENCE.devnet.canton361.fullWorkflowRerun).toBe(false);
+    expect(EVIDENCE.devnet.status).toContain("not connected");
   });
 
   it("never reads as decentralized governance on DevNet", () => {
     const { tierA, tierB } = EVIDENCE.governance;
-    // Tier A has no decentralized party anywhere; on DevNet it is only Tier A, and it has not run.
+    // Tier A has no decentralized party anywhere; on DevNet it is only Tier A, and it ran once as ordinary parties.
     expect(tierA.localnet.decentralizedParty).toBe(false);
     expect(tierA.devnet.decentralizedParty).toBe(false);
     expect(tierA.devnet.run).toBe(EVIDENCE.devnet.run);
@@ -58,7 +62,7 @@ describe("EVIDENCE", () => {
     expect(where("localnet-demo")).toContain(passCount(EVIDENCE.localnetIntegration));
     expect(where("roles")).toContain(`${EVIDENCE.privacy.participants} participants`);
     expect(where("governance")).toContain(passCount(EVIDENCE.governance.tierB.localnet.scriptedChecks));
-    expect(where("governance")).toContain("neither tier on DevNet");
+    expect(where("governance")).toContain("Tier A ran once on DevNet, Tier B did not");
     expect(where("devnet")).toContain(EVIDENCE.devnet.status);
     expect(passCount({ passed: 7, total: 9 })).toBe("7/9");
   });

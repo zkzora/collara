@@ -1,0 +1,667 @@
+{
+  "verifiedAt": "2026-10-09T10:45:09.663Z",
+  "namespace": "collara-devnet-r202610050410",
+  "participant": "hackcanton-devnet-3::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
+  "cantonVersion": "3.6.1",
+  "ledgerEnd": 2724606,
+  "receipts": [
+    {
+      "operation": "seed.B1",
+      "actor": "system:registrar",
+      "updateId": "12205dd84f8eeb9f960bfdd9ee834335b3bce8a12ca36dbe8b9a4a84245eadadbba9",
+      "recordedOffset": 2097686,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:10:41.963924Z",
+      "created": [
+        "AssetRegistry"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.B2",
+      "actor": "system:governance",
+      "updateId": "12204224cefe40b5c4e22ca83e3dc5acaeaf3a0e5e5a72e9a8b3a995b896bbea1c2f",
+      "recordedOffset": 2097693,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:10:46.297799Z",
+      "created": [
+        "GovernanceRules"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.B3",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220169e558a5c06ad9d89e474d5e671707f82d6ac5b996f405788da4fa567874de4",
+      "recordedOffset": 2097707,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:10:52.725927Z",
+      "created": [
+        "BootstrapVerifierRegistryProposal"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.B4",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220dacb434294448d68fa27d8ea2e462197c9350d189f14519ab04ca011ac8e2b74",
+      "recordedOffset": 2097720,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:10:58.895709Z",
+      "created": [
+        "GovernanceConfirmation"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.B5",
+      "actor": "user-lender-b-approver",
+      "updateId": "1220165eb7b0b59810795c7306239afd00a095aaef206aa92e77093ef848671afe66",
+      "recordedOffset": 2097723,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:11:03.786593Z",
+      "created": [
+        "GovernanceConfirmation"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.B6",
+      "actor": "user-lender-b-approver",
+      "updateId": "12209cb8f4bd725becd551b47b9688954e44d4c080a27cb9b4ef5f7fc09815e2ec13",
+      "recordedOffset": 2097729,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:11:10.431126Z",
+      "created": [
+        "VerifierRegistry",
+        "VerifierAccreditation",
+        "GovernanceExecutionResult"
+      ],
+      "archived": [
+        "GovernanceConfirmation",
+        "GovernanceConfirmation",
+        "BootstrapVerifierRegistryProposal"
+      ]
+    },
+    {
+      "operation": "seed.B7",
+      "actor": "system:registrar",
+      "updateId": "1220357483de4bd29b35a112ddbc5755c8122a4c27644a0b26a07b116ba459bdb6d3",
+      "recordedOffset": 2097738,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:11:15.899141Z",
+      "created": [
+        "CollaraConfig"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "registrar.publishVerifierStatus",
+      "actor": "system:registrar",
+      "updateId": "1220716f8d053afd4a033c7dd45e4cf27fc806a7310c6a62fa40978202ce19f5b61c",
+      "recordedOffset": 2097747,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:11:20.730324Z",
+      "created": [
+        "VerifierStatusMirror"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M1-M3/request",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12202d91cf86cf875d41c226528d3c997376e25ec159d647887cdca0f42c6a4c8d4b",
+      "recordedOffset": 2097796,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:04.574054Z",
+      "created": [
+        "AssetRegistrationRequest"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M1-M3/reserve",
+      "actor": "system:registrar",
+      "updateId": "1220395d1141f6d37c9f97f7f27dee7b546e9c61c87bd4bd98a21d4952de3258a817",
+      "recordedOffset": 2097804,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:09.715234Z",
+      "created": [
+        "AssetRegistry",
+        "IssuanceTicket"
+      ],
+      "archived": [
+        "AssetRegistry"
+      ]
+    },
+    {
+      "operation": "seed.M1-M3",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220cd1783e862518112d3965d9ff54fa802d3ab9440a4a2ebee30dfb2c25fc8beeb",
+      "recordedOffset": 2097816,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:15.378539Z",
+      "created": [
+        "AssetControl",
+        "AssetPassport"
+      ],
+      "archived": [
+        "AssetRegistrationRequest",
+        "IssuanceTicket"
+      ]
+    },
+    {
+      "operation": "seed.M1-M3/accept",
+      "actor": "system:registrar",
+      "updateId": "1220cd1783e862518112d3965d9ff54fa802d3ab9440a4a2ebee30dfb2c25fc8beeb",
+      "recordedOffset": 2097816,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:15.378539Z",
+      "created": [
+        "AssetControl",
+        "AssetPassport"
+      ],
+      "archived": [
+        "AssetRegistrationRequest",
+        "IssuanceTicket"
+      ]
+    },
+    {
+      "operation": "seed.M4",
+      "actor": "user-dealer-contributor",
+      "updateId": "1220e419df6d4c18c446842a30e0b42d37807578c6f76538946363d4d635464ba426",
+      "recordedOffset": 2097825,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:18.987799Z",
+      "created": [
+        "DealerContribution"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M5",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220e86f57a34f6df52375e41bca5e7b3ed707eb01220582d922d115bd9bf5f3e495",
+      "recordedOffset": 2097831,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:24.195119Z",
+      "created": [
+        "EvidenceManifest"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M6",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12205f5d849f16839cf006a584f8196345112e44f62f89f235c6963e03b7f485d2f2",
+      "recordedOffset": 2097834,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:29.277405Z",
+      "created": [
+        "AssetControl"
+      ],
+      "archived": [
+        "AssetControl"
+      ]
+    },
+    {
+      "operation": "seed.M7",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220f061e5762567dfb9b55646768bb797da764563cf381a5d202e6f57affb91601a",
+      "recordedOffset": 2097845,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:35.464885Z",
+      "created": [
+        "VerificationRequest"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M8",
+      "actor": "user-verifier-inspector",
+      "updateId": "12201f7fba3477ceef67f39c8cdbe58cb7aefdd95bec8f24c89f59ce81ea78d8416e",
+      "recordedOffset": 2097861,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:41.634881Z",
+      "created": [
+        "VerificationRequest"
+      ],
+      "archived": [
+        "VerificationRequest"
+      ]
+    },
+    {
+      "operation": "seed.M9",
+      "actor": "user-verifier-inspector",
+      "updateId": "12207f35224ea6b62d78578a077630dfc0361b3590c0d2017ac0dae8a978751c8c95",
+      "recordedOffset": 2097867,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:46.966220Z",
+      "created": [
+        "VerificationRequest"
+      ],
+      "archived": [
+        "VerificationRequest"
+      ]
+    },
+    {
+      "operation": "seed.M10",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12205afef21d6b09a23d76dc4f68dc7536f526cca8ab6df65a6cc819811406716d33",
+      "recordedOffset": 2097876,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:52.632551Z",
+      "created": [
+        "EvidenceManifest",
+        "AssetControl"
+      ],
+      "archived": [
+        "EvidenceManifest",
+        "AssetControl"
+      ]
+    },
+    {
+      "operation": "seed.M11",
+      "actor": "user-manufacturer-owner",
+      "updateId": "122047e28b9f10a2cd97a0d6bafcc755eb92d306a45d9281a884775183e4d0a10775",
+      "recordedOffset": 2097888,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:12:58.767232Z",
+      "created": [
+        "VerificationRequest"
+      ],
+      "archived": [
+        "VerificationRequest"
+      ]
+    },
+    {
+      "operation": "seed.M12",
+      "actor": "user-verifier-inspector",
+      "updateId": "1220509dee604436b1634d4a63a9e97f70e0fee4a7a62cd9d7444aee43a33ba7d0f3",
+      "recordedOffset": 2097894,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:04.628292Z",
+      "created": [
+        "VerificationAttestation"
+      ],
+      "archived": [
+        "VerificationRequest"
+      ]
+    },
+    {
+      "operation": "seed.M13",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12201e9343dcbbee83a44697f8a47efebe69b0fd6698a098951aa43653b9fb0ba29b",
+      "recordedOffset": 2097903,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:08.726696Z",
+      "created": [
+        "PackageShareProposal"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M14",
+      "actor": "user-dealer-contributor",
+      "updateId": "122085cf4eaee86c05054908273593ede11f135e0229135758ef7f55c061a79e087e",
+      "recordedOffset": 2097910,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:13.944859Z",
+      "created": [
+        "PackageShare"
+      ],
+      "archived": [
+        "PackageShareProposal"
+      ]
+    },
+    {
+      "operation": "seed.M15",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12209163bde81ad31932c0a1647cefdfcf33a7497ff8676d8c707c7157b8db7f7e21",
+      "recordedOffset": 2097916,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:17.709869Z",
+      "created": [
+        "PackageShare"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M16",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220429485be52692e33e5b9a6eb04350bc4310f7cfb3693828fe02d83b01b702f33",
+      "recordedOffset": 2097925,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:22.752802Z",
+      "created": [
+        "AssetControl"
+      ],
+      "archived": [
+        "AssetControl"
+      ]
+    },
+    {
+      "operation": "seed.M17",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12203eb84f5ae881a72c46a64e74fdcb256fc5c3b250122d965e26398c32666ea5d6",
+      "recordedOffset": 2097928,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:25.406319Z",
+      "created": [
+        "DisclosureValidity",
+        "AttestationDisclosure"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "seed.M18",
+      "actor": "user-lender-a-analyst",
+      "updateId": "1220e36e63da43e7fc798962c3a81a3de16bbb676ac2fd2c7411ade1dae7decf46f2",
+      "recordedOffset": 2097938,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:13:30.762128Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "review.saveAssessment/start",
+      "actor": "user-lender-a-analyst",
+      "updateId": "1220f97d7303d7480194dfa4ee1dd6050c45b860cf9d8a553027bea411d9b9bc4292",
+      "recordedOffset": 2098387,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:19:59.208037Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.saveAssessment/save",
+      "actor": "user-lender-a-analyst",
+      "updateId": "122029f8d2bd480e5950c23e833b19c5b62d463b877f755147ae63d918049e10ca7f",
+      "recordedOffset": 2098396,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:20:03.623811Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.saveAssessment",
+      "actor": "user-lender-a-analyst",
+      "updateId": "122029f8d2bd480e5950c23e833b19c5b62d463b877f755147ae63d918049e10ca7f",
+      "recordedOffset": 2098396,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:20:03.623811Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.saveAssessment/save",
+      "actor": "user-lender-a-analyst",
+      "updateId": "12207120ffd2201492849329ffef3deb81026d694b3040cc4383dbb17222684fdf9e",
+      "recordedOffset": 2098525,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:21:46.743349Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.saveAssessment",
+      "actor": "user-lender-a-analyst",
+      "updateId": "12207120ffd2201492849329ffef3deb81026d694b3040cc4383dbb17222684fdf9e",
+      "recordedOffset": 2098525,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:21:46.743349Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.submitForApproval",
+      "actor": "user-lender-a-analyst",
+      "updateId": "1220bf06f943c24bebe619433cd7e461cd27381839bbb96dc3600b7712c7e587048e",
+      "recordedOffset": 2098537,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:21:53.356829Z",
+      "created": [
+        "CollateralAssessment"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.decide/approve",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220809364126414f2f920adde040d1b2e55ae979eaefc6026477cfcb6770b23ea4d",
+      "recordedOffset": 2098544,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:21:59.431532Z",
+      "created": [
+        "CollateralAssessment",
+        "LenderDecisionNotice"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "review.decide",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220809364126414f2f920adde040d1b2e55ae979eaefc6026477cfcb6770b23ea4d",
+      "recordedOffset": 2098544,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:21:59.431532Z",
+      "created": [
+        "CollateralAssessment",
+        "LenderDecisionNotice"
+      ],
+      "archived": [
+        "CollateralAssessment"
+      ]
+    },
+    {
+      "operation": "proposal.issue",
+      "actor": "user-lender-a-approver",
+      "updateId": "12209840729c28e1fa8576ac7f9dd99c8f65cbb241b10439ca0cc634292271486ae2",
+      "recordedOffset": 2098561,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:22:09.667963Z",
+      "created": [
+        "FinancingProposal"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "proposal.accept",
+      "actor": "user-manufacturer-owner",
+      "updateId": "12202a6176b78299fc1a1ceb2e3f5c05de77a0b3a092958af75404f3a8261d3e4169",
+      "recordedOffset": 2098575,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:22:20.230728Z",
+      "created": [
+        "FinancingAgreement"
+      ],
+      "archived": [
+        "FinancingProposal"
+      ]
+    },
+    {
+      "operation": "activation.authorize",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220ece05aeb45f8be5410d007ea86620dcb576454d2c50fea7aa335922e27b7d9d5",
+      "recordedOffset": 2098588,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:22:32.969383Z",
+      "created": [
+        "PledgeActivationAuthorization"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "pledge.activate",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220f23737949bd06919c422c4dfb7c11047d49ce6821770c71e912a7a50f0279307",
+      "recordedOffset": 2098611,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:22:44.329696Z",
+      "created": [
+        "CollateralLock"
+      ],
+      "archived": [
+        "AssetControl",
+        "PledgeActivationAuthorization"
+      ]
+    },
+    {
+      "operation": "release.request",
+      "actor": "user-manufacturer-owner",
+      "updateId": "1220d9502ebc74ff80a3f0c37da9f771c5860c76297e1705c939bd5ec8c9891249ea",
+      "recordedOffset": 2098621,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:22:54.920835Z",
+      "created": [
+        "ReleaseRequest"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "release.decide",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220e9fa1123736d53d68755a39057a0a839de40f561780e153853001aff5f475e5d",
+      "recordedOffset": 2098644,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:23:06.348217Z",
+      "created": [
+        "AssetControl",
+        "CollateralLockReleased",
+        "ReleaseDecision"
+      ],
+      "archived": [
+        "ReleaseRequest",
+        "CollateralLock"
+      ]
+    },
+    {
+      "operation": "auditGrant.create",
+      "actor": "user-manufacturer-owner",
+      "updateId": "122011231fa5f04eb40b78671198d03069293850194a20d9dc1d77fb34021314e620",
+      "recordedOffset": 2098655,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:23:09.732802Z",
+      "created": [
+        "AuditGrant"
+      ],
+      "archived": []
+    },
+    {
+      "operation": "auditGrant.create",
+      "actor": "user-lender-a-approver",
+      "updateId": "1220d53a380dc7da95564a07c0252e9de4362d4046c8e0d8d8de0d64c6bd7e7ce83c",
+      "recordedOffset": 2098661,
+      "found": true,
+      "offsetMatches": true,
+      "recordTime": "2026-10-05T04:23:15.480026Z",
+      "created": [
+        "AuditGrant"
+      ],
+      "archived": []
+    }
+  ],
+  "final": {
+    "activeAssetControl": [
+      {
+        "assetId": "ASSET-DEMO-001",
+        "controlVersion": 5
+      }
+    ],
+    "activeCollateralLocks": 0,
+    "collateralLockReleased": [
+      {
+        "caseRef": "CL-001",
+        "lockControlVersion": 4,
+        "releasedControlVersion": 5
+      }
+    ],
+    "authorizedReleaseDecisions": 1
+  },
+  "privacy": {
+    "unrelatedLenderCaseContracts": 0,
+    "perTemplate": {
+      "AssetControl": 0,
+      "EvidenceManifest": 0,
+      "DealerContribution": 0,
+      "VerificationRequest": 0,
+      "VerificationAttestation": 0,
+      "CollateralAssessment": 0,
+      "FinancingProposal": 0,
+      "FinancingAgreement": 0,
+      "CollateralLock": 0,
+      "CollateralLockReleased": 0,
+      "ReleaseRequest": 0,
+      "ReleaseDecision": 0,
+      "PackageShare": 0
+    }
+  }
+}

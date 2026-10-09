@@ -1,6 +1,6 @@
 # Collara on Canton DevNet (shared participant)
 
-Status, 2026-10-04: **code ready; not yet run on DevNet.** Nothing has been uploaded to, allocated on or submitted to the DevNet participant. The only DevNet calls made while building this were unauthenticated public GETs (`/readyz`, `/livez`, `/v2/version`, `/docs/openapi`, OIDC discovery and JWKS); their output is in [`docs/devnet-evidence.md`](devnet-evidence.md). The owner runs every credentialed step by following [`docs/devnet/owner-checklist.md`](devnet/owner-checklist.md). Synthetic data only; this is not a production deployment and carries no security assurance.
+Status, 2026-10-09: **one full synthetic run on the shared participant (2026-10-05, Canton 3.5.19)**: bootstrap, fixture CL-001 and the financing workflow through pledge activation and release, all committed with real update ids and none simulated. On 2026-10-09 the node reported **Canton 3.6.1**; the recorded run was re-read and verified (43/43 receipts) and bootstrap and asset registration committed there, but the rest of the workflow was **not re-run on 3.6.1**. The public website is a UI mockup and is **not connected** to DevNet. Everything below describes the design and the steps; the results, with update ids and the 3.6.1 check, are in [`docs/devnet-evidence.md`](devnet-evidence.md). The credentialed steps are run by the owner, following [`docs/devnet/owner-checklist.md`](devnet/owner-checklist.md) (password only in the owner's own terminal).
 
 ## 1. Target
 

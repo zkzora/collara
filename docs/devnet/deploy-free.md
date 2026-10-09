@@ -1,6 +1,8 @@
 # Deploying the DevNet demo for $0: Supabase Free + Vercel Hobby (runbook)
 
-Status, 2026-10-05: **code written and unit-tested locally, never deployed.** No Supabase project or Vercel environment was created. Nothing ran against DevNet or Supabase. Synthetic data only. This is not a production deployment and comes with no security assurance. Any step that creates an account, publishes a URL or touches the DevNet ledger needs the project owner's go-ahead.
+> **Note 2026-10-09.** Demo personas are **disabled in DEVNET** (`33761de`) and web sign-in against the NODERS identity provider is not configured, so a DevNet web deployment has no sign-in that works for reviewers. Nothing is hosted. The submission uses the public UI mockup plus the recorded DevNet run ([`docs/devnet-evidence.md`](../devnet-evidence.md)). The `DEMO_SESSIONS_*` settings below have no effect in DEVNET.
+
+Status, 2026-10-09: **Supabase database configured; Vercel DevNet environment not deployed.** Project `collara` exists in `ap-northeast-2`; database `collara_devnet` and dedicated login `collara_app` were created, migrations 0000-0005 applied, and synthetic identities seeded. Session (5432) and transaction (6543) pooler connections were both verified against the non-default database. Supabase Storage/S3 is not configured yet. Synthetic data only. This is not a production deployment and comes with no security assurance. Publishing a URL or touching the DevNet ledger still needs the project owner's go-ahead.
 
 The Render path ([deploy-render.md](deploy-render.md), `render.yaml`) and LOCALNET are unchanged. This option is an alternative for when the budget is $0.
 
@@ -33,7 +35,7 @@ Checked 2026-10-05 on the providers' own pages, except where marked:
 - Supabase Free: 500 MB database, 1 GB storage, and **projects pause after 7 days without activity**. These come from a third-party summary and were not re-checked; verify on supabase.com/pricing. A paused project breaks the demo until the owner restores it in the dashboard.
 - Supabase Storage S3: endpoint `https://<project_ref>.storage.supabase.co/storage/v1/s3`, region = the project's region, `forcePathStyle: true` (the app always uses path style). S3 access keys **bypass RLS and give full access to every bucket**, so they are server-side only. Presigned URLs need the S3 protocol enabled in Storage settings (supabase.com/docs/guides/storage/s3/authentication and …/s3/compatibility).
 - **CORS: `PutBucketCors` is not supported by Supabase Storage** (compatibility page). The bucket CORS policy cannot be restricted to the Vercel domain. Supabase's own CORS behaviour on presigned S3 PUTs from a browser is **untested**. If the browser PUT is blocked, the dialog shows `Storage refused the upload. Try again.` / network error; fall back to `STORAGE_UPLOAD_MODE=proxied` (files ≤ 4.5 MB) and report it. What protects the upload is the presigned URL itself: it is issued only after the server-side permission check, is signed for one key under `quarantine/` with the exact content type, and expires after at most 10 minutes (capped by the intent's 15-minute expiry). Nothing is recorded until finalize validates the bytes.
-- **Database name.** DEVNET refuses any database whose name lacks `devnet` (a guard in `@collara/canton`). Supabase's default database is `postgres`, so create `collara_devnet` (step 1.3). Whether Supavisor's transaction pooler routes to a non-default database was **not verified**. If it does not, stop and report; do not weaken the guard. A separate database also keeps the Collara tables out of Supabase's Data API (PostgREST serves the `postgres` database).
+- **Database name.** DEVNET refuses any database whose name lacks `devnet` (a guard in `@collara/canton`). Supabase's default database is `postgres`, so Collara uses the separate `collara_devnet` database. On 2026-10-09 both Supavisor session and transaction poolers were verified to route the custom `collara_app` role to that non-default database. This also keeps the Collara tables out of Supabase's Data API (PostgREST serves the `postgres` database).
 
 ### Pooler compatibility (checked in code)
 
@@ -48,8 +50,8 @@ Transaction mode (PgBouncer/Supavisor, port 6543) supports no session state:
 
 Connection strings (Supabase → Project Settings → Database → Connect):
 
-- Runtime (Vercel): `postgres://postgres.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/collara_devnet?sslmode=require` (transaction pooler)
-- Owner's machine: `postgres://postgres.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/collara_devnet?sslmode=require` (session pooler, IPv4). The direct host `db.<project_ref>.supabase.co:5432` is IPv6-only on Free, per Supabase's connect dialog (not re-checked).
+- Runtime (Vercel): `postgres://collara_app.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/collara_devnet?uselibpqcompat=true&sslmode=require` (transaction pooler)
+- Owner's machine: `postgres://collara_app.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/collara_devnet?uselibpqcompat=true&sslmode=require` (session pooler, IPv4). With the current `pg`/`pg-connection-string`, `uselibpqcompat=true` keeps standard libpq `require` semantics: TLS is mandatory but the CA and hostname are not verified. For full verification, download the Supabase CA, configure it in the driver, and use `sslmode=verify-full`. The direct host `db.<project_ref>.supabase.co:5432` is IPv6-only on Free, per Supabase's connect dialog (not re-checked).
 
 ## Ordered runbook
 
@@ -57,9 +59,9 @@ Connection strings (Supabase → Project Settings → Database → Connect):
 
 1. Create a Supabase project (Free). Use a region near Vercel's default `iad1` (US East). Store the database password in your password manager only.
 2. Project Settings → Data API: if you will not use it, disable it. Collara never uses it.
-3. SQL editor: `create database collara_devnet;` (synthetic demo only).
-4. In your local, git-ignored `.env.devnet`: `DATABASE_URL=<session pooler URL for collara_devnet>`.
-5. `node scripts/devnet/db-setup.mjs` applies the migrations and seeds the synthetic identities. Untested against Supabase: it checks for the database through the `postgres` maintenance database. If that is refused, report the error.
+3. Create `collara_devnet` and the dedicated `collara_app` login, then transfer that database's ownership to `collara_app`. The application never uses the Supabase admin credential.
+4. In local, git-ignored `.env.devnet`, set `DATABASE_URL` to the session-pooler URL for `collara_devnet`. Keep the transaction-pooler URL for the Vercel `DATABASE_URL`.
+5. `node scripts/devnet/db-setup.mjs` applies the migrations and seeds the synthetic identities. Verified against Supabase on 2026-10-09; reruns are idempotent.
 
 ### 2. Storage bucket, S3 keys, CORS
 
@@ -106,7 +108,7 @@ Vercel project → Settings → Environment Variables, scope **Preview** only. M
 | `PUBLIC_ORIGIN` | the preview's exact `https://` origin (stable branch alias recommended) |
 | `COOKIE_SECURE` | `true` |
 | `TRUST_PROXY` | `loopback`. The adapter injects requests from 127.0.0.1 with `X-Forwarded-Proto/Host` set from the incoming request and Vercel's `X-Forwarded-For`. Trusting loopback makes `request.protocol` https, so `__Host-` Secure cookies are saved. Not verified on Vercel |
-| `DEMO_SESSIONS_ENABLED`, `DEMO_SESSIONS_ALLOW_IN_PRODUCTION` | `true` / `true` for the synthetic walkthrough personas (or both `false`) |
+| `DEMO_SESSIONS_ENABLED`, `DEMO_SESSIONS_ALLOW_IN_PRODUCTION` | No effect in DEVNET (demo personas are disabled there); leave `false` |
 | `PUBLIC_DEMO_STATUS` | `off` |
 | `CRON_SECRET` | **secret**, 16+ characters (only if you add the cron) |
 | `ON_REQUEST_SYNC_BUDGET_MS`, `ON_REQUEST_SYNC_MIN_INTERVAL_MS` | optional, defaults 8000 / 3000 |
