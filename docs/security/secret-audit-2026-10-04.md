@@ -48,3 +48,11 @@ Never reuse these values on any network deployment.
 2. Optionally neutralise the `C:\Users\Pongo` paths in `docs/_research/`.
 3. After publishing, enable GitHub secret scanning and push protection on the repository.
 4. Re-run this audit right before the visibility change (`gitleaks git . --log-opts="--all" --redact`).
+
+## Update 2026-10-09
+
+- Scans of the commits added since the audit (`33761de..HEAD`, gitleaks 8.30.1) found one match, a **false positive**: commit `b4de61b`, `scripts/publish/clean-export.mjs` line 92, where an explanatory string quoted a YAML line containing the word `key` (no value). The next commit rewords it; the old commit still contains the string. If the repository is published with its history (option B in [`docs/publication.md`](../publication.md)), a history scan will show this one finding.
+- A scan of a clean snapshot of `HEAD` (`scripts/publish/clean-export.mjs`) reports 10 findings, all in files already reviewed as false positives: five test idempotency labels, one environment-variable reference in `export.ts`, one `contractKeyHash` in a research note, and the YAML field name `key` in `render.yaml` and in this document. None carries a secret value.
+- **Not in the repository but shared in chat and therefore to be rotated:** the hackathon account password, a Supabase secret key and a Supabase S3 access key. They live only in the owner's password manager and git-ignored `.env.devnet`.
+- The third-party capture is still in the history of this private repository; nothing was rewritten. See [`docs/publication.md`](../publication.md) for clean options.
+
