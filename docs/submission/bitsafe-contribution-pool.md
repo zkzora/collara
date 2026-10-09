@@ -1,5 +1,7 @@
 # BitSafe challenge, Contribution Pool entry: governed verifier registry on Decentralization Manager
 
+> **Not being submitted** (owner decision, 2026-10-09). Kept as a description of the governance work only; do not list it as a submission.
+
 Draft entry, 2026-10-04. Sentences outside backticks are INFERRED copy, pending the team's approval. Every fact cites a file in this repository. Synthetic data only. Nothing here is a production-readiness or security claim.
 
 ## 1. What the entry is

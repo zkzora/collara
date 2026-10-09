@@ -24,7 +24,7 @@ Read on 2026-10-04 from https://hackathon.appsfactory.cc/season-3 (tabs Rules, C
 - Check every link in a private browser window before submitting.
 - Judging criteria: Value / problem, ICP / audience, Metrics / validation, GTM materials, MVP materials (working prototype, code quality, depth of Canton integration), Pitch materials. Finalists announced 2026-10-19; Grand Final 2026-10-21.
 
-## BitSafe challenge (separate entries)
+## BitSafe challenge (separate entries) — not being submitted (owner decision, 2026-10-09)
 
 | | Contribution Pool (20,000 CC) | Gold (30,000 CC) |
 |---|---|---|

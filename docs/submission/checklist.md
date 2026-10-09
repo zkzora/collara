@@ -21,7 +21,9 @@ Owner = the account owner (zkzora) unless the team assigns someone else. "Builde
 | 11 | Work done in the delivery phase; any pre-existing code disclosed | Repo created 2026-10-01; the HTML prototype and specs are dated 2026-09-19 to 2026-10-01 | Owner | State this on the project page if the form asks. |
 | 12 | **AI-assisted work disclosed** | Draft ready | Owner (edit) | [ai-disclosure.md](ai-disclosure.md). Paste it into the submission and keep the README link. |
 
-## BitSafe challenge (a separate entry)
+## BitSafe challenge (a separate entry) — **not being submitted** (owner decision, 2026-10-09)
+
+The rows below are kept for reference only. The governance code (Tier A in the app, Tier B scripts) stays in the repository as part of the product; only the challenge entry is dropped.
 
 | # | Item | Status | Owner |
 |---|---|---|---|
