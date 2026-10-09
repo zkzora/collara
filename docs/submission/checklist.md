@@ -16,21 +16,14 @@ Owner = the account owner (zkzora) unless the team assigns someone else. "Builde
 | 6 | **Track selection** | Not done | Owner | "Real-World Assets (RWA) & Business Workflows". |
 | 7 | **1,000 Mana** burned toward the project (needs ≥ 10 days of daily platform activity) | **Unknown**: only the owner can see the platform account | Owner | Check the balance and activity days today; this cannot be caught up at the last minute. |
 | 8 | **Completed project profile** and a **non-empty journal** on the platform | **Unknown** (platform account) | Owner | Profile text: [project-page.md](project-page.md). Journal: daily entries, which the rules also recommend. |
-| 9 | **Check every link in a private browser window** (signed out) | Not done | Owner | Open each link from the platform page in a private window: repo, README, `/docs`, the demo, the video, the pitch, and the BitSafe entry doc. Every one must open without signing in. |
+| 9 | **Check every link in a private browser window** (signed out) | Not done | Owner | Open each link from the platform page in a private window: repo, README, `/docs`, the demo, the video, and the pitch. Every one must open without signing in. |
 | 10 | Meaningful use of the Canton ledger | Met on LocalNet (Canton 3.5.19 sandbox) and by one recorded full run on the shared DevNet participant (43 command records, 39 ledger updates; re-verified 43/43 on Canton 3.6.1; the workflow was **not** re-run on 3.6.1) | — | [`docs/verification.md`](../verification.md), [`docs/devnet-evidence.md`](../devnet-evidence.md), `packages/domain/src/evidence.ts`. |
 | 11 | Work done in the delivery phase; any pre-existing code disclosed | Repo created 2026-10-01; the HTML prototype and specs are dated 2026-09-19 to 2026-10-01 | Owner | State this on the project page if the form asks. |
 | 12 | **AI-assisted work disclosed** | Draft ready | Owner (edit) | [ai-disclosure.md](ai-disclosure.md). Paste it into the submission and keep the README link. |
 
-## BitSafe challenge (a separate entry) — **not being submitted** (owner decision, 2026-10-09)
+## BitSafe challenge
 
-The rows below are kept for reference only. The governance code (Tier A in the app, Tier B scripts) stays in the repository as part of the product; only the challenge entry is dropped.
-
-| # | Item | Status | Owner |
-|---|---|---|---|
-| B1 | Contribution Pool entry document | Draft: [bitsafe-contribution-pool.md](bitsafe-contribution-pool.md) | Builder |
-| B2 | A judge can reproduce it locally | Tested only on Windows 11 + WSL Ubuntu 24.04. The Docker Compose path is **untested** | Owner + builder: test on a Linux machine with Docker if one is available |
-| B3 | Re-run Tier B with `collara-contracts` 0.2.0 | Not done (the recorded run used 0.1.0) | Builder |
-| B4 | Gold tier | Not pursued: it needs our own node (the shared DevNet participant cannot host Decentralized Parties), and the application deadline was 2026-10-04 | Owner decision |
+Cancelled by the owner on 2026-10-09: no BitSafe entry is submitted. The governance code (Tier A in the app, Tier B scripts) stays in the repository as part of the product.
 
 ## Recommended
 

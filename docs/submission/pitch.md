@@ -52,7 +52,7 @@ Judging criteria (rules read 2026-10-04): Value / problem, ICP / audience, Metri
   - The verifier and the dealer never see principal or terms.
   - The unrelated Lender B gets the same 404 for CL-001 records as for a record that does not exist.
 - Witness-level privacy was checked on five participants (8/8 tests, 87/87 checks). **One machine, one operator.**
-- Governance (BitSafe / Decentralization Manager): 2-of-3 seats administer the verifier registry only, and never touch collateral.
+- Governance (Decentralization Manager): 2-of-3 seats administer the verifier registry only, and never touch collateral.
   - Tier A is in the app, on one local participant.
   - Tier B (a decentralized party on three DM nodes, one operator) is scripted locally and not in the app.
   - On DevNet, Tier A ran once (as ordinary parties of one tenant user, so not decentralized there); Tier B did not, because the shared DevNet participant cannot host decentralized parties.

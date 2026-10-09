@@ -181,7 +181,7 @@ Tier A pledge activation avoids this coupling by reading the registrar's `Verifi
 - **Collara API, worker and UI on Tier B** (§9).
 - **`collara-contracts` 0.2.0 on Tier B.** The recorded run used 0.1.0; the scripts now point at 0.2.0 and have not been run with it.
 - **Any network other than this local one.** Tier B was not attempted on DevNet (the shared participant cannot host Decentralized Parties) or anywhere else.
-- **Docker / Docker Compose.** The run used WSL processes, no containers. A Compose path is drafted in [`infra/tierb/compose.yaml`](../infra/tierb/compose.yaml) and is **untested** ([submission/bitsafe-contribution-pool.md](submission/bitsafe-contribution-pool.md) §6).
+- **Docker / Docker Compose.** The run used WSL processes, no containers. A Compose path is drafted in [`infra/tierb/compose.yaml`](../infra/tierb/compose.yaml) and is **untested**.
 - **Mediator and participant timeouts.** Canton defaults were used. The about 30 s failure time is a consequence of those defaults, not a tuned value.
 
 ## 7. Resource use and cleanup

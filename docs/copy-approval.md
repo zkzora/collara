@@ -215,7 +215,7 @@ Template strings fill counts, dates and hosts from `packages/domain/src/evidence
 ## 8. Submission documents (whole-document approval: every sentence outside backticks is INFERRED)
 
 178. [ ] approve — `docs/submission/project-page.md` (whole page) and `docs/submission/pitch.md` (all slide text) — = same; re-check status facts against `packages/domain/src/evidence.ts` on the day of submission
-179. [ ] approve — `docs/submission/demo-script.md` (narration; variant label "Canton DevNet (shared participant) · synthetic data", line 9), `docs/submission/bitsafe-contribution-pool.md` (all sentences outside backticks) and `docs/submission/ai-disclosure.md:9` ("Copy marked INFERRED was written with AI assistance and has not been approved." — update to say what was approved once this list is signed) — = same
+179. [ ] approve — `docs/submission/demo-script.md` (narration; variant label "Canton DevNet (shared participant) · synthetic data", line 9), (the BitSafe entry document was removed on 2026-10-09 when the entry was cancelled) and `docs/submission/ai-disclosure.md:9` ("Copy marked INFERRED was written with AI assistance and has not been approved." — update to say what was approved once this list is signed) — = same
 
 ## 9. Changed or added on 2026-10-09 (after the DevNet run; supersedes the text of items 95, 133, 135 and 179)
 

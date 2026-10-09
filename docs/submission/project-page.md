@@ -52,7 +52,7 @@ The demo case, CL-001, goes through these steps:
 - **Daml contracts enforce the invariants.** They include a single consuming `AssetControl` token per registered asset, release controlled only by the lender, version-pinned proposal acceptance, and an activation that checks a live, owner-signed disclosure-validity marker so that a revoked attestation cannot back it. `collara-contracts` 0.2.0 has 68 Daml Script tests (invariants, attacks, privacy, revocation).
 - **Party-based privacy.** Financing terms live only in contracts between the borrower and the lender. Verifiers, dealers and the unrelated Lender B never become stakeholders. Witness-level privacy was checked on five participants of one sandbox (8/8 tests, 87/87 checks, two runs). All five participants ran on one machine under one operator, so this run does not show isolation between independent operators.
 - **Typed JSON Ledger API v2 client.** The API submits as exactly the acting organisation's party, derived server-side from the session, membership, mandate and party binding. A projection worker reads committed updates, and the UI shows `Confirmed on the ledger.` only when the ledger returned an update id.
-- **BitSafe / Decentralization Manager governance** of the verifier registry (add or suspend a verifier). Governance never touches collateral. There are two tiers, kept separate:
+- **Decentralization Manager governance** of the verifier registry (add or suspend a verifier). Governance never touches collateral. There are two tiers, kept separate:
   - *Tier A*: DM v1.12.0 `GovernanceRules` with 2-of-3 seats, implemented in the app on one local participant. The governance party is ordinary, not decentralized.
   - *Tier B*: three DM nodes and a decentralized governance party on a local three-participant Canton in WSL, 10/10 scripted checks. Every node is run by one operator, and Tier B is not wired into the app. It ran with `collara-contracts` 0.1.0 and has not been re-run with 0.2.0.
   - On DevNet, Tier A ran once (ordinary parties of one tenant user, not decentralized); Tier B did not run there.
@@ -79,7 +79,6 @@ Collara is not production-ready and makes no security claims. It is not a lender
 | Documentation: <https://collara-coral.vercel.app/docs> | Public. The repository documents are [`README.md`](../../README.md), [`docs/verification.md`](../verification.md) and [`docs/limitations.md`](../limitations.md). |
 | Video | Not recorded yet ([demo-script.md](demo-script.md)). |
 | Pitch | Outline only ([pitch.md](pitch.md)). |
-| BitSafe Contribution Pool entry | [bitsafe-contribution-pool.md](bitsafe-contribution-pool.md) |
 
 ## Tech stack (only what is used)
 

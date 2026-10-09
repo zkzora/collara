@@ -40,7 +40,6 @@ HackCanton Season 3, track "Real-World Assets (RWA) & Business Workflows", deadl
 | [`docs/submission/demo-script.md`](docs/submission/demo-script.md) | Video script with timestamps. Recommended: UI-mockup tour plus the recorded DevNet run, each labeled on screen; LocalNet and DevNet-only variants as references |
 | [`docs/submission/checklist.md`](docs/submission/checklist.md) | Mandatory items with status and owner, including a private-window link check |
 | [`docs/submission/ai-disclosure.md`](docs/submission/ai-disclosure.md) | AI-assisted tooling statement (draft for the team to edit) |
-| [`docs/submission/bitsafe-contribution-pool.md`](docs/submission/bitsafe-contribution-pool.md) | **Not being submitted (owner decision, 2026-10-09).** BitSafe Contribution Pool entry: DM `GovernableAction` modules + the Tier B LocalNet demo, evidence map, reproduction (WSL tested; Docker Compose draft untested) |
 
 **Public repository: pending the owner's decision.** The rules require a public repository with all code and this README; `zkzora/collara` is private as of 2026-10-04. Until it is public, the repository counts as missing for judging.
 
