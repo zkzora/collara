@@ -55,18 +55,18 @@ The demo case, CL-001, goes through these steps:
 - **BitSafe / Decentralization Manager governance** of the verifier registry (add or suspend a verifier). Governance never touches collateral. There are two tiers, kept separate:
   - *Tier A*: DM v1.12.0 `GovernanceRules` with 2-of-3 seats, implemented in the app on one local participant. The governance party is ordinary, not decentralized.
   - *Tier B*: three DM nodes and a decentralized governance party on a local three-participant Canton in WSL, 10/10 scripted checks. Every node is run by one operator, and Tier B is not wired into the app. It ran with `collara-contracts` 0.1.0 and has not been re-run with 0.2.0.
-  - Neither tier has run on DevNet.
+  - On DevNet, Tier A ran once (ordinary parties of one tenant user, not decentralized); Tier B did not run there.
 
 ## What is real, what is a mockup, what is not done
 
-| | Status (2026-10-04) |
+| | Status (2026-10-09) |
 |---|---|
 | Public web demo | **UI mockup** on Vercel: <https://collara-coral.vercel.app>. Synthetic data, simulated in the browser, no ledger transaction. Banner `Synthetic demo data — UI mockup.` |
 | LocalNet demo | **Real ledger commands** against a Canton 3.5.19 `dpm sandbox` with one participant (not Splice LocalNet), with an API, a worker, PostgreSQL and S3 storage. **Runs only on the authoring machine.** LocalNet integration tests 71/71 before contracts 0.2.0. After 0.2.0, the activation suites pass 10/10, and the full suite with S3 storage has not been re-run. Browser walkthrough from a clean start: 14/14. |
 | Tests and CI | 410 unit tests; GitHub Actions CI green (run 37108297524): typecheck, lint, unit tests, build, Playwright UI-mockup e2e, Daml build and tests. |
-| Canton DevNet | `COLLARA_MODE=DEVNET` code is ready. **Nothing has run on DevNet yet**; the only DevNet calls so far are unauthenticated public GETs. Governance there would be Tier A only. |
+| Canton DevNet | **One full synthetic run on the shared HackCanton participant on 2026-10-05** (Canton 3.5.19): bootstrap, fixture CL-001 and the financing workflow through pledge activation and release, 43 command records / 39 ledger updates, all committed with real update ids. The pledge is released and the case closed; Demo Lender B's own ledger view holds none of the case contracts. On 2026-10-09 the node reported Canton 3.6.1: the recorded run was re-verified (43/43 receipts) and bootstrap and asset registration committed on 3.6.1, but the **workflow was not re-run on 3.6.1**. One tenant credential acts for every party (not isolation between operators), and the public site is **not connected** to DevNet. Governance there is Tier A only. Evidence: `docs/devnet-evidence.md`. |
 | Governance Tier B | Scripted locally, one operator, not in the app; not attempted on DevNet, because the shared DevNet participant cannot host Decentralized Parties. |
-| Not done | Tier B in the app; any DevNet run; a hosted LocalNet stack; Docker/Compose (written, never run); legal pages (privacy, terms) and approval of copy marked INFERRED; independent node operators; **user validation (no interviews, no measured metrics)**. |
+| Not done | Tier B in the app; the workflow re-run on DevNet 3.6.1; a DevNet sign-in for reviewers; a hosted LocalNet or DevNet stack; Docker/Compose (written, never run); legal pages (privacy, terms) and approval of copy marked INFERRED; independent node operators; **user validation (no interviews, no measured metrics)**. |
 
 Collara is not production-ready and makes no security claims. It is not a lender, custodian or lien registry, and it does not detect pledges made outside Collara.
 
@@ -74,7 +74,7 @@ Collara is not production-ready and makes no security claims. It is not a lender
 
 | Link | Status |
 |---|---|
-| Repository: `https://github.com/zkzora/collara` | **Private today.** The rules require a public repository; making it public is the owner's decision ([checklist.md](checklist.md)). |
+| Repository: `https://github.com/zkzora/collara` | **Private today.** The rules require a public repository; making it public is the owner's decision ([checklist.md](checklist.md)). Replace this link with the public repository's URL; the existing repository's history contains a third-party capture, so publish a clean copy ([`docs/publication.md`](../publication.md)). |
 | Demo (UI mockup): <https://collara-coral.vercel.app> | Public. |
 | Documentation: <https://collara-coral.vercel.app/docs> | Public. The repository documents are [`README.md`](../../README.md), [`docs/verification.md`](../verification.md) and [`docs/limitations.md`](../limitations.md). |
 | Video | Not recorded yet ([demo-script.md](demo-script.md)). |

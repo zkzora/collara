@@ -14,7 +14,7 @@ Read on 2026-10-04 from https://hackathon.appsfactory.cc/season-3 (tabs Rules, C
 | **Track selection** (one of five) | Owner decision; "Real-World Assets (RWA) & Business Workflows" fits Collara. |
 | **1,000 Mana** burned toward the project (needs ≥ 10 days of daily platform activity) | Platform account — only the owner can check. |
 | **Completed project profile** and a **non-empty journal** on the platform | Platform account — only the owner can check. |
-| Meaningful use of the Canton ledger (Daml contracts, nodes or APIs) | Met on LocalNet (Canton 3.5.19 sandbox); DevNet in preparation. |
+| Meaningful use of the Canton ledger (Daml contracts, nodes or APIs) | Met on LocalNet (Canton 3.5.19 sandbox) and by one recorded full run on the shared DevNet participant (2026-10-05, re-verified 2026-10-09 on 3.6.1; [`docs/devnet-evidence.md`](devnet-evidence.md)). |
 | Work done in the delivery phase (Sep 18 – Oct 9); pre-existing code must be disclosed | The repo was created on 2026-10-01; the HTML prototype and specs are dated 2026-09-19 … 2026-10-01 (inside the phase). |
 | AI-assisted work allowed, used **transparently** | Should be stated in the README/submission. |
 

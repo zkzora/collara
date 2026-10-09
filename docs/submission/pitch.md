@@ -37,7 +37,7 @@ Judging criteria (rules read 2026-10-04): Value / problem, ICP / audience, Metri
 - Flow (approved workflow headings): `Register the equipment` → `Request verification` → `Share with the lender` → `Record review and pledge` → `Request and authorize release` → `Export the case history`.
 - Roles: `Different participants. Different permissions.`
 - Boundary: `A Collara record is not a legal lien registration, proof of title, or verification of pledges outside Collara.`
-- Show the demo here (see [demo-script.md](demo-script.md)), before the architecture slide. The research notes advise "Demo first; architecture and vision after the proof".
+- Show the demo here (see [demo-script.md](demo-script.md): an interactive UI-mockup tour, then the recorded DevNet run, each labeled), before the architecture slide. The research notes advise "Demo first; architecture and vision after the proof".
 
 ## 6. How Canton is used and the privacy model
 
@@ -55,7 +55,7 @@ Judging criteria (rules read 2026-10-04): Value / problem, ICP / audience, Metri
 - Governance (BitSafe / Decentralization Manager): 2-of-3 seats administer the verifier registry only, and never touch collateral.
   - Tier A is in the app, on one local participant.
   - Tier B (a decentralized party on three DM nodes, one operator) is scripted locally and not in the app.
-  - Neither tier has run on DevNet.
+  - On DevNet, Tier A ran once (as ordinary parties of one tenant user, so not decentralized there); Tier B did not, because the shared DevNet participant cannot host decentralized parties.
 
 ## 7. Evidence (what was actually run)
 
@@ -70,7 +70,7 @@ All counts come from `packages/domain/src/evidence.ts`. Show the record name nex
 | Governance Tier A on LocalNet | 10/10 integration tests |
 | Governance Tier B on LocalNet (3 DM nodes, one operator, not in the app, contracts 0.1.0) | 10/10 scripted checks |
 | Unit tests / CI | 410 / green (run 37108297524) |
-| DevNet | Code ready; **not yet run** |
+| DevNet (shared NODERS participant) | **One full synthetic run on 2026-10-05** (Canton 3.5.19): bootstrap, fixture and the financing workflow through activation and release, 43 command records / 39 ledger updates, all committed, none simulated; pledge released; Demo Lender B's own ledger view holds 0 of 13 case templates. **Re-verified 2026-10-09 on Canton 3.6.1**: 43/43 receipts. The workflow was **not re-run on 3.6.1** (bootstrap and asset registration were). One tenant credential acts for every party. The public site is not connected. |
 
 The research notes list seven control checks (spec-content.md §d.5). Their status from the repo:
 
@@ -116,9 +116,9 @@ From the GTM research note (spec-content.md §d.3); none of it has been executed
 
 ## 10. Roadmap and asks
 
-- Done: the Daml model, the API, the worker, the UI, LocalNet tests, five-participant privacy, Tier A governance in the app, and the Tier B scripted proof.
+- Done: the Daml model, the API, the worker, the UI, LocalNet tests, five-participant privacy, Tier A governance in the app, the Tier B scripted proof, and one recorded full run on the shared DevNet participant.
 - Next, in the repository's order (`docs/PROGRESS.md`):
-  1. the first DevNet run on the shared participant (Tier A);
+  1. re-run the whole workflow on DevNet 3.6.1 (needs namespaced fixture identifiers or new parties) and a DevNet sign-in that reviewers can use;
   2. Tier B in the app, which needs the whole Collara deployment on the Tier B synchronizer;
   3. legal pages (BPD-1) and approval of the copy;
   4. hosting the LocalNet stack.

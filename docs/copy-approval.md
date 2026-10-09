@@ -2,7 +2,7 @@
 
 Status, 2026-10-05: **nothing in this list is approved.** Built from `grep -rn INFERRED` over `apps/`, `packages/` and `docs/submission/` at a894f8b. No copy in code was changed while writing this file. Approved copy (backticks in `docs/_research/spec-*.md`, `packages/domain/src/copy.ts` without an INFERRED tag) is out of scope and must stay verbatim.
 
-**Summary: 179 approval items** (some items group closely related strings, e.g. one dialog or one list; about 250 individual strings in all) — §1 domain copy constants 26, §2 global UI states 8, §3 public demo gate (`/`, `/demo`, `/pilot` notice, incl. the replaced approved FAQ answer) 19, §4 `/pilot` form 25, §5 `/docs` incl. capability table 57, §6 workspace 24, §7 API refusals shared with the UI mockup client 18 (strings present in both are counted once), §8 submission documents 2 (whole-document approval). Two items propose a wording change (30, 63); all others keep the current text. Line numbers are the line where the string starts (or the INFERRED marker for a group).
+**Summary: 179 approval items (+7 changed or added on 2026-10-09, §9)** (some items group closely related strings, e.g. one dialog or one list; about 250 individual strings in all) — §1 domain copy constants 26, §2 global UI states 8, §3 public demo gate (`/`, `/demo`, `/pilot` notice, incl. the replaced approved FAQ answer) 19, §4 `/pilot` form 25, §5 `/docs` incl. capability table 57, §6 workspace 24, §7 API refusals shared with the UI mockup client 18 (strings present in both are counted once), §8 submission documents 2 (whole-document approval). Two items propose a wording change (30, 63); all others keep the current text. Line numbers are the line where the string starts (or the INFERRED marker for a group).
 
 "Proposed final text" is `= same` unless a change is clearly better; no proposal adds a claim. Where a proposal differs, approving the item means approving the proposed text (someone then edits the code).
 
@@ -216,6 +216,18 @@ Template strings fill counts, dates and hosts from `packages/domain/src/evidence
 
 178. [ ] approve — `docs/submission/project-page.md` (whole page) and `docs/submission/pitch.md` (all slide text) — = same; re-check status facts against `packages/domain/src/evidence.ts` on the day of submission
 179. [ ] approve — `docs/submission/demo-script.md` (narration; variant label "Canton DevNet (shared participant) · synthetic data", line 9), `docs/submission/bitsafe-contribution-pool.md` (all sentences outside backticks) and `docs/submission/ai-disclosure.md:9` ("Copy marked INFERRED was written with AI assistance and has not been approved." — update to say what was approved once this list is signed) — = same
+
+## 9. Changed or added on 2026-10-09 (after the DevNet run; supersedes the text of items 95, 133, 135 and 179)
+
+These strings were edited to match what was actually run (one recorded DevNet run, not connected to the public site). Facts come from `packages/domain/src/evidence.ts` and `docs/devnet-evidence.md`.
+
+180. [ ] approve — `evidence.ts` `devnet.status` (rendered by `docs.tsx` and `capabilities.ts`, replaces the text of items 95 and 135) — "one full synthetic run on the shared participant (2026-10-05); the public site is not connected to it"
+181. [ ] approve — `evidence.ts` `governance.tierA.devnet.status` — "ran once on DevNet (2026-10-05) as ordinary parties of one tenant user; not decentralized"
+182. [ ] approve — `docs.tsx` (deployment list, replaces the "Not deployed" line) — "Not hosted: the API, the worker, PostgreSQL and document storage. The Daml packages were uploaded to the shared DevNet participant for the recorded run; no Collara service is hosted on any network."
+183. [ ] approve — `docs.tsx` (governance paragraph, replaces the sentence "Neither tier has run on Canton DevNet…") — "Tier A ran once on Canton DevNet, as ordinary parties of one tenant ledger user, so it is not decentralized there either; Tier B was not attempted because the shared DevNet participant cannot host decentralized parties."
+184. [ ] approve — `capabilities.ts` governance row "where" (replaces item 133) — "Tier A on one local participant; Tier B scripted on a local topology with one operator (10/10 checks), not in the app; Tier A ran once on DevNet, Tier B did not · BitSafe governance"; the DevNet row status changes from PLANNED to IMPLEMENTED
+185. [ ] approve — `docs/submission/demo-script.md` (rewritten: variant D "UI-mockup tour + recorded DevNet run" with labels "UI mockup: simulated in the browser, no ledger" and "Canton DevNet · recorded run of 5 Oct 2026 · results, not new transactions"; replaces item 179's DevNet variant label)
+186. [ ] approve — `docs/submission/pitch.md` and `docs/submission/project-page.md` DevNet rows (a recorded run; re-verified on Canton 3.6.1; workflow not re-run there; one tenant credential; public site not connected)
 
 ## After approval
 
