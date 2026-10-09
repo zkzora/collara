@@ -58,6 +58,36 @@ describe("PersonaSwitcher", () => {
   });
 });
 
+function setupDevnet(personas: () => Promise<ReturnType<typeof personaSummary>[]>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const mock = createMockClient({ latencyMs: 0, now: new Date("2026-10-02T08:00:00Z") });
+  const client = { ...mock, demo: { ...mock.demo, personas } } as typeof mock;
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CollaraClientProvider mode="DEVNET" client={client}>
+        <SessionProvider pending={<p>Loading</p>} error={() => <p>Error</p>}>
+          <PersonaSwitcher />
+          <Viewer />
+        </SessionProvider>
+      </CollaraClientProvider>
+    </QueryClientProvider>,
+  );
+}
+
+describe("PersonaSwitcher in DEVNET", () => {
+  it("renders nothing by default: the API answers 404 unless the local recording personas are on", async () => {
+    setupDevnet(() => Promise.reject(new Error("not found")));
+    await screen.findByTestId("viewer");
+    await waitFor(() => expect(screen.queryByLabelText("Demo persona (synthetic)")).not.toBeInTheDocument());
+  });
+
+  it("lists what the API offers when the local recording personas are on", async () => {
+    setupDevnet(async () => [personaSummary(DEMO_PERSONAS["lender-a-approver"]), personaSummary(DEMO_PERSONAS["manufacturer-owner"])]);
+    const select = await screen.findByLabelText("Demo persona (synthetic)");
+    expect(select).toBeInTheDocument();
+  });
+});
+
 describe("persona labels", () => {
   it("names LOCALNET personas like UI_MOCK: business role, never the governance seat, short in the sidebar", () => {
     // The API lists roles in storage order; the label must still read "Lender Approver".

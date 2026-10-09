@@ -7,6 +7,8 @@
 //   import-bindings   matches the Console-created parties to the Collara hints; writes .local/devnet/state.json and
 //                     the DB bindings (never allocates parties)
 //   bootstrap         the seed (clean-start or main) through the API's workflow runner on the DevNet state
+//   verify-evidence   every recorded receipt (update id, offset) against the participant's update stream, plus the final
+//                     contracts; writes the non-secret receipts with --out <file> (read-only)
 //   verify-first-tx   the first committed command (update id, offset) and the registrar's AssetRegistry/CollaraConfig
 //   recover           read-only diagnosis after a DevNet reset, pruning, a lost credential, key or database: prints the
 //                     case and the exact next commands. --new-run --yes: fresh run namespace, reset of the "devnet"
@@ -38,7 +40,7 @@ import {
   type DevnetEnv,
 } from "@collara/canton";
 import { commands as commandsTable, createPgDatabase, resetProjectionSource, seedDemoIdentities, type DbHandle } from "@collara/db";
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, inArray, isNotNull } from "drizzle-orm";
 import { AcsReader } from "../ledger/acs";
 import { devnetCredentialStore } from "../ledger/devnet";
 import { loadLedgerState, type LedgerState } from "../ledger/state";
@@ -368,6 +370,125 @@ async function verifyFirstTx(): Promise<number> {
 }
 
 /**
+ * Read-only: checks every recorded command receipt (update id + offset in this database) against the participant's
+ * own update stream for the Collara parties, then reads the final contract state from the ledger. Writes the
+ * non-secret receipts (update ids, offsets, template names, record times) to --out. Exit 0 only when every receipt
+ * is found at the recorded offset and the expected final contracts exist.
+ */
+async function verifyEvidence(options: { out: string | undefined }): Promise<number> {
+  const env = loadEnv({ requireDatabase: true, requireUser: true });
+  const state = await loadLedgerState(devnetStatePath(env));
+  if (!state) throw new CliError("no DevNet state: run import-bindings first");
+  const db = openDb(env);
+  try {
+    const rows = await db.db
+      .select({ operation: commandsTable.operation, status: commandsTable.status, updateId: commandsTable.updateId, offset: commandsTable.completionOffset, actor: commandsTable.actorUserId })
+      .from(commandsTable)
+      .where(and(inArray(commandsTable.status, ["COMMITTED", "PROJECTED", "PROJECTION_DELAYED"]), isNotNull(commandsTable.updateId), isNotNull(commandsTable.completionOffset)))
+      .orderBy(asc(commandsTable.completionOffset));
+    if (rows.length === 0) throw new CliError("no committed command receipts in this database");
+    const client = new LedgerClient({ baseUrl: env.CANTON_DEVNET_JSON_API_URL, tokenProvider: provider(env, db), timeoutMs: 60_000 });
+    const parties = Object.values(state.parties).map((p) => p.party);
+    const first = Number(rows[0]?.offset);
+    const last = Number(rows[rows.length - 1]?.offset);
+    const onLedger = new Map<string, { offset: number; recordTime: string; created: string[]; archived: string[] }>();
+    const entity = (templateId: string) => templateId.split(":").pop() ?? templateId;
+    let begin = first - 1;
+    for (let pass = 0; pass < 1_000; pass++) {
+      const page = await client.updates({ beginExclusive: begin, endInclusive: last, parties, limit: 200 });
+      for (const u of page.updates) {
+        if (u.kind !== "transaction") continue;
+        onLedger.set(u.transaction.updateId, {
+          offset: u.transaction.offset,
+          recordTime: u.transaction.recordTime,
+          created: u.transaction.events.filter((e) => e.kind === "created").map((e) => entity(e.templateId)),
+          archived: u.transaction.events.filter((e) => e.kind === "archived").map((e) => entity(e.templateId)),
+        });
+      }
+      if (page.complete) break;
+      begin = page.nextBeginExclusive;
+    }
+    const receipts = rows.map((r) => {
+      const seen = onLedger.get(r.updateId ?? "");
+      return {
+        operation: r.operation,
+        actor: r.actor,
+        updateId: r.updateId,
+        recordedOffset: Number(r.offset),
+        found: !!seen,
+        offsetMatches: !!seen && seen.offset === Number(r.offset),
+        recordTime: seen?.recordTime ?? null,
+        created: seen?.created ?? [],
+        archived: seen?.archived ?? [],
+      };
+    });
+    const missing = receipts.filter((r) => !r.found || !r.offsetMatches);
+    console.log(`receipts in the database: ${receipts.length}; found on the ledger at the recorded offset: ${receipts.length - missing.length}`);
+    for (const r of missing) console.log(`  MISSING/MISMATCH  ${r.operation}  ${r.updateId}  recorded offset ${r.recordedOffset}`);
+
+    const ns = state.namespace ?? "";
+    const owner = state.parties.DemoManufacturer?.party;
+    const lender = state.parties.DemoLenderA?.party;
+    if (!owner || !lender) throw new CliError("the DevNet state has no DemoManufacturer/DemoLenderA party");
+    const asOwner = new AcsReader(client, [owner]);
+    const asLender = new AcsReader(client, [lender]);
+    const controls = await asOwner.list("AssetControl", (c) => c.namespace === ns);
+    const locks = await asOwner.list("CollateralLock", (c) => c.namespace === ns);
+    const released = await asOwner.list("CollateralLockReleased", (c) => c.namespace === ns);
+    const decisions = await asLender.list("ReleaseDecision", (d) => d.outcome === "AUTHORIZED");
+    const final = {
+      activeAssetControl: controls.map((c) => ({ assetId: c.payload.assetId, controlVersion: c.payload.controlVersion })),
+      activeCollateralLocks: locks.length,
+      collateralLockReleased: released.map((c) => ({ caseRef: c.payload.caseRef, lockControlVersion: c.payload.lockControlVersion, releasedControlVersion: c.payload.releasedControlVersion })),
+      authorizedReleaseDecisions: decisions.length,
+    };
+    // Privacy at the ledger level: the unrelated lender (and, without a grant, the auditor) must hold none of the
+    // case contracts. Counted per template as that party's own ACS, not through the application.
+    const caseTemplates = [
+      "AssetControl",
+      "EvidenceManifest",
+      "DealerContribution",
+      "VerificationRequest",
+      "VerificationAttestation",
+      "CollateralAssessment",
+      "FinancingProposal",
+      "FinancingAgreement",
+      "CollateralLock",
+      "CollateralLockReleased",
+      "ReleaseRequest",
+      "ReleaseDecision",
+      "PackageShare",
+    ] as const;
+    const unrelated = state.parties.DemoLenderB?.party;
+    const privacy: Record<string, number> = {};
+    if (unrelated) {
+      const asUnrelated = new AcsReader(client, [unrelated]);
+      for (const template of caseTemplates) privacy[template] = (await asUnrelated.list(template, () => true)).length;
+    }
+    const unrelatedSees = Object.values(privacy).reduce((sum, n) => sum + n, 0);
+    console.log(`privacy: Demo Lender B (unrelated) holds ${unrelatedSees} case contracts across ${caseTemplates.length} templates`);
+    console.log(`final state on the ledger (namespace ${ns}):`);
+    console.log(`  AssetControl (active)        ${JSON.stringify(final.activeAssetControl)}`);
+    console.log(`  CollateralLock (active)      ${final.activeCollateralLocks}`);
+    console.log(`  CollateralLockReleased       ${JSON.stringify(final.collateralLockReleased)}`);
+    console.log(`  ReleaseDecision AUTHORIZED   ${final.authorizedReleaseDecisions}`);
+    const ledgerEnd = await client.ledgerEnd();
+    const version = await client.version().then((v) => v.version).catch(() => "unknown");
+    if (options.out) {
+      await mkdir(dirname(options.out), { recursive: true });
+      const document = { verifiedAt: new Date().toISOString(), namespace: ns, participant: state.participantId, cantonVersion: version, ledgerEnd, receipts, final, privacy: { unrelatedLenderCaseContracts: unrelatedSees, perTemplate: privacy } };
+      await writeFile(options.out, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+      console.log(`wrote ${options.out}`);
+    }
+    const ok = missing.length === 0 && final.activeAssetControl.length === 1 && final.activeCollateralLocks === 0 && final.collateralLockReleased.length >= 1 && final.authorizedReleaseDecisions >= 1 && !!unrelated && unrelatedSees === 0;
+    console.log(ok ? "VERIFIED" : "NOT VERIFIED");
+    return ok ? 0 : 1;
+  } finally {
+    await db.close();
+  }
+}
+
+/**
  * Read-only diagnosis (exit 0 = nothing to recover, 2 = a recovery case applies); with --new-run --yes also the
  * recovery itself: fresh run namespace, reset of the "devnet" projection source only (at the pruning offset when
  * the participant was pruned), bindings re-imported, clean-start bootstrap. Each step is skipped when already done.
@@ -449,6 +570,7 @@ const { values } = parseArgs({
     "run-ref": { type: "string" },
     "new-run": { type: "boolean", default: false },
     yes: { type: "boolean", default: false },
+    out: { type: "string" },
   },
   allowPositionals: false,
 });
@@ -476,12 +598,15 @@ try {
     case "verify-first-tx":
       process.exitCode = await verifyFirstTx();
       break;
+    case "verify-evidence":
+      process.exitCode = await verifyEvidence({ out: values.out });
+      break;
     case "recover":
       process.exitCode = await recover({ json: values.json, newRun: values["new-run"], yes: values.yes, runRef: values["run-ref"] });
       break;
     default:
       throw new CliError(
-        "usage: cli.ts db-setup | login | preflight [--json] | import-bindings [--run-ref <ref>] | bootstrap [--profile clean-start|main] [--skip-documents] | verify-first-tx | recover [--json] [--new-run --yes [--run-ref <ref>]]",
+        "usage: cli.ts db-setup | login | preflight [--json] | import-bindings [--run-ref <ref>] | bootstrap [--profile clean-start|main] [--skip-documents] | verify-first-tx | verify-evidence [--out <file>] | recover [--json] [--new-run --yes [--run-ref <ref>]]",
       );
   }
 } catch (error) {

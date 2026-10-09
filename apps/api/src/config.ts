@@ -1,4 +1,5 @@
 import { DevnetEnvSchema, devnetGuardIssues, publicEnvKeyLeaks } from "@collara/canton";
+import { recordingPersonaIssues } from "./recording-personas";
 import { z } from "zod";
 
 export const CollaraModeSchema = z.enum(["UI_MOCK", "LOCALNET", "DEVNET"]);
@@ -47,6 +48,12 @@ const ConfigSchema = z
     // Isolated demo sessions (POST /api/demo/sessions). Demo environments only, never production auth.
     DEMO_SESSIONS_ENABLED: envBool(false),
     DEMO_SESSIONS_ALLOW_IN_PRODUCTION: envBool(false),
+    // Local screen-recording only (src/recording-personas.ts): demo personas on the real DevNet ledger, loopback
+    // requests only. Off by default; scripts/devnet/record.mjs sets it for its own child processes, never a file.
+    DEVNET_RECORDING_PERSONAS: envBool(false),
+    // Read only to refuse the recording personas on public hosting (the embedded API runs inside Next on Vercel).
+    API_MODE: z.string().min(1).optional(),
+    VERCEL: z.string().min(1).optional(),
 
     // OIDC (Keycloak in dev; same names as scripts/infra/keycloak.mjs). Login is unavailable unless the
     // issuer and the client secret are set.
@@ -120,6 +127,7 @@ const ConfigSchema = z
         ctx.addIssue({ code: "custom", path: ["DEVNET_LEDGER_USER_ID"], message: "DEVNET_LEDGER_USER_ID is required (printed by node scripts/devnet/login.mjs)" });
       }
     }
+    for (const issue of recordingPersonaIssues(config)) ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
     if (config.STORAGE_UPLOAD_MODE === "presigned" && !config.COLLARA_S3_ENDPOINT) {
       ctx.addIssue({ code: "custom", path: ["STORAGE_UPLOAD_MODE"], message: "STORAGE_UPLOAD_MODE=presigned needs COLLARA_S3_ENDPOINT (S3-compatible storage)" });
     }

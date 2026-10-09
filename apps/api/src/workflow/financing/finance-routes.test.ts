@@ -2,7 +2,7 @@
 // 404-shaped responses for unrelated parties, policy/mandate refusals before anything is submitted, and writes
 // recorded as FAILED (503) because there is no ledger — never simulated.
 import { cases, importLocalnetState, projectOnce, type DbHandle } from "@collara/db";
-import { buildScenario, scenarioBindingState, scenarioParties, type ScenarioStage } from "@collara/db/testing";
+import { buildScenario, FakeLedger, scenarioBindingState, scenarioParties, type ScenarioStage } from "@collara/db/testing";
 import { COMMAND_COPY, ERROR_COPY, type PersonaId } from "@collara/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { idem, loginAs, seededDb, testApp, type TestApp } from "../../test-support";
@@ -10,7 +10,9 @@ import { idem, loginAs, seededDb, testApp, type TestApp } from "../../test-suppo
 async function scenarioApp(stage: ScenarioStage): Promise<{ t: TestApp; db: DbHandle }> {
   const db = await seededDb();
   await importLocalnetState(db.db, scenarioBindingState());
-  const { ledger } = buildScenario(stage);
+  // The routes use the real clock (authorization and proposal expiry), so the fixture starts an hour before now rather than
+  // at the FakeLedger's fixed default date, which would let AUTH-001 (7 days) expire while the suite is still in use.
+  const { ledger } = buildScenario(stage, new FakeLedger(Date.now() - 3_600_000));
   await projectOnce(db.db, ledger, { source: "sandbox", jsonApiUrl: "http://127.0.0.1:7575", parties: Object.values(scenarioParties()) });
   await db.db.insert(cases).values({
     caseRef: "CL-001",

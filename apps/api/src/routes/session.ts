@@ -15,12 +15,15 @@ import { z } from "zod";
 import { problems } from "../errors";
 import { actorFromAuthority } from "../plugins/actor";
 import { presentMe } from "../presenters";
+import { isLoopbackRequest } from "../recording-personas";
 import { recordAudit } from "../services/audit";
 
 export interface SessionRoutesOptions {
   readonly db: Db;
   readonly mode: RuntimeMode;
   readonly demoSessionsEnabled: boolean;
+  /** DevNet recording personas: only requests that provably came from this machine (recording-personas.ts). */
+  readonly loopbackOnly?: boolean;
 }
 
 /** GET /api/me */
@@ -40,9 +43,10 @@ export const meRoutes: FastifyPluginAsyncZod<{ mode: RuntimeMode }> = async (app
 };
 
 /** /api/demo/* — 404 unless DEMO_SESSIONS_ENABLED=true. Not a production authorization path. */
-export const demoRoutes: FastifyPluginAsyncZod<SessionRoutesOptions> = async (app, { db, mode, demoSessionsEnabled }) => {
-  app.addHook("onRequest", async () => {
+export const demoRoutes: FastifyPluginAsyncZod<SessionRoutesOptions> = async (app, { db, mode, demoSessionsEnabled, loopbackOnly = false }) => {
+  app.addHook("onRequest", async (request) => {
     if (!demoSessionsEnabled) throw problems.unavailable();
+    if (loopbackOnly && !isLoopbackRequest(request)) throw problems.unavailable();
   });
 
   app.get(

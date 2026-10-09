@@ -83,7 +83,8 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
   const demo = useQuery({
     queryKey: ["demo", "personas"],
     queryFn: ({ signal }) => client.demo.personas({ signal }),
-    enabled: mode === "LOCALNET",
+    // DEVNET asks too: the API answers 404 unless the local recording personas are on (recording-personas.ts).
+    enabled: mode === "LOCALNET" || mode === "DEVNET",
     staleTime: Infinity,
     retry: false,
   });
@@ -105,7 +106,7 @@ function LoginBody({ mode }: { mode: RuntimeMode }) {
     );
   }
 
-  const remote = mode === "LOCALNET" ? (demo.data ?? []).map((p) => demoPersonaOption(p)) : [];
+  const remote = (demo.data ?? []).map((p) => demoPersonaOption(p));
   return (
     <>
       <p className="text-[13.5px] leading-relaxed text-fg-muted">Access is by invitation during the pilot.</p>

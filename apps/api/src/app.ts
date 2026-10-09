@@ -238,12 +238,17 @@ export async function buildApp(options: BuildAppOptions) {
   await app.register(authRoutes, { prefix: "/api/auth", config, db: db.db, oidc, clock });
   await app.register(meRoutes, { prefix: "/api/me", mode: config.COLLARA_MODE });
   // DevNet viewers always come from the real OIDC account. Demo persona sessions are restricted
-  // to UI_MOCK/LOCALNET so connecting an account cannot mint an approver or operator role.
+  // to UI_MOCK/LOCALNET so connecting an account cannot mint an approver or operator role. The one exception is
+  // the local recording opt-in (DEVNET_RECORDING_PERSONAS, src/recording-personas.ts): validated at start and
+  // limited to loopback requests per request.
+  const recordingPersonas = config.COLLARA_MODE === "DEVNET" && config.DEVNET_RECORDING_PERSONAS;
+  if (recordingPersonas) app.log.warn("DEVNET recording personas are ON: demo persona sessions on the DevNet ledger, loopback requests only. Local recording only.");
   await app.register(demoRoutes, {
     prefix: "/api/demo",
     db: db.db,
     mode: config.COLLARA_MODE,
-    demoSessionsEnabled: config.COLLARA_MODE !== "DEVNET" && config.DEMO_SESSIONS_ENABLED,
+    demoSessionsEnabled: recordingPersonas || (config.COLLARA_MODE !== "DEVNET" && config.DEMO_SESSIONS_ENABLED),
+    loopbackOnly: recordingPersonas,
   });
   await app.register(pilotRoutes, {
     prefix: "/api/pilot-requests",

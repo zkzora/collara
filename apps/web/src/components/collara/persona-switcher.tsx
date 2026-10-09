@@ -75,14 +75,15 @@ export function PersonaSwitcher({ className, onSwitched }: { className?: string;
   const remote = useQuery({
     queryKey: ["demo", "personas"],
     queryFn: ({ signal }) => client.demo.personas({ signal }),
-    enabled: mode === "LOCALNET",
+    enabled: mode === "LOCALNET" || mode === "DEVNET",
     staleTime: Infinity,
     retry: false,
   });
 
   const options = mode === "UI_MOCK" ? mockPersonaOptions({ short: true }) : (remote.data ?? []).map((p) => demoPersonaOption(p, { short: true }));
   const selectedLabel = options.find((option) => option.id === me.personaId)?.label;
-  if (mode === "DEVNET" || (mode === "LOCALNET" && (remote.isError || options.length === 0))) return null;
+  // LOCALNET/DEVNET: only when the API offers personas (DEVNET: local recording opt-in; otherwise the API answers 404).
+  if ((mode === "LOCALNET" || mode === "DEVNET") && (remote.isError || options.length === 0)) return null;
 
   async function change(value: string) {
     const parsed = PersonaIdSchema.safeParse(value);
