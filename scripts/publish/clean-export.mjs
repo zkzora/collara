@@ -89,7 +89,7 @@ const REVIEWED = [
   { rule: "generic-api-key", file: "apps/worker/src/jobs/handlers/export.ts", why: "reads COLLARA_S3_SECRET_KEY from the environment, no value" },
   { rule: "generic-api-key", file: "docs/_research/research-canton.md", why: "a contractKeyHash from a throwaway local sandbox" },
   { rule: "generic-api-key", file: "docs/security/secret-audit-2026-10-04.md", why: "quotes the variable name above, no value" },
-  { rule: "generic-api-key", file: "render.yaml", why: "'- key: COLLARA_S3_BUCKET' (the word key, no value)" },
+  { rule: "generic-api-key", file: "render.yaml", why: "a YAML field called key that names the bucket variable; no value" },
 ];
 const gitleaks = process.env.GITLEAKS_BIN ?? "gitleaks";
 const reportPath = join(tmpdir(), `collara-gitleaks-${process.pid}.json`);
