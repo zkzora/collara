@@ -1,0 +1,43 @@
+# Keeps the Supabase Free project `collara` (DevNet scratch database) from being paused for inactivity:
+# one read-only `select 1` a day through the session pooler. It was paused once on 2026-10-16.
+#
+# Secret SUPABASE_KEEPALIVE_DATABASE_URL: libpq URL for the session pooler (no node-only params such as
+# uselibpqcompat). The repo is public, so this job prints nothing about the database.
+# GitHub disables scheduled workflows after 60 days without repository activity; re-enable from the Actions tab.
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Ping database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Install psql if missing
+        run: command -v psql >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client)
+
+      - name: select 1
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_KEEPALIVE_DATABASE_URL }}
+          PGCONNECT_TIMEOUT: "20"
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_KEEPALIVE_DATABASE_URL is not set"; exit 1; fi
+          for attempt in 1 2 3; do
+            if psql "$DATABASE_URL" -X -q -tA -v ON_ERROR_STOP=1 -c 'select 1' >/dev/null 2>&1; then
+              echo "ok (attempt $attempt)"; exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::database not reachable after 3 attempts (paused? restore it from the Supabase dashboard)"
+          exit 1
